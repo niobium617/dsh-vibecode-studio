@@ -1,6 +1,6 @@
 # VibeCoding Studio — Phase 2 实现计划
 
-> 状态：**已批准（2026-10-25；Plan gate 通过，Phase 3 任务清单已批准，执行中：T001 完成）**
+> 状态：**已批准（2026-10-25；Plan gate 通过，Phase 3 任务清单已批准，执行中：T001、T002 完成）**
 > 日期：2026-10-25
 > 输入：[已批准 SPEC](../docs/SPEC-vibecoding-studio.md) + [已批准能力地图](../docs/CAPABILITY-MAP.md)
 > 产品决策：SPEC 第 11 节 Q1–Q10 的推荐项已随“批准”锁定，本计划不再重开产品范围。
@@ -35,8 +35,8 @@ MVP 的完成定义（与 SPEC 第 2.3 节一致）：
 | D2 | 构建 | Host 用 TS→ESM；Client 用 `tsdown`/rolldown 产出 loader 包装的 `lib/client.js`；失败则回退 esbuild + 手写 CJS 包装，再失败则参考已安装包的 bundle 结构做最小手写 `client.js` | DSH client 只认 `window.__ModuleLoader__.load({ id, factory })`；必须自己保证格式 | M1 hello-world 能被 DSH 加载 |
 | D3 | 预览帧传输 | **MVP 以流式 multipart JPEG 为主**（`GET` `/api/vibe/stream`），保留拉取式 `/api/vibe/frame` 作为断流/降级回退 | S1 已证明两种 profile 的流式均稳定 30 fps；流式延迟更低（Web 1.0 vs 2.7 ms，Desktop 1.6 vs 3.1 ms）且无 seq gap；帧格式/seq/健康检查共用，切换不改上层接口 | S1 对比（[REPORT](../spikes/s1/REPORT.md)） |
 | D4 | 输入通道 | 点击/滚轮/键盘/文本走精确 fetch 的一元请求；指针悬停由页面内拾取脚本处理，不走 Host 往返 | 避免 60 Hz 往返；降低延迟 | S3 输入延迟测试 |
-| D5 | 标注发送 | 只调用 composer 的公开 `InputActions` / `ctx.conversation`；拿不到就复制到剪贴板并提示 | 不自动发送、不逆向私有 store | S2 |
-| D6 | 截图附件 | 仅当 S2 找到公开附件路径时启用；否则 MVP 只做“复制截图 + 手动粘贴” | 不把产品堵在私有 API 上 | S2 |
+| D5 | 标注发送 | 只调用 composer 的公开 `InputActions` / `ctx.conversation`；拿不到就复制到剪贴板并提示 | 不自动发送、不逆向私有 store | S2：`conversation.input.left` + 公开 `inputActions` 在 Web/Desktop 通过（[REPORT](../spikes/s2/REPORT.md)） |
+| D6 | 截图附件 | **MVP 只做“复制截图 + 手动粘贴”**；spike 虽能触达 `createDrafts`，但它不在公开 `IConversation`，且附件 id 跨会话会丢失，不启用直接附件 | 不把产品堵在私有 API 上；回退路径已验证 | S2（[REPORT](../spikes/s2/REPORT.md)） |
 | D7 | 配置校验 | 插件配置用 `@deepseek-ai/schemastery`；持久化 JSON 用手写校验 + 单测 | 与 DSH 生态一致；不引入第二套 schema 运行时 | M1/M4 单测 |
 | D8 | API Cookie | MVP 只支持手动 `Cookie` header；P1 再加 jar | 少一个依赖，先覆盖联调主路径 | M4 验收 |
 | D9 | OpenAPI 远程 ref | 默认只允许本地文件与 localhost；其他来源必须确认 | 防 SSRF | S7 |

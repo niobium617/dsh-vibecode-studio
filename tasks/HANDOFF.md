@@ -2,13 +2,13 @@
 
 > 更新时间：2026-10-25
 > 用途：清理/切换对话后，新会话从这里恢复，不依赖旧聊天记录。
-> 当前阶段：**Phase 4 实现（Tasks gate 已通过）**；T001 S1 传输 spike 已完成，下一项 T002；尚未写产品代码。
+> 当前阶段：**Phase 4 实现（Tasks gate 已通过）**；T001 S1 传输、T002 S2 composer handoff spike 已完成，下一项 T003；尚未写产品代码。
 
 ---
 
 ## 1. 一句话状态
 
-DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、实现计划，任务清单已批准。**T001 S1 传输 spike 已通过**：Web 与 Desktop 的 pull/stream 均达到 30 fps，10 min stream soak 无断流，选定 stream 为主、pull 为回退。证据见 `spikes/s1/REPORT.md`；下一步从 `T002 S2 composer handoff spike` 继续。
+DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、实现计划，任务清单已批准。**T001 S1 传输 spike 已通过**：Web 与 Desktop 的 pull/stream 均达到 30 fps，10 min stream soak 无断流，选定 stream 为主、pull 为回退。证据见 `spikes/s1/REPORT.md`。**T002 S2 composer handoff spike 已通过**：右栏通过 `conversation.input.left` 的公开 `inputActions` 写入文本，不自动提交；文本/PNG 剪贴板在 Web/Desktop 可用；`createDrafts` 非公开且附件跨会话丢失，MVP 只做剪贴板回退。证据见 `spikes/s2/REPORT.md`；下一步从 `T003 S3 screencast + 输入 + 中文 spike` 继续。
 
 ---
 
@@ -30,7 +30,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 | Phase 1 SPEC | `docs/SPEC-vibecoding-studio.md` | 已批准（2026-10-25） |
 | Phase 2 计划 | `tasks/plan.md` | 已批准（2026-10-25） |
 | Phase 3 任务 | `tasks/todo.md` | 已批准（2026-10-25） |
-| Phase 4 实现 | `spikes/s1/`、`packages/`（后续） | 进行中（T001 完成；下一项 T002） |
+| Phase 4 实现 | `spikes/s1/`、`spikes/s2/`、`packages/`（后续） | 进行中（T001、T002 完成；下一项 T003） |
 
 任务清单已获批准，按 `tasks/todo.md` 顺序执行；如果发现计划假设不成立，先更新 `plan.md`/SPEC，再继续，不要静默改范围。
 
@@ -39,7 +39,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 ## 4. 下一步
 
 1. 任务清单已于 2026-10-25 批准，不再重复评审。
-2. T001 已完成并记录验证结果；新会话从 **T002 S2 composer handoff spike** 开始。
+2. T001、T002 已完成并记录验证结果；新会话从 **T003 S3 screencast + 输入 + 中文 spike** 开始。
 3. 每个任务完成即勾选，并在任务下记录验证结果；G0–G6 门禁通过后才进入下一阶段。
 4. 代码与文档按任务分批提交；私有仓库公开前按 `docs/PUBLISHING.md` 清理机器路径与历史。
 
@@ -49,7 +49,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 
 ```
 读 tasks/HANDOFF.md，
-任务清单已批准，T001 已完成；从 T002 S2 composer handoff spike 开始。
+任务清单已批准，T001、T002 已完成；从 T003 S3 screencast + 输入 + 中文 spike 开始。
 按 tasks/todo.md 顺序执行，每个任务完成后勾选并记录验证结果。
 ```
 
@@ -87,7 +87,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 - 预览用 Playwright/CDP + Edge；拾取 overlay 注入；源码适配 React/Vue/Svelte。
 - 标注文本优先 ≤ 4 KB；`vibe_observe` ≤ 8 KB；大内容用 artifact id。
 - API 工作台 MVP：请求构建/响应查看/集合/环境/历史/cURL/OpenAPI 导入/抓包回放；断言为 P1。
-- MVP 不做小程序/原生桌面/区域多选/截图附件（除非 S2 通过）。
+- MVP 不做小程序/原生桌面/区域多选/直接截图附件；S2 未找到可依赖的公开附件 API，截图只走“复制 + 手动粘贴”。
 - Agent 集成：4 个工具 + `/vibe` + bundled skill + 最小 preset + hooks。
 
 ---
@@ -103,4 +103,4 @@ pnpm test:e2e
 dsh --profile vibe-dev --dump-config
 ```
 
-> T001 已运行 `pnpm typecheck`、`pnpm spike:s1` 与 `spikes/s1/soak.mjs`；`pnpm test` / `pnpm build` / `pnpm test:e2e` 等产品脚手架命令在 T004 之后逐步可用。
+> T001 已运行 `pnpm typecheck`、`pnpm spike:s1` 与 `spikes/s1/soak.mjs`；T002 已运行 `pnpm typecheck`、`pnpm spike:s2:build` 并完成 Web/隔离 Desktop 手测。`pnpm test` / `pnpm build` / `pnpm test:e2e` 等产品脚手架命令在 T004 之后逐步可用。

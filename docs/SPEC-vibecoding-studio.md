@@ -30,7 +30,7 @@
 | 网页实时预览（嵌入 DSH 右栏） | **可行** | 高 | Playwright CDP `Page.startScreencast` + `Input.*` |
 | 元素/区域圈选 | **可行** | 高 | 注入 overlay + `page.exposeBinding`；react-grab 已验证同类路径 |
 | 组件栈/源码定位 | **可行（React/Vue/Svelte 开发态）** | 中高 | React fiber `_debugSource`、Vue `__file`、Svelte `__svelte_meta`；生产态回退选择器 |
-| 标注送入对话输入框 | **可行** | 中高 | `InputActions.setDraft` / `ctx.conversation.send`；截图附件路径需 spike |
+| 标注送入对话输入框 | **可行** | 高 | S2：右栏通过 `conversation.input.left` 取得公开 `inputActions`；文本已通过；截图附件走剪贴板 |
 | 截图给模型看 | **条件可行** | 中 | 用户消息可带图片；工具结果不可假设模型能“看到”图片 |
 | API 工作台 | **可行** | 高 | Host 侧 `fetch` + OpenAPI 解析 + CDP Network 抓包 |
 | 前后端联调（抓包/回放/CORS 诊断） | **可行** | 高 | 预览侧真实浏览器请求 + Host 侧请求重放 |
@@ -525,7 +525,7 @@ skills/…                       → bundled skills
 | 打开 tab | `ctx.sidebarRight.openTab(kind, options)` | 已验证 | 可从 guide/命令调用 |
 | Host↔UI 一元调用 | 精确 `/api/...` fetch route（`ctx.connection.fetch.register`） | **S1 修正**：`rpc.handle` 在本版本对第三方插件会报 `cannot get property "webServer" without inject`；改用 fetch route | 认证、Web/Desktop 通用 |
 | Host→UI 帧/流 | `ctx.connection.fetch.register`：`/api/vibe/stream` 流式 + `/api/vibe/frame` pull | **S1 已验证**：两种 profile 均 30 fps；stream 延迟更低、0 seq gap | 精确路由，认证，Desktop 友好；客户端用文档相对路径 |
-| 标注进 composer | `InputActions.setDraft` / `ctx.conversation.send` | 类型已验证；**右栏可达性待 spike** | 文本可行；附件待验证 |
+| 标注进 composer | `conversation.input.left` 的 `inputActions.setDraft` / `insertText` | **S2 已验证**：右栏可达；Web/Desktop 文本写入成功，无自动提交 | 不 import 私有 store；`createDrafts` 不在公开 `IConversation`，附件走剪贴板 |
 | 密钥 | `ctx.credentials.resolve/set/describe` | 已验证 | 环境文件只存引用 |
 | 工具 | `ctx.tools.register(defineTool(...))` | 已验证 | 需 preset 组合才可见 |
 | 命令 | `ctx.commands.register({ definitionId, name, description, handler })` | 已验证 | handler 参数是 `invocation` |
@@ -555,7 +555,7 @@ skills/…                       → bundled skills
 | # | Spike | 目标 | 通过标准 | 失败回退 |
 |---|---|---|---|---|
 | S1 | 传输 | Web/Desktop 下，`ctx.connection` 的 exact fetch route 能否稳定推流 JPEG/SSE | **已完成**：两种 profile 均 30 fps 收到帧；切 tab 可恢复；10 min stream soak 见 [REPORT](../spikes/s1/REPORT.md) | 改用 pull 长轮询 `/api/vibe/frame?wait=1&after=<seq>`，5–10 fps |
-| S2 | Composer handoff | 从右栏 tab 把文本 +（可选）截图附件放进当前会话 composer | 文本 100% 成功；截图在支持的路由下成功 | 仅文本；截图走剪贴板手动粘贴 |
+| S2 | Composer handoff | 从右栏 tab 把文本 +（可选）截图附件放进当前会话 composer | **已完成**：文本写入成功且不自动提交；文本/PNG 剪贴板可用；`createDrafts` 非公开，直接附件不产品化（[REPORT](../spikes/s2/REPORT.md)） | MVP 仅文本；截图走剪贴板手动粘贴 |
 | S3 | Screencast + 输入 | Edge headless/headful 的 screencast、点击、滚动、键盘、中文输入 | 常见表单可填写；中文组合输入可用 | 外部浏览器打开 + 只读预览 |
 | S4 | 拾取 + 源码 | 注入 overlay，React/Vue/Svelte 各取 10 个元素的源码 | ≥ 80% 命中；无页面副作用 | 选择器 + DOM；源码标记“不可用” |
 | S5 | Electron/Tauri attach | 带调试端口启动，`connectOverCDP` 成功 | 能看到画面、执行 JS、抓网络 | 标记“不支持”，不阻塞 Web |

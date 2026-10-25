@@ -2,7 +2,7 @@
 
 > A visual feedback loop for **DeepSeek Harness**: preview your local web app inside DSH, point at what is wrong, and hand structured notes to the coding agent — no screenshot ping-pong.
 
-**Status: pre-alpha.** This repository is in the spike phase. Nothing is installable as a product yet; the only working code is the S1 transport experiment under `spikes/s1/`. S1 is complete: Web and Desktop both sustain 30 fps over 10-minute stream soaks, with pull retained as a fallback (see the [transport report](spikes/s1/REPORT.md)).
+**Status: pre-alpha.** This repository is in the spike phase. Nothing is installable as a product yet; the only working code is under `spikes/`. S1 is complete: Web and Desktop both sustain 30 fps over 10-minute stream soaks, with pull retained as a fallback (see the [transport report](spikes/s1/REPORT.md)). S2 is complete: a sidebar tab reaches the current composer through public `inputActions`, inserts editable text without sending, and falls back to the clipboard for screenshots because direct attachment creation is not public API (see the [composer report](spikes/s2/REPORT.md)).
 
 [中文简介](#中文简介) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md)
 
@@ -24,7 +24,7 @@ The agent stays in control. Notes are prepared for the composer; nothing is sent
 - Localhost-only embedded preview with a streaming JPEG transport and a pull-JPEG fallback (S1 verified both; see the [transport report](spikes/s1/REPORT.md)).
 - Element picker and annotation overlay rendered above the live preview.
 - Batch annotation tray with review before handoff.
-- Composer handoff that inserts a structured, editable message.
+- Composer handoff that inserts a structured, editable message; screenshots use a copy-and-paste fallback until DSH exposes a public attachment API.
 - Session-scoped page tabs for multi-page flows.
 - Credentials never reach the page; UI only reads `describe` metadata.
 
@@ -35,9 +35,10 @@ docs/        product spec, capability map, DSH ecosystem notes
 tasks/       implementation plan, ordered task list, handoff state
 spikes/
   s1/        T001 transport spike: pull JPEG vs multipart stream
+  s2/        T002 composer handoff spike: public InputActions + clipboard fallback
 ```
 
-The product package will arrive in `packages/` after the spike gates pass. Until then, `spikes/s1/` is the only executable code.
+The product package will arrive in `packages/` after the spike gates pass. Until then, `spikes/` is the only executable code.
 
 ## Development
 
@@ -46,14 +47,15 @@ Requirements: Node.js 24, pnpm 11, and DeepSeek Harness `0.2.1-rc.2` or newer fo
 ```bash
 pnpm install
 pnpm typecheck
-pnpm spike:s1:build          # bundle host/client (required before linking)
+pnpm spike:s1:build          # bundle S1 host/client (required before linking)
 pnpm spike:s1                # local 10 s pull-vs-stream benchmark
 node spikes/s1/soak.mjs ...  # 10 min Web/Desktop soak; see spikes/s1/REPORT.md
+pnpm spike:s2:build          # bundle S2 host/client (required before linking)
 ```
 
-`spikes/s1/package/lib/` is generated and gitignored. Run `pnpm spike:s1:build` before `dsh plugin --profile vibe-dev add link:spikes/s1/package`; otherwise DSH links a package with no host/client entry points. Do not rebuild the linked package while a benchmark or soak is running; DSH hot-reloads the client and invalidates the measurement.
+`spikes/s1/package/lib/` and `spikes/s2/package/lib/` are generated and gitignored. Build before linking with `dsh plugin --profile vibe-dev add link:<absolute-path>`; otherwise DSH links a package with no host/client entry points. Do not rebuild a linked package while a benchmark, soak, or manual acceptance run is active; DSH hot-reloads the client and invalidates the result. S2 manual steps and its clipboard limitations are in [spikes/s2/run.md](spikes/s2/run.md).
 
-The S1 spike installs into a throwaway DSH profile (`vibe-dev`); it must never be installed into `desktop` or `web` directly.
+The spikes install into a throwaway DSH profile (`vibe-dev`); they must never be installed into `desktop` or `web` directly.
 
 ### Engineering guardrails
 
@@ -71,7 +73,7 @@ Early-stage contributions are welcome, especially protocol and transport reviews
 
 ## 中文简介
 
-DSH Vibecode Studio 是 DeepSeek Harness 的可视化 Vibe Coding 插件：在侧栏里预览本地 Web 应用，直接点选元素并写下修改意见，再把这些结构化批注交给编码 Agent。当前处于 pre-alpha 阶段，仓库里只有 S1 传输 spike 可以运行；预览、标注、批注箱与 composer 交接会在后续任务中逐步落地。
+DSH Vibecode Studio 是 DeepSeek Harness 的可视化 Vibe Coding 插件：在侧栏里预览本地 Web 应用，直接点选元素并写下修改意见，再把这些结构化批注交给编码 Agent。当前处于 pre-alpha 阶段，仓库里只有 S1 传输与 S2 composer 交接 spike 可以运行；预览、标注与批注箱会在后续任务中逐步落地。
 
 ## License
 

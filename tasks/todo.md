@@ -32,12 +32,13 @@
 - **文件**：`spikes/s1/{host,client,run.ts,soak.mjs,REPORT.md}`。
 - **验证结果（2026-10-25）**：`pnpm typecheck` 与 `pnpm spike:s1` 通过（pull 301 帧 / stream 300 帧，30 fps，0 gap/error）；Web 与隔离 Desktop 的 30 s pull/stream 验收均为 900–901 帧、30 fps、0 gap/错误/重连/丢帧，切 tab 后 canvas 恢复，metrics POST `saved: true`；10 min stream soak 为 Web 18,001 帧 / Desktop 18,000 帧、30 fps、0 断流/错误/重连，`packageChanged: false`，client/host 内存净增 < 2 MB。证据见 `spikes/s1/REPORT.md`；选型 stream 为主、pull 回退（Plan D3 已更新）。
 
-### - [ ] T002 S2 composer handoff spike [P]
+### - [x] T002 S2 composer handoff spike [P]
 
 - **目标**：从右栏 tab 把文本（和可选截图）放进当前会话 composer，且不自动发送。
 - **验收**：文本路径 100% 成功；不自动提交；截图成功或剪贴板回退可用；不 import 私有 store。
 - **验证**：手动 Web/Desktop；`spikes/s2/REPORT.md` 记录可用 API 路径与限制。
-- **文件**：`spikes/s2/{client.tsx,run.md,REPORT.md}`。
+- **文件**：`spikes/s2/{client.tsx,host.ts,build.ts,package/,run.md,REPORT.md}`。
+- **验证结果（2026-10-25）**：`pnpm typecheck` 与 `pnpm spike:s2:build` 通过；Web（`vibe-dev`）和隔离 Desktop 均通过 `conversation.input.left` 的公开 `inputActions` 完成 111 字符 `setDraft`、用户键盘编辑、光标 `insertText`，等待 2 s 后 `phase` 仍为 `plain` 且草稿完整，未自动提交；文本/PNG 剪贴板在两端均可用（Web 读出 `image/png`，Desktop 不透明 origin 无法 CDP 授权但 Electron 剪贴板正常）；console error 为 0。Web 跨会话文本隔离通过，但附件 id 切走再切回后丢失。`createDrafts` + `addAttachments` 在两端返回 accepted，但 `createDrafts` 不在公开 `IConversation`，D6 保持仅剪贴板回退。证据见 `spikes/s2/REPORT.md`。
 
 ### - [ ] T003 S3 screencast + 输入 + 中文 spike [P]
 
