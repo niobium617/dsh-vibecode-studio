@@ -7,15 +7,19 @@ DSH Vibecode Studio is in the spike phase. Small, well-scoped changes with evide
 1. Install Node.js 24 and pnpm 11.
 2. Run `pnpm install`.
 3. Run `pnpm typecheck`.
-4. Run `pnpm spike:s1 --seconds 10` to exercise the current transport spike.
+4. Run `pnpm spike:s1:build` to bundle the spike host/client.
+5. Run `pnpm spike:s1` to exercise the current transport spike.
+6. For the 10-minute transport soak, use `spikes/s1/soak.mjs`; do not rebuild `package/lib` while it runs. See `spikes/s1/REPORT.md` for the commands.
 
-Manual DSH runs use a throwaway profile such as `vibe-dev`. Do not modify the `desktop` or `web` profiles directly.
+`spikes/s1/package/lib/` is generated and gitignored, so build before linking the package into a profile. Manual DSH runs use a throwaway profile such as `vibe-dev`. Do not modify the `desktop` or `web` profiles directly. Do not rebuild a linked spike package while a Web/Desktop benchmark or soak is running: DSH hot-reloads the client bundle and the running measurement is discarded.
+
+For unfamiliar functionality, first survey actively maintained GitHub projects with a clear license. Compare their design, dependencies, and known issues; prefer proven approaches, but do not copy incompatible or unverified code. Validate the chosen approach against this project and record the comparison in the task or spike notes.
 
 ## Before opening a pull request
 
 - Keep changes focused; split unrelated refactors out.
 - `pnpm typecheck` passes.
-- `pnpm spike:s1 --build-only` produces both bundles.
+- `pnpm spike:s1:build` produces both bundles.
 - If transport or timing behavior changed, include the benchmark output in the PR description.
 - Update the relevant task line and verification note in `tasks/todo.md` when a planned task is finished.
 - If a plan assumption turns out to be wrong, update `docs/SPEC-vibecoding-studio.md` and `tasks/plan.md` first. Do not silently change scope.

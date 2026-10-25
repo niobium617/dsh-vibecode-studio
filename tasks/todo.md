@@ -14,7 +14,7 @@
 
 ## 0. 全局约定
 
-- 包名：`dsh-vibecode-studio`；目录：`F:\Project\DSH_vibecode_studio`。
+- 包名：`dsh-vibecode-studio`；目录：仓库根目录（以下命令均从仓库根执行）。
 - 开发 profile：`vibe-dev`；**不直接修改用户 `desktop` profile**。
 - 所有 host/client 通信走 `ctx.connection`；不裸用 `ctx.webServer`。
 - 所有页面/接口内容按不可信数据处理；密钥只走 `ctx.credentials`。
@@ -24,12 +24,13 @@
 
 ## M0：Spike Gate（阻塞 M1）
 
-### - [ ] T001 S1 传输 spike [P]
+### - [x] T001 S1 传输 spike [P]
 
 - **目标**：最小 host+client 插件，比较拉取式 JPEG 与流式帧在 DSH Web/Desktop 的稳定性。
 - **验收**：两种 profile 都能 ≥ 10 fps（1280×800，JPEG q70）；30 s 不断流；切 tab 可恢复；报告给出最终选择。
 - **验证**：`pnpm tsx spikes/s1/run.ts` + 手动 Web/Desktop；`spikes/s1/REPORT.md` 含 fps/内存/延迟表。
-- **文件**：`spikes/s1/{host,client,run.ts,REPORT.md}`。
+- **文件**：`spikes/s1/{host,client,run.ts,soak.mjs,REPORT.md}`。
+- **验证结果（2026-10-25）**：`pnpm typecheck` 与 `pnpm spike:s1` 通过（pull 301 帧 / stream 300 帧，30 fps，0 gap/error）；Web 与隔离 Desktop 的 30 s pull/stream 验收均为 900–901 帧、30 fps、0 gap/错误/重连/丢帧，切 tab 后 canvas 恢复，metrics POST `saved: true`；10 min stream soak 为 Web 18,001 帧 / Desktop 18,000 帧、30 fps、0 断流/错误/重连，`packageChanged: false`，client/host 内存净增 < 2 MB。证据见 `spikes/s1/REPORT.md`；选型 stream 为主、pull 回退（Plan D3 已更新）。
 
 ### - [ ] T002 S2 composer handoff spike [P]
 
@@ -102,8 +103,8 @@
 
 ### - [ ] T011 Connection 传输骨架
 
-- **目标**：host `rpc.handle('/vibe')` + `fetch.register('/vibe/health')`；client call/fetch；Web/Desktop 都通。
-- **验收**：health 返回；未认证/跨源被拒；Desktop 可用。
+- **目标**：host 用 `fetch.register` 注册精确 `/api/vibe/*` 路由（health + 一元请求）；client 用文档相对 `fetch`；不使用 `rpc.handle`（S1 已证第三方插件会因缺少 `webServer` inject 失败）；Web/Desktop 都通。
+- **验收**：health 返回；一元请求成功；未认证/跨源被拒；Desktop 可用。
 - **验证**：手动 Web/Desktop；`pnpm test -- tests/integration/transport`。
 - **文件**：`src/host/transport/*`、`src/client/transport/*`。
 
@@ -171,10 +172,10 @@
 
 ### - [ ] T020 Screencast + 帧路由 + canvas
 
-- **目标**：CDP `Page.startScreencast`；最新帧 + seq；`GET /vibe/frame`；client canvas 渲染；拉取基线。
-- **验收**：Web ≥ 10 fps；Desktop 手动通过（或记录 S1 回退）；无内存泄漏。
+- **目标**：CDP `Page.startScreencast`；最新帧 + seq；用精确 `/api/vibe/stream`（multipart JPEG）为主通道，`/api/vibe/frame?wait=1&after=<seq>` 为回退；client canvas 渲染；断流后切 pull，恢复后切回 stream。
+- **验收**：Web ≥ 10 fps；Desktop 手动通过；模拟断流可回退且无内存泄漏。
 - **验证**：`pnpm test -- tests/integration/frames` + 手动 Web/Desktop。
-- **文件**：`src/host/preview/{screencast,frame-buffer,route}.ts`、`src/client/preview/Canvas.tsx`、tests。
+- **文件**：`src/host/preview/{screencast,frame-buffer,route}.ts`、`src/client/preview/{Canvas.tsx,transport.ts}`、tests。
 
 ### - [ ] T021 输入转发（点击/滚轮/键盘）
 

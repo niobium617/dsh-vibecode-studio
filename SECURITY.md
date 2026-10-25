@@ -14,7 +14,7 @@ Include the affected component, reproduction steps, impact, and any suggested mi
 
 - The preview is a localhost surface first. Non-local targets are rejected unless the user explicitly approves them.
 - `file:`, `chrome:`, `devtools:`, cloud metadata endpoints, and private-network targets are blocked by default.
-- The preview page is untrusted content. Host APIs are exposed only through narrow `ctx.connection` routes and unary RPC channels.
+- The preview page is untrusted content. Host APIs are exposed only through narrow, exact `ctx.connection` fetch routes.
 - Credentials stay in `ctx.credentials`; the browser bundle never receives secret values, only `describe` metadata.
 - CDP attaches only to an already-started, approved endpoint and is never exposed to the network.
 - Annotation handoff is explicit. The plugin does not send, approve, commit, or run anything on its own.

@@ -2,9 +2,9 @@
 
 ## 需求与可行性设计（Phase 0 / Phase 1）
 
-> 状态：**已批准（2026-10-25）；Phase 0/1 完成，进入 Phase 2 计划**
+> 状态：**已批准（2026-10-25）；Phase 4 实现中，T001 S1 传输 spike 已完成**
 > 日期：2026-10-25
-> 项目：`F:\Project\DSH_vibecode_studio`
+> 项目：`<repo>`
 > 关联：[DSH 插件生态逆向分析](./dsh-plugin-ecosystem-analysis.md)
 > 目标宿主：DeepSeek Harness `0.2.1-rc.2`（本机），Node `24.13.0`，pnpm `11.21.0`
 > 本阶段只回答两件事：**要做什么、能不能做**。技术方案只到架构边界；详细实现计划在批准后另写。
@@ -523,8 +523,8 @@ skills/…                       → bundled skills
 |---|---|---|---|
 | 右栏 tab | `ctx.sidebarRightTabs.register` + `ctx.slots.register({ name: 'sidebar.right.pane.tab' })` | 已验证 | `keepMounted`、全屏、guide |
 | 打开 tab | `ctx.sidebarRight.openTab(kind, options)` | 已验证 | 可从 guide/命令调用 |
-| Host↔UI 一元调用 | `ctx.connection.rpc.handle('/vibe', handler)` + 客户端 `ctx.connection.rpc.call` | 已验证类型 | 认证、Web/Desktop 通用 |
-| Host→UI 帧/流 | `ctx.connection.fetch.register({ path, methods, requestBody, fetch })` | 已验证类型；**流式待 spike** | 精确路由，认证，Desktop 友好 |
+| Host↔UI 一元调用 | 精确 `/api/...` fetch route（`ctx.connection.fetch.register`） | **S1 修正**：`rpc.handle` 在本版本对第三方插件会报 `cannot get property "webServer" without inject`；改用 fetch route | 认证、Web/Desktop 通用 |
+| Host→UI 帧/流 | `ctx.connection.fetch.register`：`/api/vibe/stream` 流式 + `/api/vibe/frame` pull | **S1 已验证**：两种 profile 均 30 fps；stream 延迟更低、0 seq gap | 精确路由，认证，Desktop 友好；客户端用文档相对路径 |
 | 标注进 composer | `InputActions.setDraft` / `ctx.conversation.send` | 类型已验证；**右栏可达性待 spike** | 文本可行；附件待验证 |
 | 密钥 | `ctx.credentials.resolve/set/describe` | 已验证 | 环境文件只存引用 |
 | 工具 | `ctx.tools.register(defineTool(...))` | 已验证 | 需 preset 组合才可见 |
@@ -536,7 +536,7 @@ skills/…                       → bundled skills
 | 预览浏览器 | 无内置；用 `playwright-core` | 已验证 npm 包 | 用本机 Edge，不下载 Chromium |
 | 小程序 | 无内置；用 `miniprogram-automator` | 已验证 API | 需微信开发者工具 |
 
-> **不要用** `ctx.webServer.register` 作为首选：它没有应用层认证，Desktop 走的是另一套传输。`ctx.connection` 才是插件应使用的认证通道。客户端访问 exact route 用同源 `fetch()`（Desktop 由 shell 的 fetch 桥接承载）；一元调用优先走 `ctx.connection.rpc.call()`，避免自己拼信封。
+> **不要用** `ctx.webServer.register` 作为首选：它没有应用层认证，Desktop 走的是另一套传输。`ctx.connection` 才是插件应使用的认证通道。客户端访问 exact route 用同源 `fetch()`（Desktop 由 shell 的 fetch 桥接承载），路径必须是文档相对形式（`api/...`）。一元调用也优先用 exact fetch route；不要自建 `ctx.connection.rpc.handle` channel，S1 已确认它在第三方插件中会报 `cannot get property "webServer" without inject`。
 
 ### 5.9 与现有生态的差异
 
@@ -554,7 +554,7 @@ skills/…                       → bundled skills
 
 | # | Spike | 目标 | 通过标准 | 失败回退 |
 |---|---|---|---|---|
-| S1 | 传输 | Web/Desktop 下，`ctx.connection` 的 exact fetch route 能否稳定推流 JPEG/SSE | Desktop + Web 都能 10 fps 收到帧；断线可恢复 | 改为短轮询 `/frame?seq=`，5–10 fps |
+| S1 | 传输 | Web/Desktop 下，`ctx.connection` 的 exact fetch route 能否稳定推流 JPEG/SSE | **已完成**：两种 profile 均 30 fps 收到帧；切 tab 可恢复；10 min stream soak 见 [REPORT](../spikes/s1/REPORT.md) | 改用 pull 长轮询 `/api/vibe/frame?wait=1&after=<seq>`，5–10 fps |
 | S2 | Composer handoff | 从右栏 tab 把文本 +（可选）截图附件放进当前会话 composer | 文本 100% 成功；截图在支持的路由下成功 | 仅文本；截图走剪贴板手动粘贴 |
 | S3 | Screencast + 输入 | Edge headless/headful 的 screencast、点击、滚动、键盘、中文输入 | 常见表单可填写；中文组合输入可用 | 外部浏览器打开 + 只读预览 |
 | S4 | 拾取 + 源码 | 注入 overlay，React/Vue/Svelte 各取 10 个元素的源码 | ≥ 80% 命中；无页面副作用 | 选择器 + DOM；源码标记“不可用” |
@@ -581,7 +581,7 @@ skills/…                       → bundled skills
 │  └──────────────▲───────────────┘   │  Verify | Settings │  │
 │                 │ annotation text   └─────────┬──────────┘  │
 │                 │                             │             │
-│                 │                    ctx.connection RPC/fetch│
+│                 │                 ctx.connection fetch route│
 └─────────────────┼─────────────────────────────┼─────────────┘
                   │                             │
 ┌─────────────────┼─────────────────────────────┼─────────────┐
@@ -837,7 +837,7 @@ export interface TargetAdapter {
 | 层级 | 工具 | 覆盖 |
 |---|---|---|
 | 单元 | Vitest | 选择器生成、标注序列化/预算、OpenAPI 映射、脱敏、变量解析 |
-| 集成 | Vitest + 假 adapter / 本地 fixture server | 目标生命周期、帧流、RPC、错误恢复 |
+| 集成 | Vitest + 假 adapter / 本地 fixture server | 目标生命周期、帧流、一元请求、错误恢复 |
 | 组件 | React Testing Library | 标注卡、API 表单、空/错状态 |
 | E2E | Playwright + Vite demo | 打开 Studio → 拾取 → 标注 → 发送 → 预览可见 |
 | 手工 | Windows 11 + Edge + DSH Web/Desktop | 输入法、全屏、切 tab、进程清理 |
@@ -901,7 +901,7 @@ export interface TargetAdapter {
 |---|---|---|---|
 | 范围膨胀成 Apifox | 高/高 | MVP 切分写死；新需求进 P1/P2 | 开始讨论团队协作/Mock |
 | 模型无视觉 | 高/高 | 文本自包含；截图可选 | 附件发送失败/模型忽略图片 |
-| Desktop 流式传输不通 | 中/高 | 轮询回退；S1 先验 | 帧延迟/断流 |
+| Desktop 流式传输不通 | 低/高 | 轮询回退；S1 已验证 30 fps、切 tab 可恢复；真实断线与 pull 回退由 M2 验证 | 帧延迟/断流 |
 | 中文输入不可用 | 中/中 | 隐藏 textarea + composition；外部打开回退 | 输入乱码/丢字 |
 | 源码映射框架漂移 | 中/中 | adapter + 选择器回退；版本测试 | 新框架/生产构建 |
 | 小程序自动化不稳 | 高/中 | 独立 adapter；只读回退；不放进 MVP | 开发者工具升级 |

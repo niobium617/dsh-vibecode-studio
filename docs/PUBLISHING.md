@@ -4,10 +4,13 @@ The repository starts private while the implementation is unstable. Before chang
 
 ## Content
 
-- [ ] Replace machine-specific paths in `tasks/HANDOFF.md` and `docs/dsh-plugin-ecosystem-analysis.md` with placeholders such as `<DSH_INSTALL>`, `<DSH_HOME>`, and `<PROJECT_ROOT>`.
+- [ ] Run a repo-wide grep for absolute paths (e.g. `F:\`, `/Users/`, `/home/`) and replace machine-specific paths with placeholders such as `<DSH_ROOT>` and `<repo>`; check `tasks/`, `docs/`, README, and spike reports.
 - [ ] Confirm `git log -p` contains no tokens, credentials, private URLs, or personal data.
-- [ ] Review `.tmp/` and `spikes/s1/bench.json` are untracked.
+- [ ] Confirm `.tmp/`, `spikes/s1/bench.json`, `spikes/s1/metrics.jsonl`, and `spikes/s1/package/lib/` are untracked.
+- [ ] Confirm `spikes/s1/REPORT.md` contains no machine paths, tokens, or local-profile state.
 - [ ] Keep only evidence that a fresh reader can reproduce. Do not publish local-only profile state.
+- [ ] Confirm `__vibeS1` exists only in the spike and is documented as spike-only; remove or gate it before the product package ships.
+- [ ] Record license/provenance for any borrowed design or code; no unverified or incompatible snippets.
 
 ## Repository presentation
 
@@ -17,6 +20,14 @@ The repository starts private while the implementation is unstable. Before chang
 - [ ] Add a short GIF or screenshot of the preview + annotation flow once T003 exists. Use a synthetic demo app, not a private project.
 - [ ] Check docs links and code fences.
 - [ ] Confirm `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, and `CODE_OF_CONDUCT.md` are present.
+
+## Verification
+
+- [ ] `pnpm typecheck` passes on a clean install.
+- [ ] `pnpm spike:s1` passes both modes (local loopback: fps ≥ 10, zero errors/invalid frames). This benchmark does not exercise the client's document-relative `appRoute()` or the Desktop `dsh-app://` fetch bridge; repeat the Web/Desktop carrier acceptance in `spikes/s1/REPORT.md` §5–6, whose setup is environment-specific.
+- [ ] `spikes/s1/soak.mjs` completes a 600 s stream run on Web and isolated Desktop with `packageChanged: false`, zero reconnects, and < 50 MB memory growth.
+- [ ] README/CONTRIBUTING warn to run `pnpm spike:s1:build` before linking the spike package.
+- [ ] CI is green on the release commit.
 
 ## Safety
 

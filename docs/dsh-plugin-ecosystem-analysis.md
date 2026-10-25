@@ -1,7 +1,7 @@
 # DeepSeek Harness 插件生态逆向分析
 
-> 分析日期：2026-10-25  
-> 目标机器：Windows 11；DSH CLI/Web `0.2.1-rc.2`；DSH Desktop（Electron，`app.asar` 182,434,783 字节）  
+> 分析日期：2026-10-25
+> 分析基线：Windows 11；DSH CLI/Web `0.2.1-rc.2`；DSH Desktop（Electron 壳）
 > 结论先行：DSH 是真正的 Cordis 组合式 Agent Harness。“一切皆插件”不是口号——Web UI、侧栏、设置、插件市场、Agent Preset 本身都是插件行。做 VibeCoding 插件，正确形态是 **bundle（宿主插件 + Agent Preset + Skills + 可选 Web 面板）**，而不是单个 tool。
 
 ---
@@ -23,21 +23,21 @@
 
 | 项 | 值 |
 |---|---|
-| CLI/Web 安装目录 | `F:\Deepseek-Harness\DH` |
+| CLI/Web 安装目录 | `<DSH_ROOT>` |
 | `@deepseek-ai/dsh` | `0.2.1-rc.2` |
-| Desktop | Electron 壳，`F:\Deepseek-Harness\DH\Desktop\resources\app.asar`，182,434,783 字节 |
+| Desktop | Electron 壳，`<DSH_ROOT>\Desktop\resources\app.asar` |
 | Node（全局） | `v24.13.0` |
-| `DSH_HOME` | `F:\Deepseek-Harness\DH\home`（由 `bin\dsh.cmd` 设置） |
-| 默认工作区 | `F:\Deepseek-Harness\Workspaces\default-workspace` |
+| `DSH_HOME` | `<DSH_ROOT>\home`（由 `bin\dsh.cmd` 设置） |
+| 默认工作区 | `<DSH_ROOT>\Workspaces\default-workspace` |
 
-`bin\dsh.cmd` 还把 `DSH_AGENTS_HOME`、npm cache、TEMP/TMP 都放在 F 盘，符合本机 `AGENTS.md` 的“避免 C 盘存储”约束。开发时应始终通过这个 `dsh.cmd` 启动，才能继承同一套 `DSH_HOME`。
+启动脚本还会设置 `DSH_AGENTS_HOME`、npm cache 与 TEMP/TMP；具体位置因安装方式而异。开发时应始终通过同一个 `dsh.cmd` 启动，才能继承相同的 `DSH_HOME`。
 
 ### 1.2 两个 profile
 
 DSH 的安装隔离单位是 profile：
 
 ```
-F:\Deepseek-Harness\DH\home\profiles\
+<DSH_ROOT>\home\profiles\
 ├─ desktop\   桌面端使用（由桌面 App 的插件管理器管理）
 └─ web\       命令行 dsh web 使用
 ```
@@ -70,9 +70,9 @@ F:\Deepseek-Harness\DH\home\profiles\
 - 本地开发推荐：
 
 ```sh
-F:\Deepseek-Harness\DH\bin\dsh.cmd plugin --profile vibe-dev add link:F:\Project\DSH_vibecode_studio
-F:\Deepseek-Harness\DH\bin\dsh.cmd --profile vibe-dev --dump-config
-F:\Deepseek-Harness\DH\bin\dsh.cmd --profile vibe-dev web
+<DSH_ROOT>\bin\dsh.cmd plugin --profile vibe-dev add link:<repo>
+<DSH_ROOT>\bin\dsh.cmd --profile vibe-dev --dump-config
+<DSH_ROOT>\bin\dsh.cmd --profile vibe-dev web
 ```
 
 - `--dump-config` 不启动宿主，只打印组合后的树，是最便宜的 patch 校验手段。
@@ -85,7 +85,7 @@ F:\Deepseek-Harness\DH\bin\dsh.cmd --profile vibe-dev web
 | 方法 | 证据 |
 |---|---|
 | `rea analyze-javascript-application` 静态分析 `app.asar` | 已完成（exit 0，最终 JSON 约 511 MB）；中间日志与结果确认桌面端打包的是同一套 `dsh/node_modules/@deepseek-ai/*` 包。本报告结论已与本机可读包交叉验证，不依赖该 JSON 的逐条语义结果 |
-| 本机包源码/文档 | `F:\Deepseek-Harness\DH\node_modules\@deepseek-ai\*`（100+ 包）与 profile `node_modules` |
+| 本机包源码/文档 | `<DSH_ROOT>\node_modules\@deepseek-ai\*`（100+ 包）与 profile `node_modules` |
 | 官方仓库文档 | `docs/user/develop/basic/*`、`docs/cookbook/extension-cookbook.zh.md`、`.agents/notes/...` |
 | 运行配置 | `dsh-web-app/cordis.patch.yml`、`presets/*.patch.yml`、`dsh-base/cordis.patch.yml` |
 | 社区市场数据 | `dsh-plugin-catalog` 的 `index.json` / `plugins.json`、`dshmarket` README、npm 元数据 |
@@ -952,13 +952,13 @@ pnpm install
 pnpm build
 
 # 2) 建开发 profile 并链接本地包
-F:\Deepseek-Harness\DH\bin\dsh.cmd plugin --profile vibe-dev add link:F:\Project\DSH_vibecode_studio
+<DSH_ROOT>\bin\dsh.cmd plugin --profile vibe-dev add link:<repo>
 
 # 3) 只校验组合，不启动
-F:\Deepseek-Harness\DH\bin\dsh.cmd --profile vibe-dev --dump-config
+<DSH_ROOT>\bin\dsh.cmd --profile vibe-dev --dump-config
 
 # 4) 启动 Web
-F:\Deepseek-Harness\DH\bin\dsh.cmd --profile vibe-dev web
+<DSH_ROOT>\bin\dsh.cmd --profile vibe-dev web
 ```
 
 验证清单：
@@ -1018,10 +1018,10 @@ F:\Deepseek-Harness\DH\bin\dsh.cmd --profile vibe-dev web
 
 | 用途 | 路径 |
 |---|---|
-| CLI 安装 | `F:\Deepseek-Harness\DH` |
-| DSH_HOME | `F:\Deepseek-Harness\DH\home` |
-| desktop profile | `F:\Deepseek-Harness\DH\home\profiles\desktop` |
-| web profile | `F:\Deepseek-Harness\DH\home\profiles\web` |
+| CLI 安装 | `<DSH_ROOT>` |
+| DSH_HOME | `<DSH_ROOT>\home` |
+| desktop profile | `<DSH_ROOT>\home\profiles\desktop` |
+| web profile | `<DSH_ROOT>\home\profiles\web` |
 | 官方 base patch | `...\node_modules\@deepseek-ai\dsh-base\cordis.patch.yml` |
 | 官方 web patch | `...\node_modules\@deepseek-ai\dsh-web-app\cordis.patch.yml` |
 | 官方 presets | `...\dsh-web-app\presets\{standard,ptc,minimal,cordis}.patch.yml` |
@@ -1036,20 +1036,20 @@ F:\Deepseek-Harness\DH\bin\dsh.cmd --profile vibe-dev web
 
 ```sh
 # 版本与帮助
-F:\Deepseek-Harness\DH\bin\dsh.cmd --version
-F:\Deepseek-Harness\DH\bin\dsh.cmd --help
-F:\Deepseek-Harness\DH\bin\dsh.cmd plugin --help
+<DSH_ROOT>\bin\dsh.cmd --version
+<DSH_ROOT>\bin\dsh.cmd --help
+<DSH_ROOT>\bin\dsh.cmd plugin --help
 
 # 组合校验
-F:\Deepseek-Harness\DH\bin\dsh.cmd --profile desktop --dump-config
-F:\Deepseek-Harness\DH\bin\dsh.cmd --profile vibe-dev --dump-config
+<DSH_ROOT>\bin\dsh.cmd --profile desktop --dump-config
+<DSH_ROOT>\bin\dsh.cmd --profile vibe-dev --dump-config
 
 # 本地安装/卸载
-F:\Deepseek-Harness\DH\bin\dsh.cmd plugin --profile vibe-dev add link:F:\Project\DSH_vibecode_studio
-F:\Deepseek-Harness\DH\bin\dsh.cmd plugin --profile vibe-dev remove dsh-vibecode-studio
+<DSH_ROOT>\bin\dsh.cmd plugin --profile vibe-dev add link:<repo>
+<DSH_ROOT>\bin\dsh.cmd plugin --profile vibe-dev remove dsh-vibecode-studio
 
 # 启动
-F:\Deepseek-Harness\DH\bin\dsh.cmd --profile vibe-dev web
+<DSH_ROOT>\bin\dsh.cmd --profile vibe-dev web
 ```
 
 ### 9.3 参考代码片段（官方）

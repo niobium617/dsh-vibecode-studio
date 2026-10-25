@@ -1,6 +1,6 @@
 # VibeCoding Studio — Phase 2 实现计划
 
-> 状态：**已批准（2026-10-25；Plan gate 通过，Phase 3 任务清单已批准）**
+> 状态：**已批准（2026-10-25；Plan gate 通过，Phase 3 任务清单已批准，执行中：T001 完成）**
 > 日期：2026-10-25
 > 输入：[已批准 SPEC](../docs/SPEC-vibecoding-studio.md) + [已批准能力地图](../docs/CAPABILITY-MAP.md)
 > 产品决策：SPEC 第 11 节 Q1–Q10 的推荐项已随“批准”锁定，本计划不再重开产品范围。
@@ -33,8 +33,8 @@ MVP 的完成定义（与 SPEC 第 2.3 节一致）：
 |---|---|---|---|---|
 | D1 | 包形态 | 单 npm 包 + 多子路径入口 | 安装/升级/兼容性最简单；内部按模块隔离 | G1 干净 profile 安装 |
 | D2 | 构建 | Host 用 TS→ESM；Client 用 `tsdown`/rolldown 产出 loader 包装的 `lib/client.js`；失败则回退 esbuild + 手写 CJS 包装，再失败则参考已安装包的 bundle 结构做最小手写 `client.js` | DSH client 只认 `window.__ModuleLoader__.load({ id, factory })`；必须自己保证格式 | M1 hello-world 能被 DSH 加载 |
-| D3 | 预览帧传输 | **MVP 基线用拉取式 JPEG**（`GET` 最新帧 + `X-Vibe-Seq`），S1 通过后再加流式 | 拉取式在 Web/Desktop 的 fetch 桥上最稳；实现简单；10 fps 足够 | S1 对比拉取 vs 流式 |
-| D4 | 输入通道 | 点击/滚轮/键盘/文本走 RPC 一元调用；指针悬停由页面内拾取脚本处理，不走 Host 往返 | 避免 60 Hz RPC；降低延迟 | S3 输入延迟测试 |
+| D3 | 预览帧传输 | **MVP 以流式 multipart JPEG 为主**（`GET` `/api/vibe/stream`），保留拉取式 `/api/vibe/frame` 作为断流/降级回退 | S1 已证明两种 profile 的流式均稳定 30 fps；流式延迟更低（Web 1.0 vs 2.7 ms，Desktop 1.6 vs 3.1 ms）且无 seq gap；帧格式/seq/健康检查共用，切换不改上层接口 | S1 对比（[REPORT](../spikes/s1/REPORT.md)） |
+| D4 | 输入通道 | 点击/滚轮/键盘/文本走精确 fetch 的一元请求；指针悬停由页面内拾取脚本处理，不走 Host 往返 | 避免 60 Hz 往返；降低延迟 | S3 输入延迟测试 |
 | D5 | 标注发送 | 只调用 composer 的公开 `InputActions` / `ctx.conversation`；拿不到就复制到剪贴板并提示 | 不自动发送、不逆向私有 store | S2 |
 | D6 | 截图附件 | 仅当 S2 找到公开附件路径时启用；否则 MVP 只做“复制截图 + 手动粘贴” | 不把产品堵在私有 API 上 | S2 |
 | D7 | 配置校验 | 插件配置用 `@deepseek-ai/schemastery`；持久化 JSON 用手写校验 + 单测 | 与 DSH 生态一致；不引入第二套 schema 运行时 | M1/M4 单测 |
@@ -46,7 +46,7 @@ MVP 的完成定义（与 SPEC 第 2.3 节一致）：
 
 ### 2.1 计划新增的取舍（需要你确认）
 
-1. **MVP 帧传输先拉取，不先做流式**：如果 S1 证明流式在 Desktop 也稳，再把拉取作为回退，不改变接口。
+1. **MVP 帧传输以流式为主、拉取为回退**：S1 已在 Web 与 Desktop 证明流式稳定（30 fps、无 seq gap、延迟更低），按原计划预留的切换路径把拉取降为回退；接口与帧格式不变。
 2. **MVP 不做 Cookie jar**：需要登录态的接口，先手动贴 `Cookie` header；P1 再补。
 3. **`/vibe` 命令先返回状态和操作提示，不保证能直接打开右栏 tab**：右栏由 UI 按钮/快捷键打开；如果 DSH 有公开的 client 事件 seam，P1 再让命令直接开 tab。
 4. **截图附件是可选增强**：S2 不通过就不进 MVP，不影响“标注 → 修改”的主闭环。
@@ -111,7 +111,7 @@ MVP 的完成定义（与 SPEC 第 2.3 节一致）：
 **交付：**
 
 - Playwright 启动 Edge（`channel: 'msedge'`）；CDP session；`Page.startScreencast`。
-- 帧缓冲：只保留最新帧 + seq；拉取式 `GET` 路由；S1 通过后加流式。
+- 帧缓冲：只保留最新帧 + seq；流式 multipart 为主，拉取式 `GET /api/vibe/frame` 作为回退。
 - 输入：鼠标点击/滚轮、键盘、文本；坐标映射；隐藏 textarea + composition 处理中文。
 - 截图：`page.screenshot({ clip })`；artifact 存储。
 - Console：CDP `Runtime.consoleAPICalled` / `exceptionThrown`；ring buffer。
@@ -254,10 +254,10 @@ MVP 的完成定义（与 SPEC 第 2.3 节一致）：
 **最小验证：**
 
 1. 建一个临时插件（host + client），host 注册：
-   - `ctx.connection.fetch.register({ path: '/vibe/frame', methods: ['GET'], requestBody: 'buffered', fetch })`，返回最新 JPEG + `X-Vibe-Seq`。
-   - 可选：`/vibe/frames` 返回 `multipart/x-mixed-replace` 流。
-2. client 在右栏 tab 里用 `fetch('/api/vibe/frame')` 轮询，画到 canvas；记录 fps、丢帧、首帧时间。
-3. 在 Web profile 与 Desktop profile 各跑 60 s；中途刷新/断网/重连。
+   - `ctx.connection.fetch.register({ path: '/api/vibe/frame', methods: ['GET'], requestBody: 'buffered', fetch })`，返回最新 JPEG + `X-Vibe-Seq`。
+   - `/api/vibe/stream` 返回 `multipart/x-mixed-replace` 流。
+2. client 在右栏 tab 里用文档相对 `fetch('api/vibe/frame')` 轮询或用 `fetch('api/vibe/stream')` 接收流，画到 canvas；记录 fps、丢帧、首帧时间。
+3. 在 Web profile 与 Desktop profile 各跑 30 s 验收；另做 10 min stream soak；中途切 tab/后台并恢复。
 4. 对比拉取 vs 流式的 CPU/内存/延迟。
 
 **通过标准：**
@@ -271,7 +271,7 @@ MVP 的完成定义（与 SPEC 第 2.3 节一致）：
 - 流式失败 → 只做拉取，5–10 fps。
 - Desktop fetch 桥接失败 → 预览在外部浏览器打开，Studio 只做拾取/标注（降级模式）。
 
-**产出：** `spikes/s1-transport/REPORT.md`，含 fps/latency/内存表与最终选择。
+**产出：** `spikes/s1/REPORT.md`，含 fps/latency/内存表与最终选择。
 
 ### S2：Composer Handoff
 
@@ -425,7 +425,7 @@ pnpm test:e2e
 | 风险 | 触发点 | 缓解 | 回退 |
 |---|---|---|---|
 | Client bundle 包装不被 DSH 接受 | M1 hello-world | 复制已安装包的 loader 约定；先做最小 bundle | esbuild + 手写包装；再不行就参考已安装包产物手写最小 `client.js` |
-| Desktop 帧传输失败 | S1 | 拉取式基线；短轮询 | 外部浏览器 + 只读拾取 |
+| Desktop 帧传输失败 | S1 | 流式为主、拉取回退；短轮询 | 外部浏览器 + 只读拾取 |
 | 中文输入失败 | S3 | 隐藏 textarea + composition | 明示限制；外部浏览器输入 |
 | 源码映射命中低 | S4 | 三框架适配 + 选择器回退 | 只给选择器/DOM |
 | preset 与 DSH 升级漂移 | G5/升级 | 最小 preset + 升级冒烟 | 不默认启用 preset，改为文档指导 |
@@ -456,7 +456,7 @@ pnpm test:e2e
 
 请重点看：
 
-1. **第 2 节 D1–D12**：有没有你不同意的技术选择，尤其是 D2（client 构建）、D3（拉取式帧）、D5/D6（composer/截图回退）、D12（最小 preset）。
+1. **第 2 节 D1–D12**：有没有你不同意的技术选择，尤其是 D2（client 构建）、D3（流式帧 / pull 回退）、D5/D6（composer/截图回退）、D12（最小 preset）。
 2. **第 3 节工作包**：有没有漏掉的模块职责，或某个工作包明显过大。
 3. **第 4 节 Gate**：验收标准是否够具体、能否作为“继续/回退”的判断。
 4. **第 5 节 Spike**：S1–S4 的通过标准是否合理；是否要加/减。
