@@ -8,12 +8,16 @@ node_modules/
 *.tsbuildinfo
 .DS_Store
 Thumbs.db
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
 
 # Spike build outputs and machine-local measurements
 spikes/s1/package/lib/
 spikes/s1/.build/
 spikes/s1/metrics.jsonl
 spikes/s1/bench.json
+spikes/s2/package/lib/
+spikes/s2/.build/
 
 # Generic build and test outputs
 dist/
