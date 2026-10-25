@@ -10,7 +10,20 @@ export const FRAME_BOUNDARY = 'vibe-frame'
 export const STREAM_CONTENT_TYPE = `multipart/x-mixed-replace; boundary=${FRAME_BOUNDARY}`
 export const PULL_PATH = '/api/vibe/frame'
 export const STREAM_PATH = '/api/vibe/stream'
-export const RPC_CHANNEL = '/vibe'
+export const HEALTH_PATH = '/api/vibe/health'
+export const METRICS_PATH = '/api/vibe/metrics'
+/** Wire discriminator for the spike's metrics report; host and client share it. */
+export const METRICS_REPORT_KIND = 's1-transport-metrics'
+
+/**
+ * Browser-relative form of an app route. DSH apps may be mounted below a
+ * document base (Web and Desktop carriers), so client code must not assume
+ * the Host lives at the origin root. Pattern follows the built-in session
+ * routes (for example `api/changes.summary`).
+ */
+export function appRoute(path: string): string {
+  return path.replace(/^\//, '')
+}
 
 export interface FrameTick {
   /** Monotone frame counter; gaps mean the server or client skipped frames. */

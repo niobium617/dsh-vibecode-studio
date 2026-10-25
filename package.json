@@ -12,7 +12,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "spike:s1": "tsx spikes/s1/run.ts",
-    "spike:s1:build": "tsx spikes/s1/run.ts --build-only"
+    "spike:s1:build": "tsx spikes/s1/run.ts --build-only",
+    "spike:s1:soak": "node spikes/s1/soak.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",

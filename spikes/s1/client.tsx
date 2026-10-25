@@ -8,14 +8,17 @@
  */
 import * as React from 'react'
 import {
+  HEALTH_PATH,
+  METRICS_PATH,
+  METRICS_REPORT_KIND,
   PULL_PATH,
-  RPC_CHANNEL,
   STREAM_PATH,
   MultipartFrameParser,
+  appRoute,
   type StreamFrame,
 } from './protocol'
 
-export const inject = ['connection', 'slots', 'sidebarRight', 'sidebarRightTabs']
+export const inject = ['slots', 'sidebarRight', 'sidebarRightTabs']
 
 const ID = 'dsh-vibe-s1-spike'
 const KIND = 'vibe-studio-s1'
@@ -42,7 +45,7 @@ interface Health {
 }
 
 interface Report {
-  kind: 's1-transport-metrics'
+  kind: typeof METRICS_REPORT_KIND
   mode: Mode | null
   startedAt: string | null
   endedAt: string
@@ -121,9 +124,44 @@ function numberHeader(headers: Headers, name: string): number {
   return Number.isFinite(value) ? value : 0
 }
 
+const HEALTH_TIMEOUT_MS = 5000
+const METRICS_TIMEOUT_MS = 15000
+
+/** AbortSignal.timeout is available in current Edge/Electron; keep a fallback. */
+function timeoutSignal(ms: number): AbortSignal | undefined {
+  const timeout = (AbortSignal as typeof AbortSignal & { timeout?: (milliseconds: number) => AbortSignal }).timeout
+  return typeof timeout === 'function' ? timeout(ms) : undefined
+}
+
+type HealthResult =
+  | { ok: true; value: Health }
+  | { ok: false; error: unknown }
+
+/** One health request with a bounded wait; the debug hook and Runner share it. */
+async function requestHealth(): Promise<HealthResult> {
+  try {
+    const response = await fetch(appRoute(HEALTH_PATH), {
+      cache: 'no-store',
+      signal: timeoutSignal(HEALTH_TIMEOUT_MS),
+    })
+    const body: any = await response.json().catch(() => null)
+    if (response.ok && body?.ok === true) {
+      return { ok: true, value: body.value as Health }
+    }
+    return {
+      ok: false,
+      error: body?.error ?? { code: 'http', message: `health HTTP ${response.status}` },
+    }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
+}
+
 class Runner {
   private mode: Mode | null = null
   private abort: AbortController | null = null
+  /** Invalidates every async task from a previous run before new state is reset. */
+  private generation = 0
   private startedAt = 0
   private stoppedAt: number | null = null
   private autoStop: ReturnType<typeof setTimeout> | null = null
@@ -144,18 +182,17 @@ class Runner {
 
   private latencies: number[] = []
   private decodeTimes: number[] = []
+  /** Ring for the live 2 s fps display; the final per-second counts are separate. */
   private frameTimes: number[] = []
+  private secondCounts: number[] = []
   private heapBefore: number | null = null
   private health: Health | { error: unknown } | null = null
-  private queue: ReceivedFrame[] = []
   private listeners = new Set<() => void>()
   private notifyTimer: ReturnType<typeof setTimeout> | null = null
   private lastReport: Report | null = null
   private donePromise: Promise<Report | null> | null = null
   private postResult: unknown = undefined
   private postError: string | null = null
-
-  constructor(private readonly call: (endpoint: string, payload: unknown) => Promise<any>) {}
 
   setCanvas(canvas: HTMLCanvasElement | null): void {
     this.canvas = canvas
@@ -172,7 +209,9 @@ class Runner {
 
   start(mode: Mode, seconds?: number): void {
     if (this.abort !== null) this.stop()
+    const generation = ++this.generation
     const abort = new AbortController()
+    const queue: ReceivedFrame[] = []
     this.mode = mode
     this.abort = abort
     this.startedAt = Date.now()
@@ -192,7 +231,7 @@ class Runner {
     this.latencies = []
     this.decodeTimes = []
     this.frameTimes = []
-    this.queue = []
+    this.secondCounts = []
     this.lastReport = null
     this.donePromise = null
     this.postResult = undefined
@@ -200,16 +239,9 @@ class Runner {
     this.health = null
     this.heapBefore = (performance as any).memory?.usedJSHeapSize ?? null
 
-    Promise.resolve(this.call('health', {}))
-      .then((result) => {
-        this.health = result?.ok === true ? result.value as Health : { error: result?.error ?? result }
-      })
-      .catch((error) => {
-        this.health = { error: String(error) }
-      })
-
-    void this.consume(abort.signal)
-    void (mode === 'pull' ? this.pullLoop(abort.signal) : this.streamLoop(abort.signal))
+    void this.fetchHealth(generation)
+    void this.consume(generation, queue, abort.signal)
+    void (mode === 'pull' ? this.pullLoop(generation, queue, abort.signal) : this.streamLoop(generation, queue, abort.signal))
     if (seconds !== undefined && seconds > 0) {
       this.autoStop = setTimeout(() => this.stop(), seconds * 1000)
     }
@@ -225,21 +257,50 @@ class Runner {
     this.stoppedAt = Date.now()
     this.abort.abort()
     this.abort = null
+    const generation = ++this.generation
     const report = this.buildReport()
     this.lastReport = report
-    this.donePromise = this.call('metrics', report)
+    this.donePromise = this.postMetrics(report)
       .then((result) => {
-        this.postResult = result
-        if (result?.ok !== true) this.postError = result?.error?.message ?? 'metrics RPC failed'
+        if (generation !== this.generation) return report
+        report.postResult = result
+        if (result?.ok !== true) report.postError = result?.error?.message ?? 'metrics request failed'
+        this.lastReport = report
         this.notify()
-        return this.buildReport()
+        return report
       })
       .catch((error) => {
-        this.postError = String(error)
+        if (generation !== this.generation) return report
+        report.postError = String(error)
+        this.lastReport = report
         this.notify()
-        return this.buildReport()
+        return report
       })
     this.notify()
+  }
+
+  private isCurrent(generation: number): boolean {
+    return generation === this.generation
+  }
+
+  private async fetchHealth(generation: number): Promise<void> {
+    const result = await requestHealth()
+    if (!this.isCurrent(generation)) return
+    this.health = result.ok ? result.value : { error: result.error }
+  }
+
+  private async postMetrics(report: Report): Promise<any> {
+    const response = await fetch(appRoute(METRICS_PATH), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(report),
+      signal: timeoutSignal(METRICS_TIMEOUT_MS),
+    })
+    const body: any = await response.json().catch(() => null)
+    if (!response.ok) {
+      return { ok: false, error: body?.error ?? { code: 'http', message: `metrics HTTP ${response.status}` } }
+    }
+    return body
   }
 
   waitForReport(): Promise<Report | null> {
@@ -274,19 +335,23 @@ class Runner {
   }
 
   private liveFps(now: number): number {
+    // Read-only over `frameTimes`: `snapshot()` runs on every UI tick, so this
+    // must not mutate the window. Final per-second counts live in `secondCounts`.
     const cutoff = now - 2000
-    while (this.frameTimes.length > 0 && this.frameTimes[0] < cutoff) this.frameTimes.shift()
-    return this.frameTimes.length / 2
+    let count = 0
+    for (let i = this.frameTimes.length - 1; i >= 0 && this.frameTimes[i] >= cutoff; i -= 1) count += 1
+    return count / 2
   }
 
-  private async pullLoop(signal: AbortSignal): Promise<void> {
+  private async pullLoop(generation: number, queue: ReceivedFrame[], signal: AbortSignal): Promise<void> {
     let after = -1
-    while (!signal.aborted) {
+    while (this.isCurrent(generation) && !signal.aborted) {
       try {
-        const response = await fetch(`${PULL_PATH}?wait=1&after=${after}`, {
+        const response = await fetch(`${appRoute(PULL_PATH)}?wait=1&after=${after}`, {
           cache: 'no-store',
           signal,
         })
+        if (!this.isCurrent(generation)) return
         if (!response.ok) {
           this.errors += 1
           await sleep(250, signal)
@@ -296,44 +361,48 @@ class Runner {
         const ts = numberHeader(response.headers, 'x-vibe-ts')
         const hostRss = numberHeader(response.headers, 'x-vibe-host-rss')
         const bytes = new Uint8Array(await response.arrayBuffer())
-        this.record(seq, ts, bytes.byteLength, hostRss, 0)
-        this.enqueue({ bytes, seq })
+        if (!this.isCurrent(generation)) return
+        this.record(generation, seq, ts, bytes.byteLength, hostRss, 0)
+        this.enqueue(generation, queue, { bytes, seq })
         after = Math.max(after, seq)
       } catch (error) {
-        if (signal.aborted) break
+        if (!this.isCurrent(generation) || signal.aborted) return
         this.errors += 1
         await sleep(300, signal)
       }
     }
   }
 
-  private async streamLoop(signal: AbortSignal): Promise<void> {
-    while (!signal.aborted) {
+  private async streamLoop(generation: number, queue: ReceivedFrame[], signal: AbortSignal): Promise<void> {
+    while (this.isCurrent(generation) && !signal.aborted) {
       try {
-        const response = await fetch(STREAM_PATH, { cache: 'no-store', signal })
+        const response = await fetch(appRoute(STREAM_PATH), { cache: 'no-store', signal })
+        if (!this.isCurrent(generation)) return
         if (!response.ok || response.body === null) throw new Error(`stream HTTP ${response.status}`)
         if (this.connectedOnce) this.reconnects += 1
         this.connectedOnce = true
         const reader = response.body.getReader()
         const parser = new MultipartFrameParser()
-        while (!signal.aborted) {
+        while (this.isCurrent(generation) && !signal.aborted) {
           const { done, value } = await reader.read()
+          if (!this.isCurrent(generation)) return
           if (done) break
           parser.push(value, (frame: StreamFrame) => {
-            this.record(frame.seq, frame.ts, frame.bytes.byteLength, frame.hostRss, frame.dropped)
-            this.enqueue({ bytes: frame.bytes, seq: frame.seq })
+            this.record(generation, frame.seq, frame.ts, frame.bytes.byteLength, frame.hostRss, frame.dropped)
+            this.enqueue(generation, queue, { bytes: frame.bytes, seq: frame.seq })
           })
         }
-        if (!signal.aborted) throw new Error('stream ended')
+        if (this.isCurrent(generation) && !signal.aborted) throw new Error('stream ended')
       } catch (error) {
-        if (signal.aborted) break
+        if (!this.isCurrent(generation) || signal.aborted) return
         this.errors += 1
         await sleep(500, signal)
       }
     }
   }
 
-  private record(seq: number, ts: number, size: number, hostRss: number, dropped: number): void {
+  private record(generation: number, seq: number, ts: number, size: number, hostRss: number, dropped: number): void {
+    if (!this.isCurrent(generation)) return
     const now = Date.now()
     this.frames += 1
     this.bytes += size
@@ -343,28 +412,32 @@ class Runner {
     }
     this.lastSeq = Math.max(this.lastSeq, seq)
     this.latencies.push(Math.max(0, now - ts))
-    if (this.latencies.length > 5000) this.latencies.shift()
+    if (this.latencies.length > 40_000) this.latencies.shift()
     this.frameTimes.push(now)
     if (this.frameTimes.length > 5000) this.frameTimes.shift()
+    const second = Math.max(0, Math.floor((now - this.startedAt) / 1000))
+    while (this.secondCounts.length <= second) this.secondCounts.push(0)
+    this.secondCounts[second] += 1
     if (this.firstFrameMs === null && this.startedAt > 0) this.firstFrameMs = now - this.startedAt
     if (hostRss > 0) this.hostRss = hostRss
     if (dropped > 0) this.droppedReported += dropped
     this.scheduleNotify()
   }
 
-  private enqueue(frame: ReceivedFrame): void {
-    if (this.queue.length >= 2) {
-      this.queue.shift()
+  private enqueue(generation: number, queue: ReceivedFrame[], frame: ReceivedFrame): void {
+    if (!this.isCurrent(generation)) return
+    if (queue.length >= 2) {
+      queue.shift()
       this.drawDrops += 1
     }
-    this.queue.push(frame)
+    queue.push(frame)
   }
 
-  private async consume(signal: AbortSignal): Promise<void> {
+  private async consume(generation: number, queue: ReceivedFrame[], signal: AbortSignal): Promise<void> {
     const canvas = this.canvas
     const context = canvas?.getContext('2d') ?? null
-    for (;;) {
-      const item = this.queue.shift()
+    while (this.isCurrent(generation)) {
+      const item = queue.shift()
       if (item === undefined) {
         if (signal.aborted) break
         await sleep(5, signal)
@@ -376,12 +449,17 @@ class Runner {
         // runtime value is always a plain ArrayBuffer-backed view here.
         const bitmap = await createImageBitmap(new Blob([item.bytes as BlobPart], { type: 'image/jpeg' }))
         const end = performance.now()
+        if (!this.isCurrent(generation)) {
+          bitmap.close()
+          return
+        }
         this.decodeTimes.push(end - begin)
-        if (this.decodeTimes.length > 2000) this.decodeTimes.shift()
+        if (this.decodeTimes.length > 40_000) this.decodeTimes.shift()
         const target = this.canvas?.getContext('2d') ?? context
         if (target !== null) target.drawImage(bitmap, 0, 0, 1280, 800)
         bitmap.close()
       } catch {
+        if (!this.isCurrent(generation)) return
         // Decode failures are counted as client errors; the transport still records the frame.
         this.errors += 1
       }
@@ -394,7 +472,7 @@ class Runner {
     const durationMs = this.startedAt === 0 ? 0 : Math.max(1, end - this.startedAt)
     const heap = (performance as any).memory?.usedJSHeapSize ?? null
     return {
-      kind: 's1-transport-metrics',
+      kind: METRICS_REPORT_KIND,
       mode: this.mode,
       startedAt: this.startedAt === 0 ? null : new Date(this.startedAt).toISOString(),
       endedAt: new Date(end).toISOString(),
@@ -426,8 +504,6 @@ class Runner {
       client: {
         heapBefore: this.heapBefore,
         heapAfter: heap,
-        userAgent: navigator.userAgent,
-        origin: location.origin,
         visibilityState: document.visibilityState,
         desktop: Boolean((globalThis as any).dshDesktop),
         desktopProtocol: (globalThis as any).dshDesktop?.protocolVersion ?? null,
@@ -439,15 +515,7 @@ class Runner {
   }
 
   private fpsBySecond(): number[] {
-    if (this.startedAt === 0) return []
-    const buckets: number[] = []
-    for (const time of this.frameTimes) {
-      const index = Math.floor((time - this.startedAt) / 1000)
-      if (index < 0) continue
-      while (buckets.length <= index) buckets.push(0)
-      buckets[index] += 1
-    }
-    return buckets
+    return [...this.secondCounts]
   }
 
   private scheduleNotify(): void {
@@ -601,9 +669,7 @@ function cell(label: string, value: string): React.ReactElement {
 }
 
 export function apply(ctx: any): void {
-  const call = (endpoint: string, payload: unknown): Promise<any> =>
-    ctx.connection.rpc.call(RPC_CHANNEL, endpoint, payload)
-  const runner = new Runner(call)
+  const runner = new Runner()
   const StudioPanel = makePanel(runner)
 
   ctx.effect(() => ctx.sidebarRightTabs.register({
@@ -614,6 +680,7 @@ export function apply(ctx: any): void {
       id: 'vibe-studio-s1',
       title: () => 'Vibe Studio S1',
       description: () => 'Transport spike: pull vs stream',
+      order: 10,
     }],
     keepMounted: true,
   }), 'vibe-s1: tab type')
@@ -634,6 +701,23 @@ export function apply(ctx: any): void {
         return { ok: false, error: String(error) }
       }
     },
+    activeTab: (): unknown => {
+      try {
+        return ctx.sidebarRight.active() ?? null
+      } catch {
+        return null
+      }
+    },
+    closeActiveTab: (): unknown => {
+      try {
+        const tab = ctx.sidebarRight.active()
+        if (tab == null) return null
+        ctx.sidebarRight.close(tab.id)
+        return tab.id
+      } catch (error) {
+        return { error: String(error) }
+      }
+    },
     start: (mode: Mode, seconds?: number): LiveSnapshot => {
       runner.start(mode, seconds)
       return runner.snapshot()
@@ -644,8 +728,8 @@ export function apply(ctx: any): void {
     },
     report: (): Report | null => runner.report(),
     waitForReport: (): Promise<Report | null> => runner.waitForReport(),
-    health: (): Promise<any> => call('health', {}),
-    version: 's1-1',
+    health: async (): Promise<HealthResult> => await requestHealth(),
+    version: 's1-3',
   }
   ;(globalThis as any).__vibeS1 = debug
   ctx.effect(() => () => {

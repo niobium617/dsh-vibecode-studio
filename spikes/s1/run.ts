@@ -273,6 +273,7 @@ async function benchPull(base: string, seconds: number): Promise<BenchResult> {
       })
       if (!response.ok) {
         stats.errors += 1
+        await new Promise((resolve) => setTimeout(resolve, 50))
         continue
       }
       const seq = num(response.headers.get('x-vibe-seq'))
@@ -321,7 +322,10 @@ async function benchStream(base: string, seconds: number): Promise<BenchResult> 
     const parser = new MultipartFrameParser()
     while (!controller.signal.aborted) {
       const { done, value } = await reader.read()
-      if (done) break
+      if (done) {
+        if (!controller.signal.aborted) throw new Error('stream ended before the deadline')
+        break
+      }
       parser.push(value, (frame: StreamFrame) => {
         const now = Date.now()
         stats.frames += 1
@@ -355,7 +359,7 @@ function pad(value: string | number, width: number): string {
 
 function printTable(results: BenchResult[]): void {
   console.log('\nS1 local transport benchmark — same process, loopback HTTP')
-  console.log(`node ${process.version} · ${FRAME_WIDTH}x${FRAME_HEIGHT} JPEG q${FRAME_QUALITY} · ${FRAME_COUNT} synthetic frames · target ${FPS} fps`)
+  console.log(`${FRAME_WIDTH}x${FRAME_HEIGHT} JPEG q${FRAME_QUALITY} · ${FRAME_COUNT} synthetic frames · target ${FPS} fps`)
   console.log([
     pad('mode', 8), pad('sec', 5), pad('frames', 8), pad('fps', 7), pad('KB/s', 9),
     pad('frame', 8), pad('lat avg', 9), pad('lat p95', 9), pad('gaps', 6),
@@ -394,7 +398,6 @@ async function runBenchmark(seconds: number): Promise<void> {
     printTable([pull, stream])
     await writeFile(benchPath, `${JSON.stringify({
       generatedAt: new Date().toISOString(),
-      node: process.version,
       width: FRAME_WIDTH,
       height: FRAME_HEIGHT,
       quality: FRAME_QUALITY,
@@ -403,10 +406,12 @@ async function runBenchmark(seconds: number): Promise<void> {
       seconds,
       results: [pull, stream],
     }, null, 2)}\n`, 'utf8')
-    console.log(`\nbenchmark JSON -> ${benchPath}`)
-    if (stream.frames === 0 || stream.errors > 0 || stream.invalidFrames > 0) {
+    console.log('\nbenchmark JSON -> spikes/s1/bench.json')
+    const failures = [pull, stream].filter((result) =>
+      result.frames === 0 || result.fps < 10 || result.errors > 0 || result.invalidFrames > 0)
+    if (failures.length > 0) {
       process.exitCode = 1
-      console.log('stream benchmark FAILED: no frames, errors, or invalid JPEGs')
+      console.log(`benchmark FAILED for: ${failures.map((result) => result.mode).join(', ')} (below 10 fps, no frames, errors, or invalid JPEGs)`)
     }
   } finally {
     source.stop()
@@ -420,15 +425,16 @@ async function main(): Promise<void> {
   await buildAll()
   const hostSize = await fileSize(join(libDir, 'index.js'))
   const clientSize = await fileSize(join(libDir, 'client.js'))
-  console.log(`[vibe-s1] built host ${hostSize} -> ${join(libDir, 'index.js')}`)
-  console.log(`[vibe-s1] built client ${clientSize} -> ${join(libDir, 'client.js')}`)
+  console.log(`[vibe-s1] built host ${hostSize} -> spikes/s1/package/lib/index.js`)
+  console.log(`[vibe-s1] built client ${clientSize} -> spikes/s1/package/lib/client.js`)
 
   if (args.includes('--build-only')) return
 
   const seconds = Math.max(1, Number(flag('--seconds') ?? '10') || 10)
   await runBenchmark(seconds)
-  console.log('\nNext: install into the dev profile and run Web/Desktop acceptance:')
-  console.log(`  dsh plugin --profile vibe-dev add link:${packageDir}`)
+  console.log('\nNext: from the repo root, build before installing (package/lib is generated):')
+  console.log('  pnpm spike:s1:build')
+  console.log('  dsh plugin --profile vibe-dev add link:spikes/s1/package')
 }
 
 await main()

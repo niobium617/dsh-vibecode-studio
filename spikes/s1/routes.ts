@@ -76,6 +76,7 @@ export function createStreamHandler(source: FrameSource, meta: RouteMeta): (requ
   return (request: Request): Promise<Response> => {
     let closed = false
     let unsubscribe: (() => void) | null = null
+    let onAbort: (() => void) | null = null
     let lastSent = -1
     let dropped = 0
 
@@ -84,6 +85,10 @@ export function createStreamHandler(source: FrameSource, meta: RouteMeta): (requ
       closed = true
       unsubscribe?.()
       unsubscribe = null
+      if (onAbort !== null) {
+        request.signal.removeEventListener('abort', onAbort)
+        onAbort = null
+      }
       if (closeController && controller !== null) {
         try {
           controller.close()
@@ -118,7 +123,12 @@ export function createStreamHandler(source: FrameSource, meta: RouteMeta): (requ
         const initial = source.snapshot()
         if (initial !== null) send(initial)
         unsubscribe = source.subscribe(send)
-        request.signal.addEventListener('abort', () => stop(true, controller), { once: true })
+        if (request.signal.aborted) {
+          stop(true, controller)
+        } else {
+          onAbort = () => stop(true, controller)
+          request.signal.addEventListener('abort', onAbort, { once: true })
+        }
       },
       cancel() {
         stop(false, null)
