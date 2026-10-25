@@ -4,7 +4,7 @@
 
 **Status: pre-alpha.** This repository is in the spike phase. Nothing is installable as a product yet; the only working code is under `spikes/`. S1 is complete: Web and Desktop both sustain 30 fps over 10-minute stream soaks, with pull retained as a fallback (see the [transport report](spikes/s1/REPORT.md)). S2 is complete: a sidebar tab reaches the current composer through public `inputActions`, inserts editable text without sending, and falls back to the clipboard for screenshots because direct attachment creation is not public API (see the [composer report](spikes/s2/REPORT.md)).
 
-[中文简介](#中文简介) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md)
+[中文简介](#中文简介) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md) · [Dev log](docs/DEVLOG.md)
 
 ## Why
 

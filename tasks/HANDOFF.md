@@ -18,7 +18,8 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 2. [docs/CAPABILITY-MAP.md](../docs/CAPABILITY-MAP.md) — 8 个模块、依赖方向、构建顺序。
 3. [tasks/plan.md](./plan.md) — D1–D12 技术决策、M0–M6、G0–G6、S1–S8。
 4. [tasks/todo.md](./todo.md) — 61 个可执行任务、验收、验证命令、文件。
-5. [docs/dsh-plugin-ecosystem-analysis.md](../docs/dsh-plugin-ecosystem-analysis.md) — DSH 插件生态与扩展点依据（需要时查，不必通读）。
+5. [docs/DEVLOG.md](../docs/DEVLOG.md) — 开发进度、踩坑、决策变化与恢复检查清单。
+6. [docs/dsh-plugin-ecosystem-analysis.md](../docs/dsh-plugin-ecosystem-analysis.md) — DSH 插件生态与扩展点依据（需要时查，不必通读）。
 
 ---
 
