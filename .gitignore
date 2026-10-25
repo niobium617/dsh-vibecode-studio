@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Local scratch space
+.tmp/
+*.log
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+
+# Spike build outputs and machine-local measurements
+spikes/s1/package/lib/
+spikes/s1/.build/
+spikes/s1/metrics.jsonl
+spikes/s1/bench.json
+
+# Generic build and test outputs
+dist/
+coverage/

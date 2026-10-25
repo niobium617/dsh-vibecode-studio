@@ -1,0 +1,5 @@
+# T001 S1 spike bundle: one host+client row. Installed into the throwaway
+# `vibe-dev` profile; never into `desktop`/`web`.
+- insert:
+    - id: vibe-s1-spike
+      name: dsh-vibe-s1-spike

@@ -1,0 +1,26 @@
+{
+  "name": "dsh-vibecode-studio-dev",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Development workspace for dsh-vibecode-studio (spikes first; product package arrives in T006).",
+  "license": "MIT",
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "spike:s1": "tsx spikes/s1/run.ts",
+    "spike:s1:build": "tsx spikes/s1/run.ts --build-only"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/react": "^18.3.27",
+    "esbuild": "^0.25.12",
+    "jpeg-js": "^0.4.4",
+    "playwright-core": "^1.56.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
