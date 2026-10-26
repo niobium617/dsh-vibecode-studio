@@ -2,7 +2,7 @@
 
 > A visual feedback loop for **DeepSeek Harness**: preview your local web app inside DSH, point at what is wrong, and hand structured notes to the coding agent — no screenshot ping-pong.
 
-**Status: pre-alpha.** The M0 spike gate is complete. Transport, composer handoff, screencast/input/Chinese IME, and element/source mapping are verified; the G0 review selected stream-first frames with a pull fallback, one-shot CDP input, clipboard-only screenshots, and per-framework source adapters. The M1 foundation (package scaffold, contracts, client shell, connection transport, test harness) is in `src/`, `tests/` and `fixtures/`; nothing is published yet. See the [G0 review](spikes/G0.md) for the go/no-go and fallback decisions.
+**Status: pre-alpha.** The M0 spike gate is complete. Transport, composer handoff, screencast/input/Chinese IME, and element/source mapping are verified; the G0 review selected stream-first frames with a pull fallback, one-shot CDP input, clipboard-only screenshots, and per-framework source adapters. The M1 foundation (package scaffold, contracts, client shell, connection transport, test harness, `.vibe` config store) is in `src/`, `tests/` and `fixtures/`; nothing is published yet. See the [G0 review](spikes/G0.md) for the go/no-go and fallback decisions.
 
 [中文简介](#中文简介) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md) · [Dev log](docs/DEVLOG.md)
 
@@ -22,7 +22,7 @@ Vibe coding 的关键是让 Agent “看见”结果。截图会丢失元素身�
 ### 当前进度
 
 - **M0 / G0 已通过**：S1 传输、S2 composer 交接、S3 screencast/输入/中文、S4 拾取/源码四个 spike 均完成，结论与回退方案见 [spikes/G0.md](spikes/G0.md)。
-- **M1 进行中**：产品包脚手架、host/client 骨架、contracts、connection 路由与测试 harness 已完成并在 `vibe-dev` 验证。
+- **M1 进行中**：产品包脚手架、host/client 骨架、contracts、connection 路由、测试 harness 与 `.vibe/studio.json` 配置存储已完成；前者在 `vibe-dev` 验证，后者由单测覆盖。
 - **尚未发布**：根包可在开发 profile 中加载，但尚未打包发布；`spikes/` 保留为 spike 证据。
 
 ### 计划中的 MVP

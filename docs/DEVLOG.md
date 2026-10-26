@@ -8,10 +8,10 @@
 ## 1. 当前快照
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，进入 M1）**。
-- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture。
-- 进行中：无；下一项 **T013 `.vibe` 配置存储**。
+- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储。
+- 进行中：无；下一项 **T014 设置面板（基础）**。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已实现但尚未接入出厂 `lib/client.js`。
-- T001–T011 已提交并推送至 `task/m1-foundation`；T012 的 harness、fixture 与测试依赖待提交。S3/S4/T010 用 Playwright 启动的 Edge 在脚本结束时关闭，未留下进程。
+- T001–T013 已提交至本地 `task/m1-foundation`（领先 origin 5 个提交，尚未推送）。S3/S4/T010 用 Playwright 启动的 Edge 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
 
 环境：
@@ -192,6 +192,22 @@
   - `@playwright/test` 固定 1.64.1，与本机 `playwright-core` 一致；使用系统 Edge，不下载浏览器，因此 CI（ubuntu）暂不跑 E2E。
   - 组件测试文件仍保留显式 `// @vitest-environment jsdom` 与 `cleanup()`，与 harness 重复但无害；后续新测试可省略。
 
+### T013 — `.vibe` 配置存储（已完成）
+
+- 目标：`studio.json` 读写、原子写、校验、默认值、坏数据回退。
+- 结果：
+  - `src/host/studio/store.ts`：`StudioStore` / `createStudioStore()`，固定 `<project>/.vibe/studio.json`，`STUDIO_FILE_VERSION = 1`，上限 256 KiB。
+  - 读取：缺失目录/文件返回 `status: 'missing'` + 默认值；坏 JSON、不支持的版本、超大文件、字段非法返回 `status: 'invalid'` + 默认/回收值 + `issues`，不抛异常、不改写原文件。字段级回收只替换非法项，合法项保留。
+  - 校验：手写 `parseStudioDocument` / `parseStudioSettings`（不使用第二套 schema runtime），复用 `normalizeOrigin()` 归一化并去重 origin，`retentionDays` 1–365、`contextBudgetBytes` 1024–65536，未知键记为 issue。
+  - 写入：先校验（失败抛 `invalid-document` 且不建目录），再在 `.vibe` 的 **真实路径** 内创建 `wx` 临时文件、`rename` 原子替换；失败清理临时文件。
+  - 路径限定：对项目根、`.vibe`、`studio.json` 分别 `realpath`，用 `relative()` 判断包含关系；`.vibe` 为指向项目外的 junction/symlink 时读写均抛 `path-outside-project`。
+- 验证：
+  - `pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/studio-store` 1 文件 / 10 用例通过；全量 `pnpm test` 15 文件 / 99 用例通过；`pnpm build` 通过（host 11.8 KiB / client 12.0 KiB，store 尚未被入口引用）。
+  - 用例覆盖 round-trip + origin 去重 + 末尾换行、缺文件、坏 JSON 保留原文件、字段级回收、版本不支持、未知键、非法写入不落盘、超大文件、`.vibe` junction 逃逸、项目目录缺失；临时目录在 `.tmp/studio-store-*`，检查无残留。
+- 限制/决策：
+  - store 尚未接入 `src/host/index.ts` 与 UI，T014 设置面板再接服务读取同一文档。
+  - `write()` 的 `document` 参数类型是 `StudioDocument`，运行期仍走手写校验；非法值在测试里用断言强行传入。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -210,6 +226,13 @@
 43. **Vitest 5 的 `passWithNoTests` 只能放根级**：写进 project 的 inline config 会报 TS2769；放在 `test.passWithNoTests`。
 44. **Playwright 用 `channel: 'msedge'` 不下载浏览器**：直接使用本机 Edge；fixture 若缺 favicon 会请求 `/favicon.ico` 得到 404 并计入 console error，用 `<link rel="icon" href="data:," />` 消除。
 45. **判断 fixture 残留看 LISTENING**：Playwright `webServer` 关闭后，4320 上仍会短暂出现客户端 `TIME_WAIT`，不代表服务没停。
+
+### 配置存储
+
+46. **路径包含校验必须用 `realpath` + `relative`**：`join(projectDir, '.vibe')` 只是字符串拼接，`.vibe` 可以是指向任意位置的 junction/symlink。要对项目根、`.vibe`、目标文件分别 `realpath`，再用 `relative(parent, child)` 判断非空、不以 `..` 开头且非绝对路径；`startsWith(parent + sep)` 在大小写/盘符差异下不可靠。
+47. **原子写的临时文件放目标同目录**：跨卷 `rename` 会失败；临时文件写在 `.vibe` 的真实路径内，用 `flag: 'wx'` 防覆盖，`rename` 成功后原文件才变化，失败时删除临时文件。
+48. **坏数据回退要保留原文件**：读取只返回默认值和 `issues`，不自动 `write()` 修复，否则用户手写的注释/未知字段会在一次读取后消失；修复应由 UI 显式保存触发。
+49. **`pnpm test -- <path>` 不过滤**：`--` 后的路径会作为普通参数传给 vitest，实际跑全量；本仓库用 `pnpm exec vitest run <path>`。
 
 ### 传输 / DSH 插件
 
@@ -275,8 +298,8 @@
 
 - **T004 已完成**：30/30 元素源码命中；点击泄漏 0、Esc、console 均通过；限制是仅 dev 模式、未覆盖 TSX/iframe/重复组件选择器。
 - **T005 G0 已通过（GO）**：帧传输 stream 为主/pull 回退；中文主路径 + 逐字/粘贴回退；截图仅剪贴板；源码三框架适配 + 选择器/DOM 降级。证据见 [`spikes/G0.md`](../spikes/G0.md)。
-- **T006–T012 已完成**：产品包脚手架、host ESM、client loader bundle、host Config/服务位、contracts v1、client shell/右栏 tab、connection 传输、测试 harness 与 Vite fixture 均已验证；下一项 T013 `.vibe` 配置存储。
-- **T013 及以后（M1）**：studio store、设置面板、G1 评审；T014 设置持久化需与 T008 的 Config 保持单一来源，避免 UI 改一份、服务读另一份。T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 待后续任务消费；T009 的 contracts 由后续页面逐步引用。
+- **T006–T013 已完成**：产品包脚手架、host ESM、client loader bundle、host Config/服务位、contracts v1、client shell/右栏 tab、connection 传输、测试 harness 与 Vite fixture、`.vibe` 配置存储均已验证；下一项 T014 设置面板。
+- **T014 及以后（M1）**：设置面板、G1 评审；T014 需把 `StudioStore` 接入 host 服务与 UI，并与 T008 的 `Config` 保持单一来源——建议启动时以 `studio.json` 覆盖 Config 默认值，避免 UI 改一份、服务读另一份。T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 待 T014 起消费；T009 的 contracts 由后续页面逐步引用。
 - **S2 遗留**：如果上游未来公开附件创建/释放 API，再评估直接截图附件；先复测切会话保留和失败清理。
 - **Desktop 遗留**：S2 跨会话未测到，后续需要能稳定创建第二个命名会话的测试环境。
 - **成本**：避免无必要的全仓读取和重复验收；每个任务完成即提交、记录、清理进程。
@@ -310,6 +333,7 @@ pnpm spike:s4
 - G0 评审：[G0.md](../spikes/G0.md)。
 - 任务与验收：[todo.md](../tasks/todo.md)。
 - 测试 harness：`vitest.config.ts`、`playwright.config.ts`、`fixtures/vite-basic/`、`tests/e2e/fixture.spec.ts`。
+- 配置存储：`src/host/studio/store.ts`、`tests/unit/studio-store.test.ts`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。
 - 发布检查：[PUBLISHING.md](./PUBLISHING.md)。
 - 私有仓库：`https://github.com/niobium617/dsh-vibecode-studio`（当前为 private）。

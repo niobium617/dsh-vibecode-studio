@@ -127,12 +127,13 @@
 - **文件**：`tests/*`、`fixtures/vite-basic/*`、`playwright.config.ts`。
 - **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；Vitest 拆为 `node`（smoke/unit/integration）与 `component`（jsdom + 统一 cleanup）两个 project，全量 `pnpm test` 14 文件 / 89 用例通过（原 13/83 + 假 adapter 6 例），`pnpm exec vitest run tests/component/shell` 仍为 3 文件 / 13 用例。新增 `playwright.config.ts`（`channel: 'msedge'`、headless、1280×800、webServer 自动拉起 fixture、产物写 `.tmp/playwright-results`），`pnpm test:e2e` 3/3 通过（首屏与计数、中文表单、`/api/echo` 与 `/api/boom`）；fixture 监听 `127.0.0.1:4320`，测试结束无 LISTENING 残留。`fixtures/vite-basic` 为 React 19 + Vite 8 骨架（计数器、表单、列表、控制台错误按钮，`/api/echo`、`/api/boom`、`/api/slow`），可用 `pnpm fixture:dev` 单独启动。新增 `tests/helpers/fake-adapter.ts` 生命周期替身（并发 start 合并、重复 start 复用、stop 幂等、启动失败态）及 6 个集成用例。`pnpm build` 通过（host 11.8 KiB / client 12.0 KiB）。新增 devDependencies `@playwright/test@1.64.1`、`@types/react-dom@18.0.0`；Playwright 使用本机 Edge，未下载浏览器。
 
-### - [ ] T013 `.vibe` 配置存储
+### - [x] T013 `.vibe` 配置存储
 
 - **目标**：`studio.json` 读写、原子写、校验、默认值、坏数据回退。
 - **验收**：round-trip；坏 JSON 不崩溃；路径限定项目内。
 - **验证**：`pnpm test -- tests/unit/studio-store`。
 - **文件**：`src/host/studio/store.ts`、`tests/unit/studio-store.test.ts`。
+- **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/studio-store` 1 文件 / 10 用例通过；全量 `pnpm test` 15 文件 / 99 用例通过；`pnpm build` 通过（host 11.8 KiB / client 12.0 KiB，store 尚未接入 host 入口，体积不变）。实现：`StudioStore` 以 `realpath` 解析项目根、`.vibe` 与 `studio.json` 并做包含校验，拒绝指向项目外的 junction/symlink；读取对缺失文件返回 `missing` + 默认值，对坏 JSON、超版本、超 256 KiB、字段非法返回 `invalid` + 回收后的默认值 + `issues`，不抛异常、不改写原文件；写入先 `parseStudioDocument` 校验（含 origin 归一化、去重、范围检查），再在 `.vibe` 内同目录临时文件 `wx` 写入 + `rename` 原子替换，失败清理临时文件。测试覆盖 round-trip/去重/换行、缺文件、坏 JSON 保留原文件、字段级回收、版本不支持、未知键、非法写入不建目录、超大文件、`.vibe` junction 逃逸、项目目录缺失；临时目录均建在 `.tmp/studio-store-*` 并在用例后删除，无残留。命令更正：本仓库用 `pnpm exec vitest run tests/unit/studio-store`（`pnpm test -- <path>` 不过滤）。
 
 ### - [ ] T014 设置面板（基础）
 
