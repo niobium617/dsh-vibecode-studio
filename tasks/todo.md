@@ -103,12 +103,13 @@
 - **文件**：`src/contracts/*`、`tests/unit/contracts/*`。
 - **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/contracts` → 6 文件 / 34 用例通过；全量 `pnpm test` → 8 文件 / 44 用例通过；`pnpm build` 通过。注意：`pnpm test -- tests/unit/contracts` 在 vitest 下不会过滤，实际跑全量，已改用 `pnpm exec vitest run <path>`。覆盖：Annotation JSON round-trip 与坏数据拒绝、品牌 ID、UTF-8 预算与 CJK/emoji 安全截断、注解渲染 ≤4 KB、Console/Network 单行摘要与 500 B 预算、header/query/JSON body 脱敏、`<untrusted-page-content>` 边界逃逸与实体膨胀预算。所有 `src/contracts/*` 只互相引用，无第三方或 Node/DOM 运行时依赖；`TargetSession`/`ArtifactRef` 等为纯类型契约。
 
-### - [ ] T010 Client shell + 右栏 tab
+### - [x] T010 Client shell + 右栏 tab
 
 - **目标**：注册 `Vibe Studio` tab（`keepMounted`、全屏、guide）；内部页签占位；空/错/加载状态；i18n 骨架。
 - **验收**：tab 可开/全屏；切 tab/会话不丢；占位页可见；组件测试通过。
-- **验证**：手动 + `pnpm test -- tests/component/shell`。
+- **验证**：手动 + `pnpm exec vitest run tests/component/shell`。
 - **文件**：`src/client/shell/*`、`src/client/locales/{zh-CN,en}.json`。
+- **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/component/shell` 3 文件 / 13 用例、全量 `pnpm test` 11 文件 / 57 用例通过；`pnpm build` host 2.4 KiB / client 12.0 KiB。`vibe-dev` + headless Edge 实测：guide 卡片可开 tab，四个内部页签（预览/检查/标注/API）切换与占位文案正确，全屏进入/退出保持当前页签，收起右栏再展开、关闭 tab 后重开均保留“标注”页签，client.js 200、console/pageerror 0。新增 devDependencies `jsdom`/`@testing-library/react`/`@testing-library/dom`（仅测试）。限制：未单独脚本化切 Session；运行中切换系统语言需重载。
 
 ### - [ ] T011 Connection 传输骨架
 

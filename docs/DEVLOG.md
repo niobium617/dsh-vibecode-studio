@@ -8,10 +8,10 @@
 ## 1. 当前快照
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，进入 M1）**。
-- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1。
-- 进行中：无；下一项 **T010 Client shell + 右栏 tab**。
+- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab。
+- 进行中：无；下一项 **T011 Connection 传输骨架**。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务并校验 Config。
-- T001–T008 已提交并推送至 `task/m1-foundation`；T009 的 contracts、测试与文档尚未提交（等用户确认）。S3/S4 用 Playwright 启动的 Edge 在脚本结束时关闭，未留下进程。
+- T001–T009 已提交并推送至 `task/m1-foundation`；T010 的 shell 代码、测试、locales 与测试依赖待提交。S3/S4/T010 用 Playwright 启动的 Edge 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
 
 环境：
@@ -135,6 +135,23 @@
 - 验证：`pnpm exec vitest run tests/unit/contracts` 6 文件 / 34 用例、全量 `pnpm test` 8 文件 / 44 用例；`pnpm typecheck` 与 `pnpm build` 通过。`pnpm test -- <path>` 不会过滤（vitest 把 `--` 后的路径当普通参数），后续统一用 `pnpm exec vitest run <path>`。所有 contracts 只互相引用，无第三方/Node/DOM 运行时依赖。
 - 决策：注解渲染先按 UTF-8 字节预算裁剪注释，元素块先裁剪再包裹，保证关闭标签不会被截断；脱敏只处理键名，不猜测页面文本中的 token。
 
+### T010 — Client shell + 右栏 tab（已完成）
+
+- 目标：替换 T007 hello 面板，注册并填充右栏 `Vibe Studio` tab（keepMounted、全屏、guide）；内部占位页签与空/错/加载状态；i18n 骨架。
+- 结果：
+  - `src/client/shell/StudioShell.tsx`：标题/副标题、四个内部页签（预览/检查/标注/API）、`role=tablist/tab/tabpanel` 与 `aria-selected`，页面占位用统一空状态。
+  - `src/client/shell/store.ts`：模块级 `useSyncExternalStore` 状态，`keepMounted` 之外再保证强制卸载/重开后仍停留在原页签；`resetShellStore()` 供测试隔离。
+  - `src/client/shell/StateViews.tsx`：`LoadingState`（`role=status`）、`EmptyState`、`ErrorState`（`role=alert` + 重试）与 `ShellErrorBoundary`，页面崩溃只影响面板。
+  - `src/client/locales/{en,zh-CN}.json` + `src/client/i18n.ts`：`translate()` 按 locale → en → key 回退，`{name}` 插值，`detectLocale('zh*') → zh-CN`；默认 en，浏览器语言由 `browserLocale()` 读取。JSON 由 esbuild 内联进 client bundle。
+  - `src/client/index.ts` 改用 `StudioShell`，tab 标题/guide 描述走 `translate`；删除 `src/client/hello.tsx`。
+  - 测试依赖新增 devDependencies：`jsdom`、`@testing-library/react`、`@testing-library/dom`（仅测试，不进 bundle）。
+- 验证：
+  - `pnpm exec vitest run tests/component/shell` → 3 文件 / 13 用例；全量 `pnpm test` → 11 文件 / 57 用例；`pnpm typecheck` 0 error。
+  - `pnpm build` → host 2.4 KiB、client 12.0 KiB（含 shell + 两份 locales）。
+  - `vibe-dev` + headless Edge（4321/4323）：guide 卡片打开 tab；页签 预览→检查→标注 切换与面板文案正确；点“全屏”再 Esc，标注仍选中；收起右侧栏再展开、关闭 tab 后重新打开，标注页签均保留；client.js 200；console/pageerror 0。
+  - 证据脚本：`.tmp/t010-verify.mjs`、`.tmp/t010-persist.mjs`（gitignored，一次性验证，不属于产品）。
+- 限制：切 Session 未单独脚本化（与收起/重开共用 `keepMounted` 机制）；locale 在 `apply()`/渲染时读取，运行中切换系统语言需重载页面。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -147,6 +164,9 @@
 37. **schemastery 默认放过未知键**：`Schema.object` 不拒绝额外字段；需要 `resolveConfig()` 自行比对已知键，否则用户拼错配置会静默无效。
 38. **不可信包裹要先转义再截断**：先截断原始内容再转义 HTML，`<` 变成 `&lt;` 会让实际字节数膨胀 4 倍并突破预算；先转义再按字节截断，即使截断点落在实体内也不会重新产生 `<\s*untrusted-page-content`。
 39. **UTF-8 预算不能用 `string.length`**：中文/emoji 的码元数与字节数不同；按 `for...of` 逐码点累计 UTF-8 字节，才能在预算边界不产生替换字符（`�`）。
+40. **组件测试要显式 `cleanup()`**：本项目 vitest 未开 `globals`，`@testing-library/react` 的自动清理不会注册；在每个 jsdom 测试文件里 `afterEach(cleanup)`，并在 `beforeEach` 调 `resetShellStore()`，否则模块级 store 会跨用例泄漏。
+41. **jsdom 按文件开启**：全局仍为 `environment: 'node'`（contracts 等纯函数测试不需要 DOM）；组件测试首行写 `// @vitest-environment jsdom`，避免每个纯逻辑用例都付 DOM 启动成本。
+42. **右栏收起后按钮不可见**：收起右侧栏后 `新标签页` 仍在 DOM 但不可点；验证脚本先尝试“新标签页”，不可见时点“打开右侧边栏”，再点 guide 卡片，才能稳定重开 tab。
 
 ### 传输 / DSH 插件
 
@@ -212,8 +232,8 @@
 
 - **T004 已完成**：30/30 元素源码命中；点击泄漏 0、Esc、console 均通过；限制是仅 dev 模式、未覆盖 TSX/iframe/重复组件选择器。
 - **T005 G0 已通过（GO）**：帧传输 stream 为主/pull 回退；中文主路径 + 逐字/粘贴回退；截图仅剪贴板；源码三框架适配 + 选择器/DOM 降级。证据见 [`spikes/G0.md`](../spikes/G0.md)。
-- **T006–T009 已完成**：产品包脚手架、host ESM、client loader bundle、host Config/服务位、contracts v1 均已验证；下一项 T010 client shell。
-- **T010 及以后（M1）**：client shell、connection、Vite fixture、profile 安装与清理；按 G0 约束实现 connection/stream/pull。T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 待后续任务消费；T009 的 contracts 由 T010 起实际引用。
+- **T006–T010 已完成**：产品包脚手架、host ESM、client loader bundle、host Config/服务位、contracts v1、client shell/右栏 tab 均已验证；下一项 T011 connection 传输骨架。
+- **T011 及以后（M1）**：connection、Vite fixture、profile 安装与清理；按 G0 约束实现 connection/stream/pull。T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 待后续任务消费；T009 的 contracts 由后续页面逐步引用。
 - **S2 遗留**：如果上游未来公开附件创建/释放 API，再评估直接截图附件；先复测切会话保留和失败清理。
 - **Desktop 遗留**：S2 跨会话未测到，后续需要能稳定创建第二个命名会话的测试环境。
 - **成本**：避免无必要的全仓读取和重复验收；每个任务完成即提交、记录、清理进程。
