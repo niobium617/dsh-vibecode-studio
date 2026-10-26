@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { apply as clientApply, CLIENT_ID, inject as clientInject } from '../src/client/index'
 import { apply, name } from '../src/host/index'
+import { createFakeHost } from './helpers/fake-host'
 
 describe('package smoke', () => {
   it('exposes the host plugin name', () => {
@@ -9,7 +10,9 @@ describe('package smoke', () => {
 
   it('exposes a callable host apply()', () => {
     expect(apply).toBeTypeOf('function')
-    expect(() => apply({ provide: () => {} })).not.toThrow()
+    const host = createFakeHost()
+    expect(() => apply(host.ctx)).not.toThrow()
+    expect(host.routes.size).toBe(2)
   })
 
   it('exposes the client id', () => {

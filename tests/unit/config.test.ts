@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { apply, Config, normalizeOrigin, resolveConfig, type VibeStudioConfig } from '../../src/host/index'
+import { createFakeHost } from '../helpers/fake-host'
 
 describe('host config', () => {
   it('applies documented defaults', () => {
@@ -39,11 +40,15 @@ describe('host config', () => {
   })
 
   it('provides the resolved config through the service slot', () => {
-    const provide = vi.fn()
-    apply({ provide }, Config({ logLevel: 'debug' }))
+    const host = createFakeHost()
+    const provide = vi.fn(host.ctx.provide)
+    host.ctx.provide = provide
+
+    apply(host.ctx, Config({ logLevel: 'debug' }))
 
     expect(provide).toHaveBeenCalledWith('vibeStudio', {
       config: expect.objectContaining({ logLevel: 'debug' }),
+      transport: expect.anything(),
     })
   })
 })
