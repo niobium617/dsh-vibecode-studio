@@ -1,0 +1,53 @@
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #f6f7f9;
+  color: #1f2328;
+}
+
+.app {
+  max-width: 640px;
+  margin: 24px auto;
+  padding: 20px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+}
+
+h1 {
+  margin: 0 0 16px;
+  font-size: 20px;
+}
+
+form {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+  padding: 6px 8px;
+}
+
+textarea {
+  min-height: 48px;
+}
+
+.row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+ul {
+  margin: 0 0 16px;
+  padding-left: 20px;
+}
+
+li {
+  padding: 4px 0;
+}

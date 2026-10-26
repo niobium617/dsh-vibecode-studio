@@ -9,6 +9,7 @@
 > - 任务按依赖排序，不按重要性排序。
 > - `[P]` = 可与同阶段任务并行；`[P1]` = 非 MVP 阻塞；`[GATE]` = 只评审/决策，不写产品代码。
 > - 发现计划假设不成立，先更新 `plan.md`/SPEC，不硬写。
+> - 执行时只读当前任务一节；不要通读整个清单。
 
 ---
 
@@ -40,26 +41,29 @@
 - **文件**：`spikes/s2/{client.tsx,host.ts,build.ts,package/,run.md,REPORT.md}`。
 - **验证结果（2026-10-25）**：`pnpm typecheck` 与 `pnpm spike:s2:build` 通过；Web（`vibe-dev`）和隔离 Desktop 均通过 `conversation.input.left` 的公开 `inputActions` 完成 111 字符 `setDraft`、用户键盘编辑、光标 `insertText`，等待 2 s 后 `phase` 仍为 `plain` 且草稿完整，未自动提交；文本/PNG 剪贴板在两端均可用（Web 读出 `image/png`，Desktop 不透明 origin 无法 CDP 授权但 Electron 剪贴板正常）；console error 为 0。Web 跨会话文本隔离通过，但附件 id 切走再切回后丢失。`createDrafts` + `addAttachments` 在两端返回 accepted，但 `createDrafts` 不在公开 `IConversation`，D6 保持仅剪贴板回退。证据见 `spikes/s2/REPORT.md`。
 
-### - [ ] T003 S3 screencast + 输入 + 中文 spike [P]
+### - [x] T003 S3 screencast + 输入 + 中文 spike [P]
 
 - **目标**：Playwright + Edge 的 screencast、点击/滚动/键盘、中文输入、延迟测量。
 - **验收**：headless/headful 均 ≥ 10 fps；输入延迟 < 200 ms；中文可用，或明确回退方案。
 - **验证**：`pnpm tsx spikes/s3/run.ts`；`spikes/s3/REPORT.md` 含 fps/延迟/IME 结论。
 - **文件**：`spikes/s3/{run.ts,fixture.html,REPORT.md}`。
+- **验证结果（2026-10-26）**：`pnpm typecheck` 与 `pnpm spike:s3 --seconds 10` 通过；headless 988 帧 / 98.7 fps、headful 983 帧 / 98.3 fps（unique fps 同值），首帧 24/18 ms，帧接收延迟 avg/p95 7.4/12.9 ms 与 5.4/8.1 ms；输入最大 26.8/25.2 ms（滚轮最高，点击/键盘/文本 1–9 ms）；中文 `insertText`（你好，世界）、逐字 `type`（中文）、CDP 模拟 IME（你好，composition 5 / composing 6）均通过；焦点 click=text、Tab=ime、Esc 正常；0 console error。限制：真实系统 IME 未在 DSH 载体手测（T022 补）；screencast 需在 T020 限速（约 20.2 KB/帧，98.7 fps ≈ 2 MB/s）。证据见 `spikes/s3/REPORT.md`。
 
-### - [ ] T004 S4 拾取 + 源码 spike [P]
+### - [x] T004 S4 拾取 + 源码 spike [P]
 
 - **目标**：Shadow DOM overlay 拾取；React/Vue/Svelte 开发态源码定位。
 - **验收**：30 个元素源码命中 ≥ 80%；拾取不触发页面点击；`Esc` 退出；无 console 报错。
 - **验证**：`pnpm tsx spikes/s4/run.ts`；`spikes/s4/REPORT.md` + 三框架命中率表。
 - **文件**：`spikes/s4/{inject.ts,run.ts,fixtures/*,REPORT.md}`。
+- **验证结果（2026-10-26）**：`pnpm typecheck` 与 `pnpm spike:s4` 通过。React/Vue/Svelte 各 10/10，合计 30/30（100%），行号全部精确（delta=0）；选择器唯一 30/30；点击泄漏 0；Esc 三框架均退出；console/pageerror 0；overlay 均在 open Shadow DOM。React 19 已无 `_debugSource`，改用构建期 `data-inspector-*`（`@react-dev-inspector/babel-plugin`）；Vue 的 inspector 属性被移入 vnode `__v_inspector`；Svelte 读 `__svelte_meta`。证据见 `spikes/s4/REPORT.md` 与 `spikes/s4/results.json`。限制：仅 dev 模式、未覆盖 TSX/iframe/重复组件选择器。
 
-### - [ ] T005 G0 Spike 评审 [GATE]
+### - [x] T005 G0 Spike 评审 [GATE]
 
 - **目标**：汇总 S1–S4；确定帧传输基线（拉取/流式）、IME 回退、截图回退、源码回退。
 - **验收**：`spikes/G0.md` 有 go/no-go 与每条回退的最终选择；若有阻塞，更新 `plan.md`。
 - **验证**：人工评审；不写产品代码。
 - **文件**：`spikes/G0.md`。
+- **验证结果（2026-10-26）**：人工复核 S1–S4 报告与随附证据（`s1/bench.json`、`s3/results.json`、`s4/results.json`），未重跑 spike、未写产品代码。结论 **GO**：帧传输 stream 为主、pull 为回退；输入走 CDP 一元请求；中文主路径为隐藏 textarea + `compositionend` + `Input.insertText`，T022 系统 IME 手测失败时回退逐字/粘贴；截图仅复制 PNG 手动粘贴，不依赖非公开 `createDrafts`；源码按 React 构建期属性 / Vue vnode `__v_inspector` / Svelte `__svelte_meta` 适配，未命中则降级为选择器/DOM。无阻塞项，`plan.md` 无需新增修改。证据见 `spikes/G0.md`。
 
 ---
 

@@ -40,9 +40,12 @@ tasks/       implementation plan, ordered task list, handoff state
 spikes/
   s1/        T001 transport spike: pull JPEG vs multipart stream
   s2/        T002 composer handoff spike: public InputActions + clipboard fallback
+  s3/        T003 screencast, input latency, and Chinese IME spike
+  s4/        T004 element picking and React/Vue/Svelte source mapping spike
+  G0.md      T005 spike review: go/no-go and final fallback decisions
 ```
 
-The product package will arrive in `packages/` after the spike gates pass. Until then, `spikes/` is the only executable code.
+The product package will arrive in `packages/` after G0. Until then, `spikes/` is the only executable code.
 
 ## Development
 

@@ -1,0 +1,195 @@
+{
+  "generatedAt": "2026-10-26T04:37:24.630Z",
+  "browser": "msedge",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "quality": 70,
+  "seconds": 10,
+  "modes": [
+    {
+      "mode": "headless",
+      "seconds": 10,
+      "frames": 988,
+      "uniqueFrames": 988,
+      "fps": 98.7,
+      "uniqueFps": 98.7,
+      "firstFrameMs": 24,
+      "bytesPerFrame": 20712,
+      "fpsBySecond": [
+        97,
+        99,
+        99,
+        99,
+        99,
+        99,
+        97,
+        100,
+        99,
+        99,
+        1
+      ],
+      "captureLatency": {
+        "avg": 7.4,
+        "p95": 12.9,
+        "max": 27
+      },
+      "jpegValid": true,
+      "errors": 0,
+      "edgeVersion": "156.0.4314.42",
+      "inputs": [
+        {
+          "action": "click",
+          "dispatchMs": 4.1,
+          "paintMs": 8.4,
+          "accepted": true,
+          "detail": "status=clicked at 2026-10-26T04"
+        },
+        {
+          "action": "wheel",
+          "dispatchMs": 26.8,
+          "paintMs": 25.2,
+          "accepted": true,
+          "detail": "scrollY=900"
+        },
+        {
+          "action": "keyboard",
+          "dispatchMs": 4.6,
+          "paintMs": 7.6,
+          "accepted": true,
+          "detail": "text=abc"
+        },
+        {
+          "action": "insertText",
+          "dispatchMs": 6.2,
+          "paintMs": 1.9,
+          "accepted": true,
+          "detail": "text=你好，世界"
+        },
+        {
+          "action": "typeCjk",
+          "dispatchMs": 1.9,
+          "paintMs": 3.2,
+          "accepted": true,
+          "detail": "text=中文"
+        },
+        {
+          "action": "imeCommit",
+          "dispatchMs": 2.1,
+          "paintMs": 6,
+          "accepted": true,
+          "detail": "text=你好"
+        }
+      ],
+      "inputMaxMs": 26.8,
+      "cjk": {
+        "insertText": "你好，世界",
+        "typeCjk": "中文",
+        "ime": "你好",
+        "compositionEvents": 5,
+        "composingEvents": 6
+      },
+      "focus": {
+        "afterClick": "text",
+        "afterTab": "ime",
+        "escReceived": true
+      },
+      "consoleErrors": [],
+      "pass": true,
+      "failures": []
+    },
+    {
+      "mode": "headful",
+      "seconds": 10,
+      "frames": 983,
+      "uniqueFrames": 983,
+      "fps": 98.3,
+      "uniqueFps": 98.3,
+      "firstFrameMs": 18,
+      "bytesPerFrame": 20619,
+      "fpsBySecond": [
+        98,
+        99,
+        98,
+        97,
+        99,
+        99,
+        99,
+        95,
+        100,
+        98,
+        1
+      ],
+      "captureLatency": {
+        "avg": 5.4,
+        "p95": 8.1,
+        "max": 13.4
+      },
+      "jpegValid": true,
+      "errors": 0,
+      "edgeVersion": "156.0.4314.42",
+      "inputs": [
+        {
+          "action": "click",
+          "dispatchMs": 1.1,
+          "paintMs": 0.6,
+          "accepted": true,
+          "detail": "status=clicked at 2026-10-26T04"
+        },
+        {
+          "action": "wheel",
+          "dispatchMs": 25.2,
+          "paintMs": 24.2,
+          "accepted": true,
+          "detail": "scrollY=900"
+        },
+        {
+          "action": "keyboard",
+          "dispatchMs": 1.7,
+          "paintMs": 6,
+          "accepted": true,
+          "detail": "text=abc"
+        },
+        {
+          "action": "insertText",
+          "dispatchMs": 1.7,
+          "paintMs": 0.9,
+          "accepted": true,
+          "detail": "text=你好，世界"
+        },
+        {
+          "action": "typeCjk",
+          "dispatchMs": 1.6,
+          "paintMs": 4.5,
+          "accepted": true,
+          "detail": "text=中文"
+        },
+        {
+          "action": "imeCommit",
+          "dispatchMs": 1.5,
+          "paintMs": 6.9,
+          "accepted": true,
+          "detail": "text=你好"
+        }
+      ],
+      "inputMaxMs": 25.2,
+      "cjk": {
+        "insertText": "你好，世界",
+        "typeCjk": "中文",
+        "ime": "你好",
+        "compositionEvents": 5,
+        "composingEvents": 6
+      },
+      "focus": {
+        "afterClick": "text",
+        "afterTab": "ime",
+        "escReceived": true
+      },
+      "consoleErrors": [],
+      "pass": true,
+      "failures": []
+    }
+  ],
+  "pass": true
+}

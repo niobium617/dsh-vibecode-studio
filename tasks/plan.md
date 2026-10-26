@@ -345,6 +345,8 @@ MVP 的完成定义（与 SPEC 第 2.3 节一致）：
 
 **产出：** `spikes/s4-picker/REPORT.md` + 三框架命中率表。
 
+**S4 实测修订（2026-10-26）：** React 19 已移除 `_debugSource`，fiber 走不通；Vue 的 `data-v-inspector` 运行时被移入 vnode 隐藏 prop。实测改用“React 构建期 JSX 属性（`@react-dev-inspector/babel-plugin`）+ Vue vnode `__v_inspector` + Svelte `__svelte_meta`”，30/30 命中。详见 [`spikes/s4/REPORT.md`](../spikes/s4/REPORT.md)。
+
 ### 支持性 Spike（可在 M2/M4 并行）
 
 - **S7 OpenAPI**：500 端点 spec、远程 ref、循环 ref、超大 schema；通过标准 < 5 s、SSRF 拦截、错误可读。

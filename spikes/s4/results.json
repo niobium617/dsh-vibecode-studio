@@ -1,0 +1,582 @@
+{
+  "generatedAt": "2026-10-26T05:03:23.288Z",
+  "pass": true,
+  "criteria": {
+    "hitRate": 0.8,
+    "lineTolerance": 2,
+    "leaks": 0,
+    "consoleErrors": 0,
+    "esc": true,
+    "overlayShadow": true
+  },
+  "totals": {
+    "hits": 30,
+    "elements": 30,
+    "hitRate": 1,
+    "leaks": 0,
+    "consoleErrors": 0,
+    "pageErrors": 0,
+    "escPassed": true,
+    "overlayPassed": true
+  },
+  "frameworks": [
+    {
+      "framework": "react",
+      "url": "http://127.0.0.1:57488/",
+      "overlayInShadowRoot": true,
+      "picks": [
+        {
+          "id": "title",
+          "expectedLine": 9,
+          "selector": "#title",
+          "unique": true,
+          "source": {
+            "framework": "react",
+            "via": "data-inspector",
+            "file": "src\\\\App.jsx",
+            "line": 9,
+            "column": 6
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "name",
+          "expectedLine": 12,
+          "selector": "#name",
+          "unique": true,
+          "source": {
+            "framework": "react",
+            "via": "data-inspector",
+            "file": "src\\\\App.jsx",
+            "line": 12,
+            "column": 8
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "bio",
+          "expectedLine": 13,
+          "selector": "#bio",
+          "unique": true,
+          "source": {
+            "framework": "react",
+            "via": "data-inspector",
+            "file": "src\\\\App.jsx",
+            "line": 13,
+            "column": 8
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "role",
+          "expectedLine": 14,
+          "selector": "#role",
+          "unique": true,
+          "source": {
+            "framework": "react",
+            "via": "data-inspector",
+            "file": "src\\\\App.jsx",
+            "line": 14,
+            "column": 8
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "agree",
+          "expectedLine": 18,
+          "selector": "#agree",
+          "unique": true,
+          "source": {
+            "framework": "react",
+            "via": "data-inspector",
+            "file": "src\\\\App.jsx",
+            "line": 18,
+            "column": 31
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "submit",
+          "expectedLine": 19,
+          "selector": "#submit",
+          "unique": true,
+          "source": {
+            "framework": "react",
+            "via": "data-inspector",
+            "file": "src\\\\App.jsx",
+            "line": 19,
+            "column": 8
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "item-1",
+          "expectedLine": 22,
+          "selector": "#item-1",
+          "unique": true,
+          "source": {
+            "framework": "react",
+            "via": "data-inspector",
+            "file": "src\\\\App.jsx",
+            "line": 22,
+            "column": 8
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "item-2",
+          "expectedLine": 23,
+          "selector": "#item-2",
+          "unique": true,
+          "source": {
+            "framework": "react",
+            "via": "data-inspector",
+            "file": "src\\\\App.jsx",
+            "line": 23,
+            "column": 8
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "item-3",
+          "expectedLine": 24,
+          "selector": "#item-3",
+          "unique": true,
+          "source": {
+            "framework": "react",
+            "via": "data-inspector",
+            "file": "src\\\\App.jsx",
+            "line": 24,
+            "column": 8
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "footer",
+          "expectedLine": 26,
+          "selector": "#footer",
+          "unique": true,
+          "source": {
+            "framework": "react",
+            "via": "data-inspector",
+            "file": "src\\\\App.jsx",
+            "line": 26,
+            "column": 6
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        }
+      ],
+      "hits": 10,
+      "total": 10,
+      "esc": {
+        "activeAfter": false,
+        "clicksAfter": 1,
+        "passed": true
+      },
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "framework": "vue",
+      "url": "http://127.0.0.1:64017/",
+      "overlayInShadowRoot": true,
+      "picks": [
+        {
+          "id": "title",
+          "expectedLine": 10,
+          "selector": "#title",
+          "unique": true,
+          "source": {
+            "framework": "vue",
+            "via": "__v_inspector",
+            "file": "spikes/s4/fixtures/vue/src/App.vue",
+            "line": 10,
+            "column": 4
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "name",
+          "expectedLine": 13,
+          "selector": "#name",
+          "unique": true,
+          "source": {
+            "framework": "vue",
+            "via": "__v_inspector",
+            "file": "spikes/s4/fixtures/vue/src/App.vue",
+            "line": 13,
+            "column": 6
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "bio",
+          "expectedLine": 14,
+          "selector": "#bio",
+          "unique": true,
+          "source": {
+            "framework": "vue",
+            "via": "__v_inspector",
+            "file": "spikes/s4/fixtures/vue/src/App.vue",
+            "line": 14,
+            "column": 6
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "role",
+          "expectedLine": 15,
+          "selector": "#role",
+          "unique": true,
+          "source": {
+            "framework": "vue",
+            "via": "__v_inspector",
+            "file": "spikes/s4/fixtures/vue/src/App.vue",
+            "line": 15,
+            "column": 6
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "agree",
+          "expectedLine": 19,
+          "selector": "#agree",
+          "unique": true,
+          "source": {
+            "framework": "vue",
+            "via": "__v_inspector",
+            "file": "spikes/s4/fixtures/vue/src/App.vue",
+            "line": 19,
+            "column": 25
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "submit",
+          "expectedLine": 20,
+          "selector": "#submit",
+          "unique": true,
+          "source": {
+            "framework": "vue",
+            "via": "__v_inspector",
+            "file": "spikes/s4/fixtures/vue/src/App.vue",
+            "line": 20,
+            "column": 6
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "item-1",
+          "expectedLine": 23,
+          "selector": "#item-1",
+          "unique": true,
+          "source": {
+            "framework": "vue",
+            "via": "__v_inspector",
+            "file": "spikes/s4/fixtures/vue/src/App.vue",
+            "line": 23,
+            "column": 6
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "item-2",
+          "expectedLine": 24,
+          "selector": "#item-2",
+          "unique": true,
+          "source": {
+            "framework": "vue",
+            "via": "__v_inspector",
+            "file": "spikes/s4/fixtures/vue/src/App.vue",
+            "line": 24,
+            "column": 6
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "item-3",
+          "expectedLine": 25,
+          "selector": "#item-3",
+          "unique": true,
+          "source": {
+            "framework": "vue",
+            "via": "__v_inspector",
+            "file": "spikes/s4/fixtures/vue/src/App.vue",
+            "line": 25,
+            "column": 6
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "footer",
+          "expectedLine": 27,
+          "selector": "#footer",
+          "unique": true,
+          "source": {
+            "framework": "vue",
+            "via": "__v_inspector",
+            "file": "spikes/s4/fixtures/vue/src/App.vue",
+            "line": 27,
+            "column": 4
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        }
+      ],
+      "hits": 10,
+      "total": 10,
+      "esc": {
+        "activeAfter": false,
+        "clicksAfter": 1,
+        "passed": true
+      },
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "framework": "svelte",
+      "url": "http://127.0.0.1:57447/",
+      "overlayInShadowRoot": true,
+      "picks": [
+        {
+          "id": "title",
+          "expectedLine": 9,
+          "selector": "#title",
+          "unique": true,
+          "source": {
+            "framework": "svelte",
+            "via": "__svelte_meta",
+            "file": "spikes/s4/fixtures/svelte/src/App.svelte",
+            "line": 9,
+            "column": 2
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "name",
+          "expectedLine": 12,
+          "selector": "#name",
+          "unique": true,
+          "source": {
+            "framework": "svelte",
+            "via": "__svelte_meta",
+            "file": "spikes/s4/fixtures/svelte/src/App.svelte",
+            "line": 12,
+            "column": 4
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "bio",
+          "expectedLine": 13,
+          "selector": "#bio",
+          "unique": true,
+          "source": {
+            "framework": "svelte",
+            "via": "__svelte_meta",
+            "file": "spikes/s4/fixtures/svelte/src/App.svelte",
+            "line": 13,
+            "column": 4
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "role",
+          "expectedLine": 14,
+          "selector": "#role",
+          "unique": true,
+          "source": {
+            "framework": "svelte",
+            "via": "__svelte_meta",
+            "file": "spikes/s4/fixtures/svelte/src/App.svelte",
+            "line": 14,
+            "column": 4
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "agree",
+          "expectedLine": 18,
+          "selector": "#agree",
+          "unique": true,
+          "source": {
+            "framework": "svelte",
+            "via": "__svelte_meta",
+            "file": "spikes/s4/fixtures/svelte/src/App.svelte",
+            "line": 18,
+            "column": 23
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "submit",
+          "expectedLine": 19,
+          "selector": "#submit",
+          "unique": true,
+          "source": {
+            "framework": "svelte",
+            "via": "__svelte_meta",
+            "file": "spikes/s4/fixtures/svelte/src/App.svelte",
+            "line": 19,
+            "column": 4
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "item-1",
+          "expectedLine": 22,
+          "selector": "#item-1",
+          "unique": true,
+          "source": {
+            "framework": "svelte",
+            "via": "__svelte_meta",
+            "file": "spikes/s4/fixtures/svelte/src/App.svelte",
+            "line": 22,
+            "column": 4
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "item-2",
+          "expectedLine": 23,
+          "selector": "#item-2",
+          "unique": true,
+          "source": {
+            "framework": "svelte",
+            "via": "__svelte_meta",
+            "file": "spikes/s4/fixtures/svelte/src/App.svelte",
+            "line": 23,
+            "column": 4
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "item-3",
+          "expectedLine": 24,
+          "selector": "#item-3",
+          "unique": true,
+          "source": {
+            "framework": "svelte",
+            "via": "__svelte_meta",
+            "file": "spikes/s4/fixtures/svelte/src/App.svelte",
+            "line": 24,
+            "column": 4
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        },
+        {
+          "id": "footer",
+          "expectedLine": 26,
+          "selector": "#footer",
+          "unique": true,
+          "source": {
+            "framework": "svelte",
+            "via": "__svelte_meta",
+            "file": "spikes/s4/fixtures/svelte/src/App.svelte",
+            "line": 26,
+            "column": 2
+          },
+          "fileMatch": true,
+          "lineDelta": 0,
+          "hit": true,
+          "clicksLeaked": 0
+        }
+      ],
+      "hits": 10,
+      "total": 10,
+      "esc": {
+        "activeAfter": false,
+        "clicksAfter": 1,
+        "passed": true
+      },
+      "consoleErrors": [],
+      "pageErrors": []
+    }
+  ]
+}

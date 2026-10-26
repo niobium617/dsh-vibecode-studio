@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S3 screencast / input fixture</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #0d1117; color: #e6edf3; font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; }
+  #stage { position: relative; width: 100%; height: 800px; overflow: hidden; background: radial-gradient(circle at 30% 20%, #1b2a41, #0d1117 70%); }
+  #mover {
+    position: absolute; left: 40px; top: 40px; width: 180px; height: 180px; border-radius: 28px;
+    background: linear-gradient(135deg, #38bdf8, #f472b6);
+    animation: move 1.6s linear infinite alternate;
+    will-change: transform;
+  }
+  @keyframes move {
+    from { transform: translate(0, 0) rotate(0deg); }
+    to   { transform: translate(940px, 520px) rotate(180deg); }
+  }
+  #pulse {
+    position: absolute; right: 48px; bottom: 48px; width: 64px; height: 64px; border-radius: 50%;
+    background: #22c55e; animation: pulse 0.7s ease-in-out infinite alternate;
+  }
+  @keyframes pulse { from { opacity: 0.35; transform: scale(0.7); } to { opacity: 1; transform: scale(1); } }
+  .panel {
+    position: absolute; left: 32px; top: 280px; width: 560px; padding: 20px 24px;
+    background: rgba(13, 17, 23, 0.82); border: 1px solid #30363d; border-radius: 14px;
+  }
+  .panel h1 { margin: 0 0 12px; font-size: 18px; font-weight: 600; }
+  .panel p { margin: 0 0 14px; font-size: 13px; color: #9da7b3; }
+  label { display: block; margin: 12px 0 6px; font-size: 13px; color: #9da7b3; }
+  input, textarea {
+    width: 100%; padding: 10px 12px; font-size: 16px; color: #e6edf3;
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px; resize: none;
+  }
+  input:focus, textarea:focus { outline: 2px solid #38bdf8; outline-offset: 1px; }
+  #hit {
+    margin-top: 16px; padding: 12px 22px; font-size: 16px; font-weight: 600;
+    color: #0d1117; background: #38bdf8; border: 0; border-radius: 10px; cursor: pointer;
+  }
+  #hit:active { transform: translateY(1px); }
+  #status { margin-top: 12px; font-size: 13px; color: #7ee787; min-height: 20px; }
+  #scroller { padding: 40px 32px 120px; }
+  #scroller h2 { margin: 0 0 16px; font-size: 20px; }
+  .filler { height: 2400px; background: repeating-linear-gradient(180deg, #161b22 0 90px, #0d1117 90px 180px); border-radius: 12px; }
+  #ticks { position: absolute; left: 32px; top: 32px; font-size: 13px; color: #9da7b3; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="mover"></div>
+  <div id="pulse"></div>
+  <div id="ticks">frame 0</div>
+  <div class="panel">
+    <h1>S3 input fixture</h1>
+    <p>Animated stage for screencast fps; controls for click / wheel / keyboard / IME.</p>
+    <button id="hit" type="button">点击目标 Click target</button>
+    <label for="text">Text input</label>
+    <input id="text" type="text" autocomplete="off" spellcheck="false">
+    <label for="ime">IME / composition area</label>
+    <textarea id="ime" rows="2" autocomplete="off" spellcheck="false"></textarea>
+    <div id="status">ready</div>
+  </div>
+</div>
+<div id="scroller">
+  <h2>Scroll target</h2>
+  <div class="filler"></div>
+</div>
+<script>
+(() => {
+  const log = [];
+  const MAX_LOG = 600;
+  let frames = 0;
+  let scrollTargetY = 0;
+
+  function abs(ts) { return performance.timeOrigin + ts; }
+
+  function push(type, extra) {
+    const now = performance.now();
+    const entry = Object.assign({ type, t: abs(now), perf: now }, extra);
+    log.push(entry);
+    if (log.length > MAX_LOG) log.splice(0, log.length - MAX_LOG);
+    requestAnimationFrame((ts) => { entry.paint = abs(ts); });
+    return entry;
+  }
+
+  function describe(target) {
+    if (!target || !target.id) return null;
+    return target.id;
+  }
+
+  const hit = document.getElementById('hit');
+  hit.addEventListener('pointerdown', (event) => push('pointerdown', { target: describe(event.target) }), true);
+  hit.addEventListener('mousedown', (event) => push('mousedown', { target: describe(event.target) }), true);
+  hit.addEventListener('click', (event) => {
+    push('click', { target: describe(event.target) });
+    document.getElementById('status').textContent = 'clicked at ' + new Date().toISOString();
+  }, true);
+
+  document.addEventListener('keydown', (event) => push('keydown', {
+    key: event.key, code: event.code, isComposing: event.isComposing,
+  }), true);
+  document.addEventListener('beforeinput', (event) => push('beforeinput', {
+    inputType: event.inputType, data: event.data, isComposing: event.isComposing,
+    target: describe(event.target),
+  }), true);
+  document.addEventListener('input', (event) => {
+    const target = event.target;
+    push('input', {
+      inputType: event.inputType, data: event.data, isComposing: event.isComposing,
+      target: describe(target), value: target && 'value' in target ? target.value : null,
+    });
+  }, true);
+  document.addEventListener('compositionstart', (event) => push('compositionstart', {
+    data: event.data, target: describe(event.target),
+  }), true);
+  document.addEventListener('compositionupdate', (event) => push('compositionupdate', {
+    data: event.data, target: describe(event.target),
+  }), true);
+  document.addEventListener('compositionend', (event) => push('compositionend', {
+    data: event.data, target: describe(event.target),
+  }), true);
+
+  window.addEventListener('scroll', () => {
+    push('scroll', { scrollY: window.scrollY });
+  }, { capture: true, passive: true });
+
+  function tick() {
+    frames += 1;
+    document.getElementById('ticks').textContent = 'frame ' + frames;
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  window.__vibeReset = () => { log.length = 0; frames = 0; };
+  window.__vibeSetScrollTarget = (y) => { scrollTargetY = y; };
+  window.__vibeSnapshot = () => ({
+    now: abs(performance.now()),
+    frames,
+    scrollY: window.scrollY,
+    scrollTargetY,
+    text: document.getElementById('text').value,
+    ime: document.getElementById('ime').value,
+    status: document.getElementById('status').textContent,
+    active: document.activeElement ? describe(document.activeElement) : null,
+    events: log.slice(),
+  });
+})();
+</script>
+</body>
+</html>

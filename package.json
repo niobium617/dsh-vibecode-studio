@@ -14,15 +14,29 @@
     "spike:s1": "tsx spikes/s1/run.ts",
     "spike:s1:build": "tsx spikes/s1/run.ts --build-only",
     "spike:s1:soak": "node spikes/s1/soak.mjs",
-    "spike:s2:build": "tsx spikes/s2/build.ts"
+    "spike:s2:build": "tsx spikes/s2/build.ts",
+    "spike:s3": "tsx spikes/s3/run.ts",
+    "spike:s4": "tsx spikes/s4/run.ts",
+    "usage:cc": "node tools/cc-usage.mjs"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@react-dev-inspector/babel-plugin": "2.0.1",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@types/node": "^24.10.0",
     "@types/react": "^18.3.27",
-    "esbuild": "^0.25.12",
+    "@vitejs/plugin-react": "^6.1.2",
+    "@vitejs/plugin-vue": "^6.0.10",
+    "esbuild": "^0.28.2",
     "jpeg-js": "^0.4.4",
     "playwright-core": "^1.56.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "svelte": "^5.57.2",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5",
+    "vite-plugin-vue-inspector": "^7.0.0",
+    "vue": "^3.5.44"
   }
 }

@@ -1,18 +1,20 @@
 # VibeCoding Studio — 会话交接
 
-> 更新时间：2026-10-25
+> 更新时间：2026-10-26
 > 用途：清理/切换对话后，新会话从这里恢复，不依赖旧聊天记录。
-> 当前阶段：**Phase 4 实现（Tasks gate 已通过）**；T001 S1 传输、T002 S2 composer handoff spike 已完成，下一项 T003；尚未写产品代码。
+> 当前阶段：**Phase 4 实现（M0/G0 已通过）**；T001–T004 四个 spike 与 T005 G0 评审已完成，下一项 T006 包脚手架与工具链；尚未写产品代码。
 
 ---
 
 ## 1. 一句话状态
 
-DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、实现计划，任务清单已批准。**T001 S1 传输 spike 已通过**：Web 与 Desktop 的 pull/stream 均达到 30 fps，10 min stream soak 无断流，选定 stream 为主、pull 为回退。证据见 `spikes/s1/REPORT.md`。**T002 S2 composer handoff spike 已通过**：右栏通过 `conversation.input.left` 的公开 `inputActions` 写入文本，不自动提交；文本/PNG 剪贴板在 Web/Desktop 可用；`createDrafts` 非公开且附件跨会话丢失，MVP 只做剪贴板回退。证据见 `spikes/s2/REPORT.md`；下一步从 `T003 S3 screencast + 输入 + 中文 spike` 继续。
+DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、实现计划，任务清单已批准。**T001 S1 传输 spike 已通过**：Web 与 Desktop 的 pull/stream 均达到 30 fps，10 min stream soak 无断流，选定 stream 为主、pull 为回退。证据见 `spikes/s1/REPORT.md`。**T002 S2 composer handoff spike 已通过**：右栏通过 `conversation.input.left` 的公开 `inputActions` 写入文本，不自动提交；文本/PNG 剪贴板在 Web/Desktop 可用；`createDrafts` 非公开且附件跨会话丢失，MVP 只做剪贴板回退。证据见 `spikes/s2/REPORT.md`。**T003 S3 screencast + 输入 + 中文 spike 已通过**：headless 98.7 fps / headful 98.3 fps（unique 同值），输入最大 26.8/25.2 ms，中文 `insertText`/逐字 `type`/模拟 IME 均正确，焦点/Tab/Esc 正常。限制：真实系统 IME 待 T022 手测；screencast 需在 T020 限速。证据见 `spikes/s3/REPORT.md`。**T004 S4 拾取 + 源码 spike 已通过**：React/Vue/Svelte 各 10/10，合计 30/30（100%），行号精确、选择器唯一 30/30、点击泄漏 0、Esc 正常、0 console/pageerror；React 19 已无 `_debugSource`，改用构建期 `data-inspector-*`；Vue 读 vnode `__v_inspector`；Svelte 读 `__svelte_meta`。证据见 `spikes/s4/REPORT.md`。**T005 G0 评审已通过（GO）**：stream 为主、pull 为回退；中文走隐藏 textarea + `insertText`，T022 系统 IME 手测失败时回退逐字/粘贴；截图只走复制 PNG 手动粘贴；源码按三框架适配、未命中降级选择器/DOM。无阻塞，证据见 `spikes/G0.md`。下一步 T006 包脚手架与工具链。
 
 ---
 
-## 2. 必读文件（按顺序）
+## 2. 参考资料（按需读取，不要通读）
+
+新会话只读本文件 + `tasks/todo.md` 的当前任务段；下面文档仅在任务引用或验收需要时按 section 查。SPEC/plan 已批准，不重复评审。
 
 1. [docs/SPEC-vibecoding-studio.md](../docs/SPEC-vibecoding-studio.md) — 需求、可行性、MVP 切分、安全边界。
 2. [docs/CAPABILITY-MAP.md](../docs/CAPABILITY-MAP.md) — 8 个模块、依赖方向、构建顺序。
@@ -31,7 +33,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 | Phase 1 SPEC | `docs/SPEC-vibecoding-studio.md` | 已批准（2026-10-25） |
 | Phase 2 计划 | `tasks/plan.md` | 已批准（2026-10-25） |
 | Phase 3 任务 | `tasks/todo.md` | 已批准（2026-10-25） |
-| Phase 4 实现 | `spikes/s1/`、`spikes/s2/`、`packages/`（后续） | 进行中（T001、T002 完成；下一项 T003） |
+| Phase 4 实现 | `spikes/s1/`、`spikes/s2/`、`spikes/s3/`、`spikes/s4/`、`spikes/G0.md`、`packages/`（后续） | M0/G0 已通过（T001–T005 完成；下一项 T006） |
 
 任务清单已获批准，按 `tasks/todo.md` 顺序执行；如果发现计划假设不成立，先更新 `plan.md`/SPEC，再继续，不要静默改范围。
 
@@ -40,8 +42,8 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 ## 4. 下一步
 
 1. 任务清单已于 2026-10-25 批准，不再重复评审。
-2. T001、T002 已完成并记录验证结果；新会话从 **T003 S3 screencast + 输入 + 中文 spike** 开始。
-3. 每个任务完成即勾选，并在任务下记录验证结果；G0–G6 门禁通过后才进入下一阶段。
+2. T001–T004 已完成并记录验证结果；**T005 G0 评审已通过（GO）**，证据见 `spikes/G0.md`。新会话从 **T006 包脚手架与工具链** 开始。
+3. 每个任务完成即勾选，并在任务下记录验证结果；G0 已通过，进入 M1；后续门禁 G1–G6 通过后才进入下一阶段。
 4. 代码与文档按任务分批提交；私有仓库公开前按 `docs/PUBLISHING.md` 清理机器路径与历史。
 
 ---
@@ -49,9 +51,9 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 ## 5. 新会话启动语（可直接粘贴）
 
 ```
-读 tasks/HANDOFF.md，
-任务清单已批准，T001、T002 已完成；从 T003 S3 screencast + 输入 + 中文 spike 开始。
-按 tasks/todo.md 顺序执行，每个任务完成后勾选并记录验证结果。
+读 tasks/HANDOFF.md 的“一句话状态”“下一步”“环境与路径”和“不可违反的约束”，
+任务清单已批准，T001–T005 已完成（G0 通过）；只读 tasks/todo.md 中 T006 一节，从 T006 包脚手架与工具链开始。
+按 tasks/todo.md 顺序执行，每个任务完成后勾选并记录验证结果；不要通读已批准的 SPEC/plan。
 ```
 
 ---
@@ -63,6 +65,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 - DSH 数据：`<DSH_ROOT>\home`
 - 开发 profile：`vibe-dev`（**不要直接改 desktop profile**）
 - Node：`24.13.0`；pnpm：`11.21.0`；DSH：`0.2.1-rc.2`
+- 会话用量：`pnpm usage:cc`（只读；`--all` 显示全部，`--json` 输出 JSON）
 - 浏览器：本机 Edge；Playwright 用 `channel: 'msedge'`，不下载浏览器
 - 临时/缓存：非系统盘或项目目录，避免占用 C 盘
 
@@ -104,4 +107,4 @@ pnpm test:e2e
 dsh --profile vibe-dev --dump-config
 ```
 
-> T001 已运行 `pnpm typecheck`、`pnpm spike:s1` 与 `spikes/s1/soak.mjs`；T002 已运行 `pnpm typecheck`、`pnpm spike:s2:build` 并完成 Web/隔离 Desktop 手测。`pnpm test` / `pnpm build` / `pnpm test:e2e` 等产品脚手架命令在 T004 之后逐步可用。
+> T001 已运行 `pnpm typecheck`、`pnpm spike:s1` 与 `spikes/s1/soak.mjs`；T002 已运行 `pnpm typecheck`、`pnpm spike:s2:build` 并完成 Web/隔离 Desktop 手测；T003 已运行 `pnpm typecheck` 与 `pnpm spike:s3 --seconds 10`；T004 已运行 `pnpm typecheck` 与 `pnpm spike:s4`；T005 为人工评审，未重跑 spike。`pnpm test` / `pnpm build` / `pnpm test:e2e` 等产品脚手架命令在 T006 之后逐步可用。
