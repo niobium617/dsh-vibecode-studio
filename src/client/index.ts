@@ -5,7 +5,8 @@
  * stays the host side; T010 grows the pane into the Studio shell.
  */
 import * as React from 'react'
-import { Hello } from './hello'
+import { browserLocale, translate } from './i18n'
+import { StudioShell } from './shell/StudioShell'
 
 export const CLIENT_ID = 'dsh-vibecode-studio'
 
@@ -14,16 +15,19 @@ export const inject = ['slots', 'sidebarRightTabs']
 const KIND = 'vibe-studio'
 
 export function apply(ctx: any): void {
-  const panel = React.createElement(Hello)
+  const panel = React.createElement(StudioShell)
+  const title = (): string => translate('shell.title', { locale: browserLocale() })
+  const description = (): string =>
+    translate('shell.guide.description', { locale: browserLocale() })
 
   ctx.effect(() => ctx.sidebarRightTabs.register({
     id: CLIENT_ID,
     kind: KIND,
-    title: () => 'Vibe Studio',
+    title,
     guide: [{
       id: CLIENT_ID,
-      title: () => 'Vibe Studio',
-      description: () => 'Preview, inspect and annotate the running app',
+      title,
+      description,
       order: 12,
     }],
     keepMounted: true,

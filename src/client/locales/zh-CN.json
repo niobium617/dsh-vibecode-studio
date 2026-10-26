@@ -1,0 +1,18 @@
+{
+  "shell.title": "Vibe Studio",
+  "shell.subtitle": "预览、检查并标注正在运行的应用",
+  "shell.guide.description": "预览、检查并标注正在运行的应用",
+  "tab.preview": "预览",
+  "tab.inspect": "检查",
+  "tab.annotations": "标注",
+  "tab.api": "API",
+  "state.loading": "加载中…",
+  "state.empty.title": "暂无内容",
+  "state.error.title": "出错了",
+  "state.error.body": "该面板无法渲染。",
+  "state.error.retry": "重试",
+  "page.preview.empty": "还没有预览目标。启动本地应用后在这里打开。",
+  "page.inspect.empty": "在预览中拾取元素，查看它的源码位置。",
+  "page.annotations.empty": "发送到对话的标注会显示在这里。",
+  "page.api.empty": "在这里构建并发送 HTTP 请求。"
+}
