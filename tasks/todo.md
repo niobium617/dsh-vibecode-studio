@@ -111,12 +111,13 @@
 - **文件**：`src/client/shell/*`、`src/client/locales/{zh-CN,en}.json`。
 - **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/component/shell` 3 文件 / 13 用例、全量 `pnpm test` 11 文件 / 57 用例通过；`pnpm build` host 2.4 KiB / client 12.0 KiB。`vibe-dev` + headless Edge 实测：guide 卡片可开 tab，四个内部页签（预览/检查/标注/API）切换与占位文案正确，全屏进入/退出保持当前页签，收起右栏再展开、关闭 tab 后重开均保留“标注”页签，client.js 200、console/pageerror 0。新增 devDependencies `jsdom`/`@testing-library/react`/`@testing-library/dom`（仅测试）。限制：未单独脚本化切 Session；运行中切换系统语言需重载。
 
-### - [ ] T011 Connection 传输骨架
+### - [x] T011 Connection 传输骨架
 
 - **目标**：host 用 `fetch.register` 注册精确 `/api/vibe/*` 路由（health + 一元请求）；client 用文档相对 `fetch`；不使用 `rpc.handle`（S1 已证第三方插件会因缺少 `webServer` inject 失败）；Web/Desktop 都通。
 - **验收**：health 返回；一元请求成功；未认证/跨源被拒；Desktop 可用。
-- **验证**：手动 Web/Desktop；`pnpm test -- tests/integration/transport`。
+- **验证**：手动 Web/Desktop；`pnpm exec vitest run tests/integration/transport`（`pnpm test -- <path>` 不会过滤，见下方命令更正）。
 - **文件**：`src/host/transport/*`、`src/client/transport/*`。
+- **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/transport` 2 文件 / 26 用例、全量 `pnpm test` 13 文件 / 83 用例通过；`pnpm build` host 11.8 KiB / client 12.0 KiB。实现：`src/contracts/transport.ts` 共享路径与信封契约，`src/host/transport/*`（`UnaryRegistry` + health/unary 两条精确路由，方法表可扩展），`src/client/transport/*`（文档相对 fetch、超时/调用方中止、稳定错误映射），`tests/helpers/fake-host.ts`。真实载体：`vibe-dev` 加 `--patch .tmp/t011-disable-spikes.yml` 临时禁用 s1/s2 同路径路由（不改 profile 文件），raw HTTP 9/9——无 cookie health 401、token 303 + Set-Cookie、认证 health 200、`Origin: http://evil.example` 403、`Host: evil.example` 403、认证 `studio.ping` 200 echo、`text/plain` 415；headless Edge 页面内执行 client transport，文档相对 `api/vibe/health` / `api/vibe/request` 均成功、ping echo `{source:'web'}`、未知方法映射 `not_found/404`、除该预期 404 外 console 0；隔离 Desktop（`.tmp/desktop-home` + 独立 userData + loopback 9223，`dsh-app://app`）health 与 ping 均成功、console 0，进程树已清理。限制：client transport 尚未接入 `src/client/index.ts` 的出厂 bundle（按 T011 文件边界，待后续 UI 任务接线）；未认证/跨源拒绝来自 DSH Connection 自身，插件不重复实现。
 
 ### - [ ] T012 测试 harness + fixture
 

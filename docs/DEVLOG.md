@@ -8,9 +8,9 @@
 ## 1. 当前快照
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，进入 M1）**。
-- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab。
-- 进行中：无；下一项 **T011 Connection 传输骨架**。
-- 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务并校验 Config。
+- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架。
+- 进行中：无；下一项 **T012 测试 harness + fixture**。
+- 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已实现但尚未接入出厂 `lib/client.js`。
 - T001–T009 已提交并推送至 `task/m1-foundation`；T010 的 shell 代码、测试、locales 与测试依赖待提交。S3/S4/T010 用 Playwright 启动的 Edge 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
 
@@ -151,6 +151,27 @@
   - `vibe-dev` + headless Edge（4321/4323）：guide 卡片打开 tab；页签 预览→检查→标注 切换与面板文案正确；点“全屏”再 Esc，标注仍选中；收起右侧栏再展开、关闭 tab 后重新打开，标注页签均保留；client.js 200；console/pageerror 0。
   - 证据脚本：`.tmp/t010-verify.mjs`、`.tmp/t010-persist.mjs`（gitignored，一次性验证，不属于产品）。
 - 限制：切 Session 未单独脚本化（与收起/重开共用 `keepMounted` 机制）；locale 在 `apply()`/渲染时读取，运行中切换系统语言需重载页面。
+
+### T011 — Connection 传输骨架（已完成）
+
+- 目标：host 用 `ctx.connection.fetch.register` 注册精确 `/api/vibe/*` 路由（health + 一元请求），client 用文档相对 `fetch`；不用 `rpc.handle`；Web/Desktop 都通。
+- 结果：
+  - `src/contracts/transport.ts`：共享 `TRANSPORT_VERSION`、`/api/vibe/health`、`/api/vibe/request`、64 KiB 上限、10 s 默认超时、请求/成功/失败信封与运行时校验；`appRoute()` 去掉前导 `/`，供客户端使用。
+  - `src/host/transport/unary.ts`：`UnaryRegistry` 方法表（内置 `studio.ping`），拦截重复/非法方法名；`StudioError.code` 映射 HTTP 状态，未知异常统一 500 `internal`（不泄漏实现细节）。
+  - `src/host/transport/routes.ts`：health 仅 GET（405 + `allow`），unary 仅 POST，要求 `application/json`（415），`content-length` 与实际 UTF-8 字节双重 64 KiB 限制（413），JSON/对象/未知键/方法/id 逐项校验，所有响应带 `no-store`/`nosniff`，序列化失败也回信封。
+  - `src/host/transport/index.ts` + `src/host/index.ts`：`registerTransport()` 通过 `ctx.effect` 注册两条路由并返回 registry；`apply()` 把 `{ config, transport }` 放进 `vibeStudio` 服务。
+  - `src/client/transport/*`：`fetchHealth()`/`callUnary()` 使用 `api/vibe/...` 文档相对路径与 `credentials: 'same-origin'`；调用方 signal + 超时合并；HTTP/信封锁错误映射为稳定 `StudioError`；请求前本地校验方法名、可序列化与大小，避免无效流量。
+  - `tests/helpers/fake-host.ts`：测试用 Connection/effect 替身；host 15 例、client 11 例集成测试。
+- 验证：
+  - `pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/transport` 2 文件 / 26 用例；全量 `pnpm test` 13 文件 / 83 用例；`pnpm build` host 11.8 KiB / client 12.0 KiB。
+  - `vibe-dev` + `.tmp/t011-disable-spikes.yml`（launch overlay 临时禁用 s1/s2 的同路径路由，不改 profile 文件）+ raw `node:http`：9/9——无 cookie `GET /api/vibe/health` 401；token 303 + `Set-Cookie`；认证 health 200（plugin/version/uptime/config）；`Origin: http://evil.example` 403；`Host: evil.example` 403；认证 `studio.ping` 200 且 echo 正确；`text/plain` 415。
+  - headless Edge（4325）：页面 `baseURI=http://127.0.0.1:4325/`，注入 client transport 探针后请求为 `api/vibe/health`、`api/vibe/request`（文档相对），health 与 ping（echo `{source:'web'}`）成功，未知方法得到 `not_found/404`，除该预期 404 外 console 0。
+  - 隔离 Desktop（`DSH_HOME=.tmp/desktop-home`、独立 userData、loopback CDP 9223）：`origin=dsh-app://app`，请求为 `dsh-app://app/api/vibe/health` 与 `.../request`，health/ping 成功（echo `{source:'desktop'}`），console 0；脚本结束 `taskkill /T` 清理进程树。
+  - 证据脚本：`.tmp/t011-auth.mjs`、`.tmp/t011-web.mjs`、`.tmp/t011-desktop.mjs`、`.tmp/t011-probe.js`（gitignored，一次性验证）。
+- 限制/决策：
+  - 未认证 401、跨源/Host 403 由 DSH Connection 的 `/api` 桥提供，插件不重复鉴权；插件只做精确路由与参数校验。
+  - client transport 尚未接入 `src/client/index.ts`，`lib/client.js` 仍只有 shell（12.0 KiB）；按 T011 文件边界留待后续 UI 任务接线。
+  - s1/s2 spike 仍在 `vibe-dev` 的依赖与 bundle 列表中；本次只用 `--patch` 临时覆盖，未改真实 profile，也未删除 spike 包。
 
 ## 3. 踩坑与已验证经验
 
