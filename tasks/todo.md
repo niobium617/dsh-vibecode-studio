@@ -95,12 +95,13 @@
 - **文件**：`src/host/index.ts`、`src/host/config.ts`、`profiles/vibe-dev/README.md`。
 - **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；`pnpm test` 2 文件 / 10 用例通过（新增 `tests/unit/config.test.ts` 6 例）；`pnpm build` 生成 `lib/index.js` 2.4 KiB，构建脚本内 `import()` 自检通过。`dsh --profile vibe-dev --dump-config` 输出含 `# == dsh-vibecode-studio`、`- id: vibe-studio`、`name: dsh-vibecode-studio`；`.tmp/t008-valid.yml` 覆盖值（debug / localhost:5173 / 14 天）出现在 dump 中。负例用 `--patch .tmp/t008-invalid.yml` 实际启动（4319）：`dsh: warning: 1 entry did not activate`，`vibe-studio (dsh-vibecode-studio): ValidationError: invalid config: - $.logLevel expected "debug" | "info" | "warn" | "error" but got "verbose"`，其余 DSH 正常服务；`--dump-config` 本身不校验配置。默认配置在 4317 启动 20 s，无 warning/error，超时退出（124）；两个端口均已释放。语义校验补在 `resolveConfig()`（拒绝未知键、规范化并去重 origin、要求至少一个 origin）。
 
-### - [ ] T009 Contracts v1
+### - [x] T009 Contracts v1
 
 - **目标**：`TargetKind/TargetConfig/TargetCapabilities/TargetSession`、`Annotation`、`ElementContext`、`SourceContext`、`ConsoleEntry`、`NetworkEntry`、`StudioError`、`ArtifactRef`、预算/截断、不可信包裹。
 - **验收**：纯类型/纯函数；单测覆盖序列化、预算、脱敏、包裹；无运行时依赖。
 - **验证**：`pnpm test -- tests/unit/contracts`。
 - **文件**：`src/contracts/*`、`tests/unit/contracts/*`。
+- **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；`pnpm test -- tests/unit/contracts` 8 文件 / 44 用例通过；全量 `pnpm test` 同结果；`pnpm build` 通过。覆盖：Annotation JSON round-trip 与坏数据拒绝、品牌 ID、UTF-8 预算与 CJK/emoji 安全截断、注解渲染 ≤4 KB、Console/Network 单行摘要与 500 B 预算、header/query/JSON body 脱敏、`<untrusted-page-content>` 边界逃逸与实体膨胀预算。所有 `src/contracts/*` 只互相引用，无第三方或 Node/DOM 运行时依赖；`TargetSession`/`ArtifactRef` 等为纯类型契约。
 
 ### - [ ] T010 Client shell + 右栏 tab
 
