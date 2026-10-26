@@ -71,26 +71,29 @@
 
 > 依赖：G0 通过。T006 先做；T007/T008/T009 可在 T006 后并行；T010 依赖 T007/T009；T011 依赖 T008；T012 依赖 T006；T013 依赖 T009；T014 依赖 T010/T013。
 
-### - [ ] T006 包脚手架与工具链
+### - [x] T006 包脚手架与工具链
 
 - **目标**：`package.json`、TS strict、构建/测试脚本、目录骨架；host 能产出 ESM。
 - **验收**：`pnpm install`、`pnpm typecheck`、`pnpm test`（smoke）、`pnpm build` 全绿；无 DSH 依赖错误。
 - **验证**：上述命令；`pnpm build` 产出 `lib/index.js`。
 - **文件**：`package.json`、`tsconfig.json`、`vitest.config.ts`、`scripts/*`、`src/host/index.ts`、`src/client/index.ts`。
+- **验证结果（2026-10-26）**：`pnpm install`（already up to date）、`pnpm typecheck`（0 error）、`pnpm test`（Vitest 5.0.5，1 文件 / 3 用例通过）、`pnpm build` 全绿。`lib/index.js` 已生成（108 B，ESM `export { apply, name }`），构建脚本内 `import()` 自检通过；仓库无 DSH 运行时依赖。包名由 dev workspace `dsh-vibecode-studio-dev` 改为产品包 `dsh-vibecode-studio@0.1.0`（暂保留 `private`，T060 打包时处理）；`lib/` 已加入 `.gitignore`。
 
-### - [ ] T007 Client bundle loader 包装
+### - [x] T007 Client bundle loader 包装
 
 - **目标**：把最小 client 插件打成 `window.__ModuleLoader__.load({ id, factory })` 格式的 `lib/client.js`，在 DSH 中加载。
 - **验收**：`vibe-dev` 启动后出现 hello tab；无 loader 报错；React/JSX 正常。
 - **验证**：`pnpm build:client`；`dsh --profile vibe-dev`；手动打开 tab。
 - **文件**：`scripts/build-client.mjs`、`src/client/index.ts`、`src/client/hello.tsx`、`lib/client.js`。
+- **验证结果（2026-10-26）**：`pnpm typecheck` 0 error、`pnpm test` 4/4、`pnpm build:client` 通过，产出 loader 包装的 `lib/client.js`（3.2 KiB）。packages 以 link 装入 `vibe-dev` 后启动 `dsh --profile vibe-dev --no-open --host 127.0.0.1 --port 4317`；headless Edge 打开右栏“新标签页”菜单可见 **Vibe Studio**，点击后 `[data-vibe-hello="1"]` 渲染，点击按钮计数 0→1（React state 生效）；`dsh-vibecode-studio/client.js` 响应 200，console/pageerror 0，无 loader 报错。为让 DSH 识别包，另补了 `cordis.patch.yml` 与 `package.json` 的 `dsh.bundle`/`dsh.client.inject`（renderer、sidebar-right）。限制：本轮只验证 Web 载体；Desktop 留到 T015。
 
-### - [ ] T008 Host 插件骨架与 Config
+### - [x] T008 Host 插件骨架与 Config
 
 - **目标**：`name`/`inject`/`apply`；`Config` 用 schemastery；服务注册位；profile 安装说明。
 - **验收**：`--dump-config` 含本插件；非法配置被拒；启动无报错。
 - **验证**：`dsh --profile vibe-dev --dump-config`；改坏配置做负例。
 - **文件**：`src/host/index.ts`、`src/host/config.ts`、`profiles/vibe-dev/README.md`。
+- **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；`pnpm test` 2 文件 / 10 用例通过（新增 `tests/unit/config.test.ts` 6 例）；`pnpm build` 生成 `lib/index.js` 2.4 KiB，构建脚本内 `import()` 自检通过。`dsh --profile vibe-dev --dump-config` 输出含 `# == dsh-vibecode-studio`、`- id: vibe-studio`、`name: dsh-vibecode-studio`；`.tmp/t008-valid.yml` 覆盖值（debug / localhost:5173 / 14 天）出现在 dump 中。负例用 `--patch .tmp/t008-invalid.yml` 实际启动（4319）：`dsh: warning: 1 entry did not activate`，`vibe-studio (dsh-vibecode-studio): ValidationError: invalid config: - $.logLevel expected "debug" | "info" | "warn" | "error" but got "verbose"`，其余 DSH 正常服务；`--dump-config` 本身不校验配置。默认配置在 4317 启动 20 s，无 warning/error，超时退出（124）；两个端口均已释放。语义校验补在 `resolveConfig()`（拒绝未知键、规范化并去重 origin、要求至少一个 origin）。
 
 ### - [ ] T009 Contracts v1
 
