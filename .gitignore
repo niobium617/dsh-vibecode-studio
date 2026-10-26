@@ -23,3 +23,6 @@ spikes/s2/.build/
 lib/
 dist/
 coverage/
+
+# Studio state written into the host project directory at runtime
+.vibe/

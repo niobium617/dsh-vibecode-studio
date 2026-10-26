@@ -49,6 +49,7 @@ describe('host config', () => {
     expect(provide).toHaveBeenCalledWith('vibeStudio', {
       config: expect.objectContaining({ logLevel: 'debug' }),
       transport: expect.anything(),
+      settings: expect.anything(),
     })
   })
 })

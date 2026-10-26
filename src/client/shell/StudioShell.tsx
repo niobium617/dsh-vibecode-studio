@@ -5,6 +5,7 @@
  */
 import * as React from 'react'
 import { browserLocale, createTranslator, type Locale } from '../i18n'
+import { SettingsPage } from './settings/SettingsPage'
 import { EmptyState, ShellErrorBoundary } from './StateViews'
 import { useShellState, setActiveTab } from './store'
 import { DEFAULT_TAB, STUDIO_TAB_DEFINITIONS } from './tabs'
@@ -109,7 +110,11 @@ export function StudioShell({ locale }: StudioShellProps): React.ReactElement {
         style={panelStyle}
       >
         <ShellErrorBoundary key={current.id} locale={activeLocale}>
-          <EmptyState title={t('state.empty.title')} body={t(current.emptyKey)} />
+          {current.id === 'settings' ? (
+            <SettingsPage locale={activeLocale} />
+          ) : (
+            <EmptyState title={t('state.empty.title')} body={t(current.emptyKey)} />
+          )}
         </ShellErrorBoundary>
       </section>
     </div>

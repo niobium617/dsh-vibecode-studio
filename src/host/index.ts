@@ -7,6 +7,11 @@
  */
 import { Config, resolveConfig, type VibeStudioConfig } from './config'
 import {
+  createStudioSettingsService,
+  registerSettingsMethods,
+  type StudioSettingsService,
+} from './studio/settings'
+import {
   registerTransport,
   type TransportHostContext,
   type UnaryRegistry,
@@ -14,6 +19,12 @@ import {
 
 export { Config, LOG_LEVELS, normalizeOrigin, resolveConfig } from './config'
 export type { LogLevel, VibeStudioConfig } from './config'
+export {
+  createStudioSettingsService,
+  registerSettingsMethods,
+  StudioSettingsService,
+} from './studio/settings'
+export type { StudioSettingsServiceOptions } from './studio/settings'
 export {
   createHealthPayload,
   registerTransport,
@@ -29,6 +40,8 @@ export interface VibeStudioService {
   readonly config: VibeStudioConfig
   /** Unary method registry shared by preview, inspect and API features. */
   readonly transport: UnaryRegistry
+  /** `.vibe/studio.json` settings, shared with the panel. */
+  readonly settings: StudioSettingsService
 }
 
 /** Minimal Cordis surface used at this stage. */
@@ -39,5 +52,20 @@ export interface HostContext extends TransportHostContext {
 export function apply(ctx: HostContext, config: VibeStudioConfig = new Config()): void {
   const resolved = resolveConfig(config)
   const { registry } = registerTransport(ctx, { plugin: name, config: resolved })
-  ctx.provide('vibeStudio', { config: resolved, transport: registry } satisfies VibeStudioService)
+
+  // M1 binds the project root to the Host process cwd; `apply` has no session
+  // yet. Revisit once preview targets resolve a workspace directory (M2).
+  const settings = createStudioSettingsService({ projectDir: process.cwd(), config: resolved })
+  const setupSettings = () => registerSettingsMethods(registry, settings)
+  if (typeof ctx.effect === 'function') {
+    ctx.effect(setupSettings, 'vibe-studio: settings methods')
+  } else {
+    setupSettings()
+  }
+
+  ctx.provide('vibeStudio', {
+    config: resolved,
+    transport: registry,
+    settings,
+  } satisfies VibeStudioService)
 }

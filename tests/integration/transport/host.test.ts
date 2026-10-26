@@ -58,6 +58,7 @@ describe('host transport registration', () => {
     expect(host.effectLabels).toEqual([
       `vibe-studio: ${HEALTH_PATH}`,
       `vibe-studio: ${REQUEST_PATH}`,
+      'vibe-studio: settings methods',
     ])
   })
 
@@ -67,9 +68,13 @@ describe('host transport registration', () => {
 
     expect(service.config.logLevel).toBe('debug')
     expect(service.transport.has('studio.ping')).toBe(true)
+    expect(service.transport.has('studio.settings.get')).toBe(true)
+    expect(service.transport.has('studio.settings.update')).toBe(true)
+    expect(service.settings).toBeDefined()
 
     await host.dispose()
     expect(host.routes.size).toBe(0)
+    expect(service.transport.has('studio.settings.get')).toBe(false)
   })
 })
 

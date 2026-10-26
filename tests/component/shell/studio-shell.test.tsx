@@ -21,7 +21,7 @@ describe('StudioShell', () => {
     render(<StudioShell locale="en" />)
 
     expect(screen.getByRole('heading', { name: 'Vibe Studio' })).toBeTruthy()
-    expect(tabNames()).toEqual(['Preview', 'Inspect', 'Annotations', 'API'])
+    expect(tabNames()).toEqual(['Preview', 'Inspect', 'Annotations', 'API', 'Settings'])
 
     const selected = screen.getAllByRole('tab').filter(
       (tab) => tab.getAttribute('aria-selected') === 'true',
@@ -66,7 +66,7 @@ describe('StudioShell', () => {
     render(<StudioShell locale="zh-CN" />)
 
     expect(screen.getByRole('heading', { name: 'Vibe Studio' })).toBeTruthy()
-    expect(tabNames()).toEqual(['预览', '检查', '标注', 'API'])
+    expect(tabNames()).toEqual(['预览', '检查', '标注', 'API', '设置'])
     expect(screen.getByText('暂无内容')).toBeTruthy()
   })
 })
