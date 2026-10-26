@@ -101,7 +101,7 @@
 - **验收**：纯类型/纯函数；单测覆盖序列化、预算、脱敏、包裹；无运行时依赖。
 - **验证**：`pnpm test -- tests/unit/contracts`。
 - **文件**：`src/contracts/*`、`tests/unit/contracts/*`。
-- **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；`pnpm test -- tests/unit/contracts` 8 文件 / 44 用例通过；全量 `pnpm test` 同结果；`pnpm build` 通过。覆盖：Annotation JSON round-trip 与坏数据拒绝、品牌 ID、UTF-8 预算与 CJK/emoji 安全截断、注解渲染 ≤4 KB、Console/Network 单行摘要与 500 B 预算、header/query/JSON body 脱敏、`<untrusted-page-content>` 边界逃逸与实体膨胀预算。所有 `src/contracts/*` 只互相引用，无第三方或 Node/DOM 运行时依赖；`TargetSession`/`ArtifactRef` 等为纯类型契约。
+- **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/contracts` → 6 文件 / 34 用例通过；全量 `pnpm test` → 8 文件 / 44 用例通过；`pnpm build` 通过。注意：`pnpm test -- tests/unit/contracts` 在 vitest 下不会过滤，实际跑全量，已改用 `pnpm exec vitest run <path>`。覆盖：Annotation JSON round-trip 与坏数据拒绝、品牌 ID、UTF-8 预算与 CJK/emoji 安全截断、注解渲染 ≤4 KB、Console/Network 单行摘要与 500 B 预算、header/query/JSON body 脱敏、`<untrusted-page-content>` 边界逃逸与实体膨胀预算。所有 `src/contracts/*` 只互相引用，无第三方或 Node/DOM 运行时依赖；`TargetSession`/`ArtifactRef` 等为纯类型契约。
 
 ### - [ ] T010 Client shell + 右栏 tab
 
