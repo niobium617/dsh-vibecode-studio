@@ -1,16 +1,44 @@
 {
-  "name": "dsh-vibecode-studio-dev",
-  "version": "0.0.0",
+  "name": "dsh-vibecode-studio",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Development workspace for dsh-vibecode-studio (spikes first; product package arrives in T006).",
+  "description": "Dsh VibeCoding Studio: in-chat preview, annotation, inspect and API workbench for DSH.",
   "license": "MIT",
   "packageManager": "pnpm@11.21.0",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml"
+  ],
   "engines": {
-    "node": ">=24"
+    "node": ">=24",
+    "dsh": ">=0.2.1-rc.2"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ]
+    }
   },
   "scripts": {
+    "clean": "node scripts/clean.mjs",
     "typecheck": "tsc --noEmit",
+    "build": "node scripts/build-host.mjs && node scripts/build-client.mjs",
+    "build:host": "node scripts/build-host.mjs",
+    "build:client": "node scripts/build-client.mjs",
+    "test": "vitest run",
     "spike:s1": "tsx spikes/s1/run.ts",
     "spike:s1:build": "tsx spikes/s1/run.ts --build-only",
     "spike:s1:soak": "node spikes/s1/soak.mjs",
@@ -37,6 +65,10 @@
     "typescript": "^5.9.3",
     "vite": "^8.3.5",
     "vite-plugin-vue-inspector": "^7.0.0",
+    "vitest": "^5.0.5",
     "vue": "^3.5.44"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "~3.18.5"
   }
 }

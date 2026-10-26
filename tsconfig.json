@@ -10,15 +10,25 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "types": ["node"]
   },
-  "include": ["spikes/**/*.ts", "spikes/**/*.tsx"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "spikes/**/*.ts",
+    "spikes/**/*.tsx",
+    "vitest.config.ts"
+  ],
   "exclude": [
     "node_modules",
+    "lib",
     "spikes/s1/package/lib",
     "spikes/s1/.build"
   ]
