@@ -1,3 +1,7 @@
+## 中文简介
+
+DSH Vibecode Studio 是 DeepSeek Harness 的可视化 Vibe Coding 插件：在侧栏里预览本地 Web 应用，直接点选元素并写下修改意见，再把这些结构化批注交给编码 Agent。当前处于 pre-alpha 阶段，仓库里只有 S1 传输与 S2 composer 交接 spike 可以运行；预览、标注与批注箱会在后续任务中逐步落地。
+
 # DSH Vibecode Studio
 
 > A visual feedback loop for **DeepSeek Harness**: preview your local web app inside DSH, point at what is wrong, and hand structured notes to the coding agent — no screenshot ping-pong.
@@ -71,9 +75,6 @@ See [docs/SPEC-vibecoding-studio.md](docs/SPEC-vibecoding-studio.md) for the ful
 
 Early-stage contributions are welcome, especially protocol and transport reviews. Read [CONTRIBUTING.md](CONTRIBUTING.md) first. Security reports should follow [SECURITY.md](SECURITY.md).
 
-## 中文简介
-
-DSH Vibecode Studio 是 DeepSeek Harness 的可视化 Vibe Coding 插件：在侧栏里预览本地 Web 应用，直接点选元素并写下修改意见，再把这些结构化批注交给编码 Agent。当前处于 pre-alpha 阶段，仓库里只有 S1 传输与 S2 composer 交接 spike 可以运行；预览、标注与批注箱会在后续任务中逐步落地。
 
 ## License
 
