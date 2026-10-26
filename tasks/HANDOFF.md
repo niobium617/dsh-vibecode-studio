@@ -126,7 +126,7 @@ dsh --profile vibe-dev --dump-config
 
 ## 10. 本次退出状态（2026-10-27）
 
-- 分支 `task/m1-foundation`；T014 功能提交 `ca86181 feat(studio): add settings panel backed by shared studio.json config`；T015 只改文档与 `vibe-dev` 的 patch 层，代码无变更。本交接提交后领先 `origin/task/m1-foundation` **10 个提交**，尚未推送。
+- 分支 `task/m1-foundation`；T014 功能提交 `ca86181 feat(studio): add settings panel backed by shared studio.json config`；T015 只改文档与 `vibe-dev` 的 patch 层，代码无变更。M1 的 10 个提交已于 2026-10-27 推送（`a1cae3a..1cdcb74`），本地与 `origin/task/m1-foundation` 一致。
 - **G1 通过（GO），M1 完成**：`pnpm typecheck` 0 error、`pnpm test` 17 文件 / 114 用例、`pnpm build`（host 25.8 KiB / client 36.8 KiB）、`pnpm test:e2e` 3/3。
 - 环境变更：`vibe-dev/cordis.patch.yml` 持久禁用 `vibe-s1-spike`/`vibe-s2-spike`（二者与 studio 抢 `/api/vibe/health`）；备份 `.tmp/logs/vibe-dev-cordis.patch.yml.bak-2026-10-27`，删除两条 `disabled: true` 即回滚。真实 `desktop`/`web` profile 未改。
 - 双端手测：Web（4327）与隔离 Desktop（CDP 9223）均打开 Vibe Studio、5 页签、设置页正常；desktop profile SHA-256 前后一致；无 LISTENING 端口、无 dsh/Desktop/Edge 残留、未生成 `.vibe`。
