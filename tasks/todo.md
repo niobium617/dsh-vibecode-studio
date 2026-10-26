@@ -119,12 +119,13 @@
 - **文件**：`src/host/transport/*`、`src/client/transport/*`。
 - **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/transport` 2 文件 / 26 用例、全量 `pnpm test` 13 文件 / 83 用例通过；`pnpm build` host 11.8 KiB / client 12.0 KiB。实现：`src/contracts/transport.ts` 共享路径与信封契约，`src/host/transport/*`（`UnaryRegistry` + health/unary 两条精确路由，方法表可扩展），`src/client/transport/*`（文档相对 fetch、超时/调用方中止、稳定错误映射），`tests/helpers/fake-host.ts`。真实载体：`vibe-dev` 加 `--patch .tmp/t011-disable-spikes.yml` 临时禁用 s1/s2 同路径路由（不改 profile 文件），raw HTTP 9/9——无 cookie health 401、token 303 + Set-Cookie、认证 health 200、`Origin: http://evil.example` 403、`Host: evil.example` 403、认证 `studio.ping` 200 echo、`text/plain` 415；headless Edge 页面内执行 client transport，文档相对 `api/vibe/health` / `api/vibe/request` 均成功、ping echo `{source:'web'}`、未知方法映射 `not_found/404`、除该预期 404 外 console 0；隔离 Desktop（`.tmp/desktop-home` + 独立 userData + loopback 9223，`dsh-app://app`）health 与 ping 均成功、console 0，进程树已清理。限制：client transport 尚未接入 `src/client/index.ts` 的出厂 bundle（按 T011 文件边界，待后续 UI 任务接线）；未认证/跨源拒绝来自 DSH Connection 自身，插件不重复实现。
 
-### - [ ] T012 测试 harness + fixture
+### - [x] T012 测试 harness + fixture
 
 - **目标**：Vitest、React Testing Library、Playwright 配置；Vite fixture 骨架；假 adapter。
 - **验收**：示例单测/集成/E2E 全绿；fixture 可启动。
 - **验证**：`pnpm test`、`pnpm test:e2e`。
 - **文件**：`tests/*`、`fixtures/vite-basic/*`、`playwright.config.ts`。
+- **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；Vitest 拆为 `node`（smoke/unit/integration）与 `component`（jsdom + 统一 cleanup）两个 project，全量 `pnpm test` 14 文件 / 89 用例通过（原 13/83 + 假 adapter 6 例），`pnpm exec vitest run tests/component/shell` 仍为 3 文件 / 13 用例。新增 `playwright.config.ts`（`channel: 'msedge'`、headless、1280×800、webServer 自动拉起 fixture、产物写 `.tmp/playwright-results`），`pnpm test:e2e` 3/3 通过（首屏与计数、中文表单、`/api/echo` 与 `/api/boom`）；fixture 监听 `127.0.0.1:4320`，测试结束无 LISTENING 残留。`fixtures/vite-basic` 为 React 19 + Vite 8 骨架（计数器、表单、列表、控制台错误按钮，`/api/echo`、`/api/boom`、`/api/slow`），可用 `pnpm fixture:dev` 单独启动。新增 `tests/helpers/fake-adapter.ts` 生命周期替身（并发 start 合并、重复 start 复用、stop 幂等、启动失败态）及 6 个集成用例。`pnpm build` 通过（host 11.8 KiB / client 12.0 KiB）。新增 devDependencies `@playwright/test@1.64.1`、`@types/react-dom@18.0.0`；Playwright 使用本机 Edge，未下载浏览器。
 
 ### - [ ] T013 `.vibe` 配置存储
 

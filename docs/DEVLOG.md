@@ -8,10 +8,10 @@
 ## 1. 当前快照
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，进入 M1）**。
-- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架。
-- 进行中：无；下一项 **T012 测试 harness + fixture**。
+- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture。
+- 进行中：无；下一项 **T013 `.vibe` 配置存储**。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已实现但尚未接入出厂 `lib/client.js`。
-- T001–T009 已提交并推送至 `task/m1-foundation`；T010 的 shell 代码、测试、locales 与测试依赖待提交。S3/S4/T010 用 Playwright 启动的 Edge 在脚本结束时关闭，未留下进程。
+- T001–T011 已提交并推送至 `task/m1-foundation`；T012 的 harness、fixture 与测试依赖待提交。S3/S4/T010 用 Playwright 启动的 Edge 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
 
 环境：
@@ -173,6 +173,25 @@
   - client transport 尚未接入 `src/client/index.ts`，`lib/client.js` 仍只有 shell（12.0 KiB）；按 T011 文件边界留待后续 UI 任务接线。
   - s1/s2 spike 仍在 `vibe-dev` 的依赖与 bundle 列表中；本次只用 `--patch` 临时覆盖，未改真实 profile，也未删除 spike 包。
 
+### T012 — 测试 harness + fixture（已完成）
+
+- 目标：Vitest / React Testing Library / Playwright 配置；Vite fixture 骨架；假 adapter。
+- 结果：
+  - `vitest.config.ts` 改为两个 project：`node`（smoke、unit、integration）与 `component`（jsdom、`tests/setup/component.ts` 统一 `cleanup()`）。`passWithNoTests` 只能放在根级。
+  - `playwright.config.ts`：`testDir: tests/e2e`、`channel: 'msedge'`、headless、1280×800、单 worker、失败截图/trace 写入 `.tmp/playwright-results`；`webServer` 用 `pnpm fixture:dev` 自动启动 fixture，`reuseExistingServer` 仅本地开启。
+  - `fixtures/vite-basic/`：React 19 + Vite 8 骨架，含计数器、可提交表单（Name/Note）、列表、控制台错误按钮，以及 dev 插件路由 `POST /api/echo`、`GET /api/boom`（500）、`GET /api/slow?ms=`；`pnpm fixture:dev` 监听 `127.0.0.1:4320`（strictPort）。
+  - `tests/helpers/fake-adapter.ts`：harness 用目标 adapter 生命周期替身（并发 start 合并、重复 start 复用、stop 幂等、失败态保留），`tests/integration/targets/fake-adapter.test.ts` 6 例；T016 定义真实契约时再对齐。
+  - `tests/e2e/fixture.spec.ts`：3 例（首屏/计数、中文表单、fixture API）。
+  - `package.json` 新增 `test:e2e`、`fixture:dev`；`tsconfig.json` 纳入 `fixtures/**` 与 `playwright.config.ts`。
+- 验证：
+  - `pnpm typecheck` 0 error；`pnpm test` 14 文件 / 89 用例通过；`pnpm exec vitest run tests/component/shell` 3 文件 / 13 用例通过；`pnpm build` 通过（host 11.8 KiB / client 12.0 KiB）。
+  - `pnpm test:e2e` 3/3 通过（3.7 s）；fixture 由 Playwright 自动拉起，结束后 4320 无 LISTENING，仅剩客户端 TIME_WAIT。
+  - 首次 E2E 因浏览器请求缺失的 favicon 得到 404、污染 console 断言而失败 1 例；补 `<link rel="icon" href="data:," />` 后全绿。
+- 限制/决策：
+  - `@types/react-dom` 解析为 18.0.0（与现有 `@types/react` 18.3 同主版本），fixture 只用 `createRoot`，暂不升级。
+  - `@playwright/test` 固定 1.64.1，与本机 `playwright-core` 一致；使用系统 Edge，不下载浏览器，因此 CI（ubuntu）暂不跑 E2E。
+  - 组件测试文件仍保留显式 `// @vitest-environment jsdom` 与 `cleanup()`，与 harness 重复但无害；后续新测试可省略。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -185,9 +204,12 @@
 37. **schemastery 默认放过未知键**：`Schema.object` 不拒绝额外字段；需要 `resolveConfig()` 自行比对已知键，否则用户拼错配置会静默无效。
 38. **不可信包裹要先转义再截断**：先截断原始内容再转义 HTML，`<` 变成 `&lt;` 会让实际字节数膨胀 4 倍并突破预算；先转义再按字节截断，即使截断点落在实体内也不会重新产生 `<\s*untrusted-page-content`。
 39. **UTF-8 预算不能用 `string.length`**：中文/emoji 的码元数与字节数不同；按 `for...of` 逐码点累计 UTF-8 字节，才能在预算边界不产生替换字符（`�`）。
-40. **组件测试要显式 `cleanup()`**：本项目 vitest 未开 `globals`，`@testing-library/react` 的自动清理不会注册；在每个 jsdom 测试文件里 `afterEach(cleanup)`，并在 `beforeEach` 调 `resetShellStore()`，否则模块级 store 会跨用例泄漏。
-41. **jsdom 按文件开启**：全局仍为 `environment: 'node'`（contracts 等纯函数测试不需要 DOM）；组件测试首行写 `// @vitest-environment jsdom`，避免每个纯逻辑用例都付 DOM 启动成本。
+40. **组件测试的 cleanup 由 harness 统一注册**：T012 起 `component` project 通过 `tests/setup/component.ts` 在 `afterEach` 调 `cleanup()`；测试文件里显式 `cleanup()` 保留为双保险。模块级 store 仍需 `beforeEach` 调 `resetShellStore()`，否则会跨用例泄漏。
+41. **jsdom 按 project 开启**：T012 起 `component` project 指定 `environment: 'jsdom'`，`node` project 跑纯函数与集成测试，避免每个纯逻辑用例都付 DOM 启动成本；文件首行 `// @vitest-environment jsdom` 已冗余但保留。
 42. **右栏收起后按钮不可见**：收起右侧栏后 `新标签页` 仍在 DOM 但不可点；验证脚本先尝试“新标签页”，不可见时点“打开右侧边栏”，再点 guide 卡片，才能稳定重开 tab。
+43. **Vitest 5 的 `passWithNoTests` 只能放根级**：写进 project 的 inline config 会报 TS2769；放在 `test.passWithNoTests`。
+44. **Playwright 用 `channel: 'msedge'` 不下载浏览器**：直接使用本机 Edge；fixture 若缺 favicon 会请求 `/favicon.ico` 得到 404 并计入 console error，用 `<link rel="icon" href="data:," />` 消除。
+45. **判断 fixture 残留看 LISTENING**：Playwright `webServer` 关闭后，4320 上仍会短暂出现客户端 `TIME_WAIT`，不代表服务没停。
 
 ### 传输 / DSH 插件
 
@@ -253,8 +275,8 @@
 
 - **T004 已完成**：30/30 元素源码命中；点击泄漏 0、Esc、console 均通过；限制是仅 dev 模式、未覆盖 TSX/iframe/重复组件选择器。
 - **T005 G0 已通过（GO）**：帧传输 stream 为主/pull 回退；中文主路径 + 逐字/粘贴回退；截图仅剪贴板；源码三框架适配 + 选择器/DOM 降级。证据见 [`spikes/G0.md`](../spikes/G0.md)。
-- **T006–T010 已完成**：产品包脚手架、host ESM、client loader bundle、host Config/服务位、contracts v1、client shell/右栏 tab 均已验证；下一项 T011 connection 传输骨架。
-- **T011 及以后（M1）**：connection、Vite fixture、profile 安装与清理；按 G0 约束实现 connection/stream/pull。T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 待后续任务消费；T009 的 contracts 由后续页面逐步引用。
+- **T006–T012 已完成**：产品包脚手架、host ESM、client loader bundle、host Config/服务位、contracts v1、client shell/右栏 tab、connection 传输、测试 harness 与 Vite fixture 均已验证；下一项 T013 `.vibe` 配置存储。
+- **T013 及以后（M1）**：studio store、设置面板、G1 评审；T014 设置持久化需与 T008 的 Config 保持单一来源，避免 UI 改一份、服务读另一份。T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 待后续任务消费；T009 的 contracts 由后续页面逐步引用。
 - **S2 遗留**：如果上游未来公开附件创建/释放 API，再评估直接截图附件；先复测切会话保留和失败清理。
 - **Desktop 遗留**：S2 跨会话未测到，后续需要能稳定创建第二个命名会话的测试环境。
 - **成本**：避免无必要的全仓读取和重复验收；每个任务完成即提交、记录、清理进程。
@@ -265,6 +287,7 @@
 git status -sb
 pnpm typecheck
 pnpm test
+pnpm test:e2e          # 自动拉起 fixtures/vite-basic (127.0.0.1:4320)
 pnpm build
 pnpm spike:s1
 pnpm spike:s2:build
@@ -286,6 +309,7 @@ pnpm spike:s4
 - S4 拾取/源码：[REPORT](../spikes/s4/REPORT.md)、[results.json](../spikes/s4/results.json)。
 - G0 评审：[G0.md](../spikes/G0.md)。
 - 任务与验收：[todo.md](../tasks/todo.md)。
+- 测试 harness：`vitest.config.ts`、`playwright.config.ts`、`fixtures/vite-basic/`、`tests/e2e/fixture.spec.ts`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。
 - 发布检查：[PUBLISHING.md](./PUBLISHING.md)。
 - 私有仓库：`https://github.com/niobium617/dsh-vibecode-studio`（当前为 private）。

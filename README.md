@@ -2,7 +2,7 @@
 
 > A visual feedback loop for **DeepSeek Harness**: preview your local web app inside DSH, point at what is wrong, and hand structured notes to the coding agent — no screenshot ping-pong.
 
-**Status: pre-alpha.** The M0 spike gate is complete. Transport, composer handoff, screencast/input/Chinese IME, and element/source mapping are verified; the G0 review selected stream-first frames with a pull fallback, one-shot CDP input, clipboard-only screenshots, and per-framework source adapters. Nothing is installable as a product yet — product code starts with M1, and the only working code is under `spikes/`. See the [G0 review](spikes/G0.md) for the go/no-go and fallback decisions.
+**Status: pre-alpha.** The M0 spike gate is complete. Transport, composer handoff, screencast/input/Chinese IME, and element/source mapping are verified; the G0 review selected stream-first frames with a pull fallback, one-shot CDP input, clipboard-only screenshots, and per-framework source adapters. The M1 foundation (package scaffold, contracts, client shell, connection transport, test harness) is in `src/`, `tests/` and `fixtures/`; nothing is published yet. See the [G0 review](spikes/G0.md) for the go/no-go and fallback decisions.
 
 [中文简介](#中文简介) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md) · [Dev log](docs/DEVLOG.md)
 
@@ -22,8 +22,8 @@ Vibe coding 的关键是让 Agent “看见”结果。截图会丢失元素身�
 ### 当前进度
 
 - **M0 / G0 已通过**：S1 传输、S2 composer 交接、S3 screencast/输入/中文、S4 拾取/源码四个 spike 均完成，结论与回退方案见 [spikes/G0.md](spikes/G0.md)。
-- **下一阶段 M1**：搭建产品包脚手架、host/client 骨架、contracts、connection 路由与测试 harness。
-- **尚未发布**：目前只有 `spikes/` 下的实验代码，暂不能作为插件安装；产品包将从 `packages/` 开始。
+- **M1 进行中**：产品包脚手架、host/client 骨架、contracts、connection 路由与测试 harness 已完成并在 `vibe-dev` 验证。
+- **尚未发布**：根包可在开发 profile 中加载，但尚未打包发布；`spikes/` 保留为 spike 证据。
 
 ### 计划中的 MVP
 
@@ -81,6 +81,9 @@ The agent stays in control. Notes are prepared for the composer; nothing is sent
 
 ```text
 docs/        product spec, capability map, DSH ecosystem notes
+src/         product package (host, client, contracts)
+tests/       Vitest unit/component/integration + Playwright E2E
+fixtures/    vite-basic React app for E2E and preview/inspect tests
 tasks/       implementation plan, ordered task list, handoff state
 spikes/
   s1/        T001 transport spike: pull JPEG vs multipart stream
@@ -90,7 +93,7 @@ spikes/
   G0.md      T005 spike review: go/no-go and final fallback decisions
 ```
 
-G0 has passed; the product package will arrive in `packages/` as M1 begins. Until then, `spikes/` is the only executable code.
+G0 has passed and M1 is in progress: the root package already builds host `lib/index.js` and loader-wrapped `lib/client.js`, with the test harness in `tests/` and `fixtures/vite-basic`.
 
 ## Development
 
@@ -99,6 +102,9 @@ Requirements: Node.js 24, pnpm 11, and DeepSeek Harness `0.2.1-rc.2` or newer fo
 ```bash
 pnpm install
 pnpm typecheck
+pnpm test                    # Vitest: node + jsdom projects
+pnpm test:e2e                # Playwright + local Edge against fixtures/vite-basic
+pnpm fixture:dev             # fixture only → http://127.0.0.1:4320
 pnpm spike:s1:build          # bundle S1 host/client (required before linking)
 pnpm spike:s1                # local 10 s pull-vs-stream benchmark
 node spikes/s1/soak.mjs ...  # 10 min Web/Desktop soak; see spikes/s1/REPORT.md
