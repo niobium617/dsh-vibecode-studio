@@ -143,12 +143,13 @@
 - **文件**：`src/client/shell/settings/*`、`src/host/studio/settings.ts`。
 - **验证结果（2026-10-27）**：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/studio-settings.test.ts tests/component/shell/settings.test.tsx tests/component/shell/studio-shell.test.tsx` 3 文件 / 19 用例通过；全量 `pnpm test` 17 文件 / 114 用例通过；`pnpm build` 通过（host 25.8 KiB / client 36.8 KiB）。实现：`settings.ts` 懒读 `StudioStore`，把文档值应用到与 health 共享的同一 `VibeStudioConfig` 对象；`studio.settings.get/update` 注册到 unary transport，update 合并后严格校验，非法值返回 `invalid_input` + `issues` 且不落盘；`SettingsPage` 本地校验数字范围与空 origin，Host issues 映射到字段，保存后显示“已保存”。手动：`.tmp/t014-verify.mjs` 在 `vibe-dev` + headless Edge（`--patch .tmp/t014-profile-patch.yml` 临时禁用 s1/s2 同路径路由）两轮启动——首轮为默认值 + “尚未保存”提示；保存后 `.vibe/studio.json` 写入 version 1（retentionDays 14 / contextBudgetBytes 16384 / screenshotEnabled false / logLevel debug / 新增 origin），health 返回同一组值；retentionDays 输入 0 出现字段提示且文件不变；重启后表单仍为保存值、无提示；console 0。测试生成的 `.vibe/` 已删除，4322–4324 仅 TIME_WAIT、无 dsh/Edge 残留。表单加 `noValidate`，避免浏览器原生校验绕过组件内翻译提示。
 
-### - [ ] T015 G1 Foundation 评审 [GATE]
+### - [x] T015 G1 Foundation 评审 [GATE]
 
 - **目标**：干净 `vibe-dev` profile 安装；tab 可见；health 通；全量检查。
 - **验收**：`pnpm typecheck/test/build` 绿；Web/Desktop 均能开 tab；未改 desktop profile。
 - **验证**：上述命令 + 手动；`tasks/todo.md` 勾选记录。
 - **文件**：无。
+- **验证结果（2026-10-27）**：`pnpm typecheck` 0 error；`pnpm test` 17 文件 / 114 用例；`pnpm build` host 25.8 KiB / client 36.8 KiB；`pnpm test:e2e` 3/3。根因处理：`vibe-dev` 的 s1/s2 spike 与 studio 抢 `/api/vibe/health`，在 profile patch 层新增 `disabled: true`（改前备份 `.tmp/logs/vibe-dev-cordis.patch.yml.bak-2026-10-27`，删两行即可恢复）；不带 `--patch` 启动后 `studio.ping` 与 `studio.settings.get` 均 200，health 返回 `plugin: dsh-vibecode-studio`。Web（headless Edge，4327）打开右栏 Vibe Studio：5 页签（预览/检查/标注/API/设置）、设置页回填默认值 + 未保存提示、health 同源，console 0。Desktop（隔离 `DSH_HOME=.tmp/desktop-home`，CDP 9223）同样 5 页签 + 设置页、health 200；真实 `desktop` profile 前后 SHA-256 一致（`850eb26…b6a7c`），未修改。2 条 503 为 Host 就绪前预热轮询噪声，无其他 console 错误。结束后无 LISTENING 端口、无 dsh/Desktop/Edge 残留、未生成 `.vibe`。
 
 ---
 

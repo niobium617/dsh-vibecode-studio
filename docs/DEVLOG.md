@@ -8,10 +8,10 @@
 ## 1. 当前快照
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，进入 M1）**。
-- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）。
-- 进行中：无；下一项 **T015 G1 Foundation 评审**（GATE）。
+- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审。
+- 阶段：**M1 已完成并通过 G1**；下一项 **T016 Target 模型、配置与 adapter 注册表**（M2 首项）。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
-- T001–T014 已提交至本地 `task/m1-foundation`（尚未推送）。S3/S4/T010/T014 用 Playwright 启动的 Edge 在脚本结束时关闭，未留下进程。
+- T001–T015 已提交至本地 `task/m1-foundation`（尚未推送）。S3/S4/T010/T014/T015 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
 
 环境：
@@ -224,7 +224,21 @@
 - 限制/决策：
   - M1 的项目根取 Host 进程 `process.cwd()`：`apply()` 阶段没有工作目录/会话绑定，暂不加 `projectDir` 配置项；M2 预览目标解析工作区目录时再收紧。
   - `<form>` 必须带 `noValidate`：否则浏览器原生 `min` 校验会拦截提交，组件内翻译后的字段提示不会出现。
-  - `vibe-dev` 自带的 s1/s2 spike 也注册 `/api/vibe/health`，同时启用会让 studio Host 注册路由时报 “already registered” 并整体不激活；手动验证沿用 T011 的做法，用 `--patch` 临时禁用，不改 profile。
+  - `vibe-dev` 自带的 s1/s2 spike 也注册 `/api/vibe/health`，同时启用会让 studio Host 注册路由时报 “already registered” 并整体不激活；手动验证沿用 T011 的做法，用 `--patch` 临时禁用，不改 profile（T015 已改为在 profile patch 层持久禁用）。
+
+### T015 — G1 Foundation 评审（已完成，GO）
+
+- 目标：干净 `vibe-dev` 安装、tab 可见、health 通、全量检查；Web/Desktop 均可开 tab，且不改 `desktop` profile。
+- 结果：
+  - 根因处理：`vibe-dev` 的 `vibe-s1-spike`/`vibe-s2-spike` 与 studio 都注册 `/api/vibe/health`，导致 studio `apply()` 在路由注册处抛 “already registered” 并整体不激活。按 T011 的验证结论，在 `vibe-dev/cordis.patch.yml` 的 patch 层为两个 spike 增加 `disabled: true`；包仍安装，删除这两项即可恢复。改前备份 `.tmp/logs/vibe-dev-cordis.patch.yml.bak-2026-10-27`。
+  - 不带 `--patch` 启动后：`studio.ping`、`studio.settings.get` 均 200，`update` 无参返回 400 `invalid_input`（方法已注册），health 返回 `plugin: dsh-vibecode-studio`。
+  - Web（headless Edge，4327）：guide 打开 Vibe Studio，5 页签（预览/检查/标注/API/设置），设置页回填默认值 + “尚未保存”，health 同源，console 0。
+  - Desktop（真实 Electron `dsh-app://app`，隔离 `DSH_HOME=.tmp/desktop-home`，CDP 9223）：网络就绪后 UI 进入主界面，点击侧栏 Vibe Studio 入口，5 页签 + 设置页正常；`desktop` profile 关键文件前后 SHA-256 一致（`850eb268…3b6a7c`）。2 条 503 是 Host 就绪前的预热轮询噪声，无其他 console 错误。
+- 验证：
+  - `pnpm typecheck` 0 error；`pnpm test` 17 文件 / 114 用例；`pnpm build` host 25.8 KiB / client 36.8 KiB；`pnpm test:e2e` 3/3。
+  - 脚本 `.tmp/t015-web.mjs`、`.tmp/t015-desktop.mjs`（Desktop 报告存 `.tmp/logs/t015-desktop.json`，`ok: true`）。
+  - 结束后 4320/4327/9223 无 LISTENING，无 dsh/Desktop/Edge 残留，未生成 `.vibe`。
+- 结论：**G1 通过（GO）**，M1 完成，进入 M2（T016 起）。
 
 ## 3. 踩坑与已验证经验
 
