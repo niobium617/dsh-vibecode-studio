@@ -1,17 +1,17 @@
 # Development log
 
 > 项目：DSH Vibecode Studio
-> 记录日期：2026-10-26
+> 记录日期：2026-10-27
 > 用途：按任务记录开发进度、已验证事实、踩过的坑和恢复入口。
 > **验收细节以 `spikes/*/REPORT.md` 为准；恢复会话先读 `tasks/HANDOFF.md`，本页只查当前任务相关段，不必通读。**
 
 ## 1. 当前快照
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，进入 M1）**。
-- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储。
-- 进行中：无；下一项 **T014 设置面板（基础）**。
-- 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已实现但尚未接入出厂 `lib/client.js`。
-- T001–T013 已提交至本地 `task/m1-foundation`（领先 origin 5 个提交，尚未推送）。S3/S4/T010 用 Playwright 启动的 Edge 在脚本结束时关闭，未留下进程。
+- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）。
+- 进行中：无；下一项 **T015 G1 Foundation 评审**（GATE）。
+- 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
+- T001–T014 已提交至本地 `task/m1-foundation`（尚未推送）。S3/S4/T010/T014 用 Playwright 启动的 Edge 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
 
 环境：
@@ -207,6 +207,24 @@
 - 限制/决策：
   - store 尚未接入 `src/host/index.ts` 与 UI，T014 设置面板再接服务读取同一文档。
   - `write()` 的 `document` 参数类型是 `StudioDocument`，运行期仍走手写校验；非法值在测试里用断言强行传入。
+
+### T014 — 设置面板（基础）（已完成）
+
+- 目标：origin 允许列表、保留期、上下文预算、截图开关、日志级别；UI 改动持久化，服务读取同一配置，非法值有提示。
+- 结果：
+  - `src/contracts/settings.ts`：`studio.settings.get/update` 方法名、字段枚举、范围常量（保留期 1–365、预算 1024–65536）、快照/参数守卫；contracts 仍无运行时依赖。
+  - `src/host/studio/settings.ts`：`createStudioSettingsService()` 惰性读一次 `StudioStore`；文件缺失时沿用 profile `Config`，文件有效或可回收时把文档值应用到 **同一个** `VibeStudioConfig` 对象（health 直接读取它），因此 UI 与服务同源。`update()` 先合并 patch，再走 `parseStudioSettings()` 严格校验；非法值抛 `invalid_input` + `issues`，不写文件；成功后 `StudioStore.write({ version: 1, settings })` 原子持久化并立即应用。
+  - `registerSettingsMethods()` 把两个方法注册到 T011 的 `UnaryRegistry`，返回幂等注销函数；`src/host/index.ts` 在 `ctx.effect` 中接线，`vibeStudio` 服务新增 `settings`。
+  - `src/client/shell/settings/*`：`transportSettingsApi` 走 `callUnary` + 快照守卫；`SettingsPage` 用草稿字符串编辑数字、本地校验范围/空 origin、Host `issues` 分组到字段、保存后 `role="status"` 显示“已保存”；加载失败可重试，`missing`/`invalid` 显示状态提示。
+  - 右栏新增第 5 个 `settings` 页签，`en`/`zh-CN` 文案齐全；`StudioShell` 在 `settings` 页渲染 `SettingsPage`。
+- 验证：
+  - `pnpm typecheck` 0 error；聚焦 3 文件 / 19 用例通过（设置服务 7、设置页 7、shell 页签 5）；全量 `pnpm test` **17 文件 / 114 用例**通过；`pnpm build` 通过（host 25.8 KiB / client 36.8 KiB）。
+  - 手动（`.tmp/t014-verify.mjs`，`vibe-dev` + headless Edge，`--patch .tmp/t014-profile-patch.yml` 临时禁用 s1/s2 同路径路由，端口 4322）：首轮显示默认值 + “尚未保存”；保存 retentionDays 14 / contextBudgetBytes 16384 / 新增 `http://localhost:5173` / 关闭截图 / logLevel debug 后，`.vibe/studio.json` 为 `version: 1` 且值一致，`api/vibe/health` 返回同一组 `config`（plugin 为 `dsh-vibecode-studio`）；把 retentionDays 改成 0 出现字段提示、文件保持 14；重启 DSH 后设置页回填保存值、无提示；两轮 console 0。
+  - 测试生成的 `.vibe/` 已删除；4322/4323/4324 仅 TIME_WAIT，无 dsh/Edge 进程残留。
+- 限制/决策：
+  - M1 的项目根取 Host 进程 `process.cwd()`：`apply()` 阶段没有工作目录/会话绑定，暂不加 `projectDir` 配置项；M2 预览目标解析工作区目录时再收紧。
+  - `<form>` 必须带 `noValidate`：否则浏览器原生 `min` 校验会拦截提交，组件内翻译后的字段提示不会出现。
+  - `vibe-dev` 自带的 s1/s2 spike 也注册 `/api/vibe/health`，同时启用会让 studio Host 注册路由时报 “already registered” 并整体不激活；手动验证沿用 T011 的做法，用 `--patch` 临时禁用，不改 profile。
 
 ## 3. 踩坑与已验证经验
 

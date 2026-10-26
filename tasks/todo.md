@@ -135,12 +135,13 @@
 - **文件**：`src/host/studio/store.ts`、`tests/unit/studio-store.test.ts`。
 - **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/studio-store` 1 文件 / 10 用例通过；全量 `pnpm test` 15 文件 / 99 用例通过；`pnpm build` 通过（host 11.8 KiB / client 12.0 KiB，store 尚未接入 host 入口，体积不变）。实现：`StudioStore` 以 `realpath` 解析项目根、`.vibe` 与 `studio.json` 并做包含校验，拒绝指向项目外的 junction/symlink；读取对缺失文件返回 `missing` + 默认值，对坏 JSON、超版本、超 256 KiB、字段非法返回 `invalid` + 回收后的默认值 + `issues`，不抛异常、不改写原文件；写入先 `parseStudioDocument` 校验（含 origin 归一化、去重、范围检查），再在 `.vibe` 内同目录临时文件 `wx` 写入 + `rename` 原子替换，失败清理临时文件。测试覆盖 round-trip/去重/换行、缺文件、坏 JSON 保留原文件、字段级回收、版本不支持、未知键、非法写入不建目录、超大文件、`.vibe` junction 逃逸、项目目录缺失；临时目录均建在 `.tmp/studio-store-*` 并在用例后删除，无残留。命令更正：本仓库用 `pnpm exec vitest run tests/unit/studio-store`（`pnpm test -- <path>` 不过滤）。
 
-### - [ ] T014 设置面板（基础）
+### - [x] T014 设置面板（基础）
 
 - **目标**：origin 允许列表、保留期、上下文预算、截图开关、日志级别；持久化。
 - **验收**：UI 改动持久化；服务读取同一配置；非法值有提示。
 - **验证**：组件测试 + 手动。
 - **文件**：`src/client/shell/settings/*`、`src/host/studio/settings.ts`。
+- **验证结果（2026-10-27）**：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/studio-settings.test.ts tests/component/shell/settings.test.tsx tests/component/shell/studio-shell.test.tsx` 3 文件 / 19 用例通过；全量 `pnpm test` 17 文件 / 114 用例通过；`pnpm build` 通过（host 25.8 KiB / client 36.8 KiB）。实现：`settings.ts` 懒读 `StudioStore`，把文档值应用到与 health 共享的同一 `VibeStudioConfig` 对象；`studio.settings.get/update` 注册到 unary transport，update 合并后严格校验，非法值返回 `invalid_input` + `issues` 且不落盘；`SettingsPage` 本地校验数字范围与空 origin，Host issues 映射到字段，保存后显示“已保存”。手动：`.tmp/t014-verify.mjs` 在 `vibe-dev` + headless Edge（`--patch .tmp/t014-profile-patch.yml` 临时禁用 s1/s2 同路径路由）两轮启动——首轮为默认值 + “尚未保存”提示；保存后 `.vibe/studio.json` 写入 version 1（retentionDays 14 / contextBudgetBytes 16384 / screenshotEnabled false / logLevel debug / 新增 origin），health 返回同一组值；retentionDays 输入 0 出现字段提示且文件不变；重启后表单仍为保存值、无提示；console 0。测试生成的 `.vibe/` 已删除，4322–4324 仅 TIME_WAIT、无 dsh/Edge 残留。表单加 `noValidate`，避免浏览器原生校验绕过组件内翻译提示。
 
 ### - [ ] T015 G1 Foundation 评审 [GATE]
 
