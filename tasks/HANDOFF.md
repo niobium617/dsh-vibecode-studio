@@ -46,6 +46,14 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 3. 每个任务完成即勾选，并在任务下记录验证结果；G0 已通过，进入 M1；后续门禁 G1–G6 通过后才进入下一阶段。
 4. 代码与文档按任务分批提交；私有仓库公开前按 `docs/PUBLISHING.md` 清理机器路径与历史。
 
+### T014 起步提示（下一会话）
+
+- 任务段：`tasks/todo.md` 的 T014“设置面板（基础）”：origin 允许列表、保留期、上下文预算、截图开关、日志级别；UI 改动持久化；服务读取同一配置；非法值有提示。
+- 验证：组件测试 + `vibe-dev` 手动；计划文件边界 `src/client/shell/settings/*`、`src/host/studio/settings.ts`（如实现落在别处，先在任务记录里说明）。
+- 已有可复用：`StudioStore`（`src/host/studio/store.ts`：读取/校验/原子写/坏数据回退，导出 `parseStudioSettings()`、`DEFAULT_STUDIO_SETTINGS`、`createDefaultStudioDocument()`）；T008 的 `Config`（`src/host/config.ts`）字段同名、范围一致（保留期 1–365、上下文预算 1024–65536）。
+- 设计注意：不要让 UI 存一份、host Config 读另一份。建议启动时读 `studio.json` 合并进服务配置，保存时统一走 `StudioStore.write()`；`write()` 会拒绝非法文档，UI 仍需把 `issues` 映射为字段级提示。
+- `StudioStore` 尚未被 `src/host/index.ts` 引用；T014 接线后跑 `pnpm typecheck`、`pnpm test`、`pnpm build`，并在 `vibe-dev` 验证重启后配置仍在。
+
 ---
 
 ## 5. 新会话启动语（可直接粘贴）
@@ -111,3 +119,13 @@ dsh --profile vibe-dev --dump-config
 > T001 已运行 `pnpm typecheck`、`pnpm spike:s1` 与 `spikes/s1/soak.mjs`；T002 已运行 `pnpm typecheck`、`pnpm spike:s2:build` 并完成 Web/隔离 Desktop 手测；T003 已运行 `pnpm typecheck` 与 `pnpm spike:s3 --seconds 10`；T004 已运行 `pnpm typecheck` 与 `pnpm spike:s4`；T005 为人工评审，未重跑 spike；T006 已运行 `pnpm install`、`pnpm typecheck`、`pnpm test`、`pnpm build`；T007 已运行 `pnpm typecheck`、`pnpm test`（4/4）、`pnpm build:client`（`lib/client.js` 3.2 KiB），并在 `vibe-dev` Web 用手动/headless Edge 验证 hello tab、client.js 200、console 0；T008 已运行 `pnpm typecheck`、`pnpm test`（10/10）、`pnpm build`（`lib/index.js` 2.4 KiB）、`dsh --profile vibe-dev --dump-config`，并用 `.tmp/t008-valid.yml` / `.tmp/t008-invalid.yml` 做正/负配置启动验证（4317/4319，均已释放）；T009 已运行 `pnpm typecheck`、`pnpm exec vitest run tests/unit/contracts`（6 文件 / 34 用例）、全量 `pnpm test`（8 文件 / 44 用例）与 `pnpm build`；T010 已运行 `pnpm typecheck`、`pnpm exec vitest run tests/component/shell`（3 文件 / 13 用例）、全量 `pnpm test`（11 文件 / 57 用例）、`pnpm build`（client 12.0 KiB），并用 `.tmp/t010-verify.mjs` / `.tmp/t010-persist.mjs` 在 `vibe-dev` + headless Edge 验证 tab 打开、页签切换、全屏、收起/重开保留页签、console 0；T011 已运行 `pnpm typecheck`、`pnpm exec vitest run tests/integration/transport`（2 文件 / 26 用例）、全量 `pnpm test`（13 文件 / 83 用例）、`pnpm build`（host 11.8 KiB / client 12.0 KiB），并用 `.tmp/t011-auth.mjs`（raw HTTP 9/9：401/403/200/415）、`.tmp/t011-web.mjs`（headless Edge 页面内 client transport）与 `.tmp/t011-desktop.mjs`（隔离 Desktop `dsh-app://app`）验证；launch 时用 `--patch .tmp/t011-disable-spikes.yml` 临时禁用 s1/s2 同路径路由，未改 profile。T012 已运行 `pnpm typecheck`、全量 `pnpm test`（14 文件 / 89 用例）、`pnpm exec vitest run tests/component/shell`（3 文件 / 13 用例）、`pnpm test:e2e`（3/3，fixture 由 webServer 拉起）与 `pnpm build`（host 11.8 KiB / client 12.0 KiB）；fixture 结束无 LISTENING 残留。T013 已运行 `pnpm typecheck`、`pnpm exec vitest run tests/unit/studio-store`（1 文件 / 10 用例）、全量 `pnpm test`（15 文件 / 99 用例）与 `pnpm build`（host 11.8 KiB / client 12.0 KiB）；临时目录 `.tmp/studio-store-*` 检查无残留。`pnpm test:e2e` 现可用，依赖本机 Edge。
 
 > 命令更正（2026-10-26）：`todo.md` 中 `pnpm test -- <path>` 的写法不会过滤，vitest 会把 `--` 后的路径当普通参数跑全量。需要只跑某个目录时用 `pnpm exec vitest run <path>`。
+
+---
+
+## 10. 本次退出状态（2026-10-26）
+
+- 分支 `task/m1-foundation`，工作区干净；领先 `origin/task/m1-foundation` **7 个提交**（T011–T013 尚未推送）。
+- 最近提交：`5d82d53 feat(studio): add atomic .vibe studio.json store with validation`、`e803387 docs(m1): record T013 store verification`；交接整理提交见 `git log -1`。
+- T013 已完成并验证：`pnpm typecheck` 0 error、`pnpm exec vitest run tests/unit/studio-store` 1 文件 / 10 用例、全量 `pnpm test` 15 文件 / 99 用例、`pnpm build` 通过；`.tmp/studio-store-*` 无残留。
+- 本会话只跑 typecheck / Vitest / build，未启动 DSH 或 Edge fixture，无后台进程或端口需要清理。
+- 下一会话直接粘贴第 5 节启动语；从 T014 设置面板（基础）开始。
