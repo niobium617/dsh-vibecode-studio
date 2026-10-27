@@ -12,6 +12,7 @@
  */
 import { isStudioError, type StudioError } from './errors'
 import type { TargetCapabilities } from './target'
+import type { ConsoleEntry } from './telemetry'
 
 export const TRANSPORT_VERSION = 1
 
@@ -39,6 +40,9 @@ export const PREVIEW_STOP_METHOD = 'preview.session.stop'
 export const PREVIEW_STATUS_METHOD = 'preview.session.status'
 /** Input events use the shared unary route rather than a dedicated route. */
 export const PREVIEW_INPUT_METHOD = 'preview.input'
+/** Console capture is read/clear over unary methods; no extra route (T023). */
+export const PREVIEW_CONSOLE_LIST_METHOD = 'preview.console.list'
+export const PREVIEW_CONSOLE_CLEAR_METHOD = 'preview.console.clear'
 
 /** Unary requests carry input events and small commands; 64 KiB is ample. */
 export const MAX_UNARY_BODY_BYTES = 64 * 1024
@@ -311,6 +315,52 @@ export function isPreviewInputEvent(value: unknown): value is PreviewInputEvent 
   }
 
   return false
+}
+
+/**
+ * Console capture wire contract (T023). The Host keeps a bounded ring buffer
+ * and the panel polls with `after`; `lastSeq` keeps increasing across clears so
+ * a client can tell "nothing new" from "the Host sequence restarted".
+ */
+export const MAX_CONSOLE_ENTRIES = 500
+export const MAX_CONSOLE_TEXT_BYTES = 500
+
+export interface PreviewConsoleQuery {
+  /** Only entries with a sequence number greater than this. */
+  readonly after?: number
+  /** Keep only the last N matching entries. */
+  readonly limit?: number
+}
+
+export interface PreviewConsoleSnapshot {
+  readonly entries: readonly ConsoleEntry[]
+  readonly lastSeq: number
+  /** Entries evicted because an entry/byte budget was exceeded. */
+  readonly dropped: number
+}
+
+export interface PreviewConsoleClearResult {
+  readonly cleared: number
+  readonly lastSeq: number
+}
+
+const PREVIEW_CONSOLE_QUERY_KEYS = new Set(['after', 'limit'])
+
+function isSafeCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+}
+
+/** Strict shape check; unknown keys and out-of-range counts are rejected. */
+export function isPreviewConsoleQuery(value: unknown): value is PreviewConsoleQuery {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  if (Object.keys(record).some((key) => !PREVIEW_CONSOLE_QUERY_KEYS.has(key))) return false
+  if (record.after !== undefined && !isSafeCount(record.after)) return false
+  if (record.limit !== undefined) {
+    if (!isSafeCount(record.limit) || record.limit === 0) return false
+    if (record.limit > MAX_CONSOLE_ENTRIES) return false
+  }
+  return true
 }
 
 /** Strict shape check; range checks stay in `validateTargetConfig`. */

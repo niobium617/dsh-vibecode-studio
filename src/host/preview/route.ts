@@ -17,14 +17,19 @@ import {
   FRAME_BOUNDARY,
   FRAME_PATH,
   MAX_FRAME_WAIT_MS,
+  PREVIEW_CONSOLE_CLEAR_METHOD,
+  PREVIEW_CONSOLE_LIST_METHOD,
   PREVIEW_INPUT_METHOD,
   PREVIEW_START_METHOD,
   PREVIEW_STATUS_METHOD,
   PREVIEW_STOP_METHOD,
   STREAM_CONTENT_TYPE,
   STREAM_PATH,
+  isPreviewConsoleQuery,
   isPreviewInputEvent,
   isPreviewStartParams,
+  type PreviewConsoleClearResult,
+  type PreviewConsoleSnapshot,
   type PreviewFrameMeta,
   type PreviewInputAck,
   type PreviewSessionSnapshot,
@@ -40,6 +45,10 @@ import {
   type TransportHostContext,
   type UnaryRegistry,
 } from '../transport'
+import {
+  createPreviewConsoleCollector,
+  type PreviewConsoleCollector,
+} from './console'
 import { createPreviewFrameBuffer, type PreviewFrame, type PreviewFrameBuffer } from './frame-buffer'
 import {
   createPreviewInputDispatcher,
@@ -57,6 +66,10 @@ export interface PreviewService {
   status(): PreviewSessionSnapshot
   /** Validates and forwards one pointer/wheel/key event (T021). */
   input(event: unknown): Promise<PreviewInputAck>
+  /** Bounded console history for the live preview (T023). */
+  consoleList(query?: unknown): PreviewConsoleSnapshot
+  /** Clears the Host console buffer; the panel clears its copy too. */
+  consoleClear(): PreviewConsoleClearResult
   dispose(): Promise<void>
 }
 
@@ -73,6 +86,10 @@ export interface PreviewServiceOptions {
   readonly createInput?: (
     page: NonNullable<ReturnType<NonNullable<TargetAdapter['screencastPage']>>>,
   ) => PreviewInputDispatcher
+  /** Test seam: substitutes the CDP console collector. */
+  readonly createConsole?: (
+    page: NonNullable<ReturnType<NonNullable<TargetAdapter['screencastPage']>>>,
+  ) => PreviewConsoleCollector
 }
 
 function toPreviewError(error: unknown): StudioError {
@@ -96,6 +113,7 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
   let source: ScreencastSource | undefined
   let inputDispatcher: PreviewInputDispatcher | undefined
   let inputSupported = false
+  let consoleCollector: PreviewConsoleCollector | undefined
   let targetId: string | null = null
   let url: string | null = null
   let capabilities: TargetCapabilities | null = null
@@ -121,8 +139,11 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     source = undefined
     if (activeSource) await activeSource.stop().catch(() => undefined)
     buffer.clear()
-    // Input owns its own CDP session; detach it before the adapter closes the
-    // page so a stopped preview leaves no handle behind.
+    // Console and input own their own CDP sessions; stop them before the
+    // adapter closes the page so a stopped preview leaves no handle behind.
+    const activeConsole = consoleCollector
+    consoleCollector = undefined
+    if (activeConsole) await activeConsole.stop().catch(() => undefined)
     const activeInput = inputDispatcher
     inputDispatcher = undefined
     inputSupported = false
@@ -203,9 +224,27 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
         options.createInput?.(page) ?? createPreviewInputDispatcher({ page })
     }
 
+    // Console capture is auxiliary: if CDP refuses Runtime.enable the preview
+    // still runs, but the snapshot stops advertising the capability.
+    let consoleReady = false
+    if (session.capabilities.console) {
+      const createdConsole =
+        options.createConsole?.(page) ?? createPreviewConsoleCollector({ page })
+      try {
+        await createdConsole.start()
+        consoleCollector = createdConsole
+        consoleReady = true
+      } catch {
+        await createdConsole.stop().catch(() => undefined)
+      }
+    }
+
     targetId = session.targetId
     url = session.url
-    capabilities = session.capabilities
+    capabilities =
+      session.capabilities.console && !consoleReady
+        ? { ...session.capabilities, console: false }
+        : session.capabilities
     state = 'ready'
     return snapshot()
   }
@@ -225,6 +264,31 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
       })
     }
     return inputDispatcher.dispatch(event)
+  }
+
+  function requireConsole(): PreviewConsoleCollector {
+    if (state !== 'ready') {
+      throw studioError('target_unavailable', 'vibe-studio: preview is not running')
+    }
+    if (!consoleCollector) {
+      throw studioError('unsupported', 'vibe-studio: console capture is unavailable', {
+        capability: 'console',
+      })
+    }
+    return consoleCollector
+  }
+
+  function consoleList(query?: unknown): PreviewConsoleSnapshot {
+    if (query !== undefined && !isPreviewConsoleQuery(query)) {
+      throw studioError('invalid_input', 'vibe-studio: invalid console query', {
+        field: 'query',
+      })
+    }
+    return requireConsole().snapshot(query)
+  }
+
+  function consoleClear(): PreviewConsoleClearResult {
+    return requireConsole().clear()
   }
 
   async function start(params: PreviewStartParams): Promise<PreviewSessionSnapshot> {
@@ -271,6 +335,8 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     stop,
     status: snapshot,
     input,
+    consoleList,
+    consoleClear,
     async dispose() {
       await stop()
     },
@@ -295,11 +361,19 @@ export function registerPreviewMethods(
   const offInput = registry.register(PREVIEW_INPUT_METHOD, async (params) =>
     service.input(params),
   )
+  const offConsoleList = registry.register(PREVIEW_CONSOLE_LIST_METHOD, async (params) =>
+    service.consoleList(params),
+  )
+  const offConsoleClear = registry.register(PREVIEW_CONSOLE_CLEAR_METHOD, async () =>
+    service.consoleClear(),
+  )
   return () => {
     offStart()
     offStop()
     offStatus()
     offInput()
+    offConsoleList()
+    offConsoleClear()
   }
 }
 

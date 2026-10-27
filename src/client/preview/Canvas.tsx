@@ -17,6 +17,7 @@ import {
 } from '../../contracts/transport'
 import { createTranslator, type Locale } from '../i18n'
 import { callUnary } from '../transport/client'
+import { ConsoleDrawer } from './ConsoleDrawer'
 import { InputLayer } from './InputLayer'
 import {
   PreviewTransport,
@@ -338,6 +339,9 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
         ) : null}
       </div>
       {state === 'ready' ? <p style={noteStyle}>{t('preview.input.hint')}</p> : null}
+      {state === 'ready' && snapshot?.capabilities?.console === true ? (
+        <ConsoleDrawer active locale={locale} />
+      ) : null}
     </div>
   )
 }

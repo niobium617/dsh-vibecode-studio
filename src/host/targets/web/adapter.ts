@@ -30,13 +30,13 @@ import {
 
 export type WebTargetAdapterStatus = 'idle' | 'starting' | 'ready' | 'stopped' | 'failed'
 
-/** Screencast (T020) and input (T021) are wired; pick/console/network follow. */
+/** Screencast (T020), input (T021) and console (T023) are wired; pick/network follow. */
 export const WEB_TARGET_CAPABILITIES: TargetCapabilities = Object.freeze({
   screencast: true,
   input: true,
   pick: false,
   sourceMap: false,
-  console: false,
+  console: true,
   network: false,
   screenshot: true,
 })

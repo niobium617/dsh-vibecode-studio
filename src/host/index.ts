@@ -76,6 +76,21 @@ export type {
   PreviewInputDispatcher,
   PreviewInputDispatcherOptions,
 } from './preview/input'
+export {
+  createPreviewConsoleCollector,
+  formatConsoleArgs,
+  formatRemoteObject,
+  mapConsoleEvent,
+  normalizeConsoleText,
+  normalizeConsoleTimestamp,
+  PreviewConsoleBuffer,
+} from './preview/console'
+export type {
+  ConsoleRecordInput,
+  PreviewConsoleCollector,
+  PreviewConsoleCollectorOptions,
+  PreviewConsoleStats,
+} from './preview/console'
 export { createWebTargetAdapter, WEB_TARGET_CAPABILITIES } from './targets/web/adapter'
 export type {
   WebTargetAdapter,
