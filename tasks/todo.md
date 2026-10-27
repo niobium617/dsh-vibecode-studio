@@ -181,12 +181,13 @@
 - **文件**：`spikes/s8/{run.ts,REPORT.md}`。
 - **验证结果（2026-10-27）**：`spikes/s8/run.ts` 用真实 Vite 8.3.5 + `fixtures/vite-basic`，逐场景测量启动、停止、孤儿与端口冲突；原始数据 `.tmp/logs/s8-results.json`。启动 9 次 spawn 的 HTTP 就绪 393–469 ms（中位 417 ms，预算 10 s），ready 日志 362–380 ms。停止：直接 `child.kill()` 14–15 ms、0 存活（Node 24 对非 detached 子进程使用 job object，`IsProcessInJob=true`，不依赖此行为）；`taskkill /T /F` 435–598 ms、3/3 无存活；`cmd.exe` 中转（`shell:true`）只杀 cmd 时 1 个 vite node 存活且仍占端口，按记录 PID 直接强杀后清零——证明必须记录 PID 并校验。端口冲突 exit 1、366–484 ms，stderr `Error: Port <port> is already in use`。结束时残留进程 0、监听端口 0。`pnpm exec tsc --noEmit` 0 error。报告给出 T019 的启动/就绪/停止/兜底/错误映射结论；`spikes/s8/` 仅 `run.ts` 与 `REPORT.md` 两个文件。
 
-### - [ ] T019 Dev server 进程监督
+### - [x] T019 Dev server 进程监督
 
 - **目标**：按 S8 结论实现 supervisor：spawn、日志 ring buffer、健康检查、停止、Windows tree kill。
 - **验收**：启动/停止/重启；日志可见；无孤儿；单测用假进程。
 - **验证**：`pnpm test -- tests/integration/supervisor` + 手动。
 - **文件**：`src/host/targets/process/{supervisor,logs}.ts`、tests。
+- **验证结果（2026-10-27）**：`src/host/targets/process/supervisor.ts` 实现可注入 spawn/HTTP 探测/进程列举/树杀/端口探测的 supervisor：严格校验 spec（绝对 command/cwd、端口范围、loopback 就绪 URL，非本地 `permission_denied`）、`shell:false` + `windowsHide:true` 启动、50–100 ms 轮询 HTTP 就绪（10 s 预算，超时 `timeout`）、端口冲突/提前退出映射 `preview_failed` + `reason:'port_in_use'|'exited'`、spawn 失败 `target_unavailable`、abort 可中断；启动结束清空上一轮日志，并发 start 合并，ready 幂等，失败可重试。停止记录后代 PID，Windows 用 `taskkill /PID /T /F`，等待退出后在 grace 后按 PID + 命令行精确匹配补杀，校验 survivors 与端口释放（5 s），端口仍占用记 `reason:'port_busy'`。启动失败且子进程已自行退出（如端口冲突）时跳过端口释放等待，避免误报与 5 s 延迟。`logs.ts` 提供 500 条 / 64 KiB / 单行 2000 字符的环形缓冲，按流拆分半行、去 ANSI、保留 seq 且支持 `after`/`limit` 增量读取。`tests/helpers/fake-dev-server.ts` 假进程 + `tests/integration/supervisor/{logs,supervisor}.test.ts` 覆盖生命周期、日志、超时/冲突/abort/spawn 失败、并发、重启、树杀、PID 复用保护、端口占用、非法配置与非本地 URL；全部用假进程，不启动真实长驻服务。验证：`pnpm exec vitest run tests/integration/supervisor` 2 文件 / 23 用例通过；全量 `pnpm exec vitest run` 24 文件 / 171 用例通过；`pnpm typecheck` 0 error；`pnpm build` host 67.4 KiB / client 36.8 KiB。手动（`.tmp/t019-manual.ts`，真实 Vite 8.3.5 + `fixtures/vite-basic`，结果 `.tmp/logs/t019-manual.json`，`pass: true`）：启动 ready 532 ms、日志含 `Local:`/`ready at`；重启 run=2、新 PID、旧日志已清；停止 `portReleased:true`、`survivors:[]`、端口关闭、无残留 node.exe；端口冲突约 1.6 s 返回 `preview_failed`/`port_in_use`。进程查询需限定 `Name -eq "node.exe"`，否则执行查询的 PowerShell 自身会误匹配。
 
 ### - [ ] T020 Screencast + 帧路由 + canvas
 
