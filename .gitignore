@@ -20,5 +20,9 @@ spikes/s2/package/lib/
 spikes/s2/.build/
 
 # Generic build and test outputs
+lib/
 dist/
 coverage/
+
+# Studio state written into the host project directory at runtime
+.vibe/

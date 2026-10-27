@@ -1,0 +1,6 @@
+# dsh-vibecode-studio bundle: one host+client row.
+# Installed only into the development profile (`vibe-dev`); never into the
+# real `desktop` or `web` profiles.
+- insert:
+    - id: vibe-studio
+      name: dsh-vibecode-studio

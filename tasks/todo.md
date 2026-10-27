@@ -71,75 +71,85 @@
 
 > 依赖：G0 通过。T006 先做；T007/T008/T009 可在 T006 后并行；T010 依赖 T007/T009；T011 依赖 T008；T012 依赖 T006；T013 依赖 T009；T014 依赖 T010/T013。
 
-### - [ ] T006 包脚手架与工具链
+### - [x] T006 包脚手架与工具链
 
 - **目标**：`package.json`、TS strict、构建/测试脚本、目录骨架；host 能产出 ESM。
 - **验收**：`pnpm install`、`pnpm typecheck`、`pnpm test`（smoke）、`pnpm build` 全绿；无 DSH 依赖错误。
 - **验证**：上述命令；`pnpm build` 产出 `lib/index.js`。
 - **文件**：`package.json`、`tsconfig.json`、`vitest.config.ts`、`scripts/*`、`src/host/index.ts`、`src/client/index.ts`。
+- **验证结果（2026-10-26）**：`pnpm install`（already up to date）、`pnpm typecheck`（0 error）、`pnpm test`（Vitest 5.0.5，1 文件 / 3 用例通过）、`pnpm build` 全绿。`lib/index.js` 已生成（108 B，ESM `export { apply, name }`），构建脚本内 `import()` 自检通过；仓库无 DSH 运行时依赖。包名由 dev workspace `dsh-vibecode-studio-dev` 改为产品包 `dsh-vibecode-studio@0.1.0`（暂保留 `private`，T060 打包时处理）；`lib/` 已加入 `.gitignore`。
 
-### - [ ] T007 Client bundle loader 包装
+### - [x] T007 Client bundle loader 包装
 
 - **目标**：把最小 client 插件打成 `window.__ModuleLoader__.load({ id, factory })` 格式的 `lib/client.js`，在 DSH 中加载。
 - **验收**：`vibe-dev` 启动后出现 hello tab；无 loader 报错；React/JSX 正常。
 - **验证**：`pnpm build:client`；`dsh --profile vibe-dev`；手动打开 tab。
 - **文件**：`scripts/build-client.mjs`、`src/client/index.ts`、`src/client/hello.tsx`、`lib/client.js`。
+- **验证结果（2026-10-26）**：`pnpm typecheck` 0 error、`pnpm test` 4/4、`pnpm build:client` 通过，产出 loader 包装的 `lib/client.js`（3.2 KiB）。packages 以 link 装入 `vibe-dev` 后启动 `dsh --profile vibe-dev --no-open --host 127.0.0.1 --port 4317`；headless Edge 打开右栏“新标签页”菜单可见 **Vibe Studio**，点击后 `[data-vibe-hello="1"]` 渲染，点击按钮计数 0→1（React state 生效）；`dsh-vibecode-studio/client.js` 响应 200，console/pageerror 0，无 loader 报错。为让 DSH 识别包，另补了 `cordis.patch.yml` 与 `package.json` 的 `dsh.bundle`/`dsh.client.inject`（renderer、sidebar-right）。限制：本轮只验证 Web 载体；Desktop 留到 T015。
 
-### - [ ] T008 Host 插件骨架与 Config
+### - [x] T008 Host 插件骨架与 Config
 
 - **目标**：`name`/`inject`/`apply`；`Config` 用 schemastery；服务注册位；profile 安装说明。
 - **验收**：`--dump-config` 含本插件；非法配置被拒；启动无报错。
 - **验证**：`dsh --profile vibe-dev --dump-config`；改坏配置做负例。
 - **文件**：`src/host/index.ts`、`src/host/config.ts`、`profiles/vibe-dev/README.md`。
+- **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；`pnpm test` 2 文件 / 10 用例通过（新增 `tests/unit/config.test.ts` 6 例）；`pnpm build` 生成 `lib/index.js` 2.4 KiB，构建脚本内 `import()` 自检通过。`dsh --profile vibe-dev --dump-config` 输出含 `# == dsh-vibecode-studio`、`- id: vibe-studio`、`name: dsh-vibecode-studio`；`.tmp/t008-valid.yml` 覆盖值（debug / localhost:5173 / 14 天）出现在 dump 中。负例用 `--patch .tmp/t008-invalid.yml` 实际启动（4319）：`dsh: warning: 1 entry did not activate`，`vibe-studio (dsh-vibecode-studio): ValidationError: invalid config: - $.logLevel expected "debug" | "info" | "warn" | "error" but got "verbose"`，其余 DSH 正常服务；`--dump-config` 本身不校验配置。默认配置在 4317 启动 20 s，无 warning/error，超时退出（124）；两个端口均已释放。语义校验补在 `resolveConfig()`（拒绝未知键、规范化并去重 origin、要求至少一个 origin）。
 
-### - [ ] T009 Contracts v1
+### - [x] T009 Contracts v1
 
 - **目标**：`TargetKind/TargetConfig/TargetCapabilities/TargetSession`、`Annotation`、`ElementContext`、`SourceContext`、`ConsoleEntry`、`NetworkEntry`、`StudioError`、`ArtifactRef`、预算/截断、不可信包裹。
 - **验收**：纯类型/纯函数；单测覆盖序列化、预算、脱敏、包裹；无运行时依赖。
 - **验证**：`pnpm test -- tests/unit/contracts`。
 - **文件**：`src/contracts/*`、`tests/unit/contracts/*`。
+- **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/contracts` → 6 文件 / 34 用例通过；全量 `pnpm test` → 8 文件 / 44 用例通过；`pnpm build` 通过。注意：`pnpm test -- tests/unit/contracts` 在 vitest 下不会过滤，实际跑全量，已改用 `pnpm exec vitest run <path>`。覆盖：Annotation JSON round-trip 与坏数据拒绝、品牌 ID、UTF-8 预算与 CJK/emoji 安全截断、注解渲染 ≤4 KB、Console/Network 单行摘要与 500 B 预算、header/query/JSON body 脱敏、`<untrusted-page-content>` 边界逃逸与实体膨胀预算。所有 `src/contracts/*` 只互相引用，无第三方或 Node/DOM 运行时依赖；`TargetSession`/`ArtifactRef` 等为纯类型契约。
 
-### - [ ] T010 Client shell + 右栏 tab
+### - [x] T010 Client shell + 右栏 tab
 
 - **目标**：注册 `Vibe Studio` tab（`keepMounted`、全屏、guide）；内部页签占位；空/错/加载状态；i18n 骨架。
 - **验收**：tab 可开/全屏；切 tab/会话不丢；占位页可见；组件测试通过。
-- **验证**：手动 + `pnpm test -- tests/component/shell`。
+- **验证**：手动 + `pnpm exec vitest run tests/component/shell`。
 - **文件**：`src/client/shell/*`、`src/client/locales/{zh-CN,en}.json`。
+- **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/component/shell` 3 文件 / 13 用例、全量 `pnpm test` 11 文件 / 57 用例通过；`pnpm build` host 2.4 KiB / client 12.0 KiB。`vibe-dev` + headless Edge 实测：guide 卡片可开 tab，四个内部页签（预览/检查/标注/API）切换与占位文案正确，全屏进入/退出保持当前页签，收起右栏再展开、关闭 tab 后重开均保留“标注”页签，client.js 200、console/pageerror 0。新增 devDependencies `jsdom`/`@testing-library/react`/`@testing-library/dom`（仅测试）。限制：未单独脚本化切 Session；运行中切换系统语言需重载。
 
-### - [ ] T011 Connection 传输骨架
+### - [x] T011 Connection 传输骨架
 
 - **目标**：host 用 `fetch.register` 注册精确 `/api/vibe/*` 路由（health + 一元请求）；client 用文档相对 `fetch`；不使用 `rpc.handle`（S1 已证第三方插件会因缺少 `webServer` inject 失败）；Web/Desktop 都通。
 - **验收**：health 返回；一元请求成功；未认证/跨源被拒；Desktop 可用。
-- **验证**：手动 Web/Desktop；`pnpm test -- tests/integration/transport`。
+- **验证**：手动 Web/Desktop；`pnpm exec vitest run tests/integration/transport`（`pnpm test -- <path>` 不会过滤，见下方命令更正）。
 - **文件**：`src/host/transport/*`、`src/client/transport/*`。
+- **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/transport` 2 文件 / 26 用例、全量 `pnpm test` 13 文件 / 83 用例通过；`pnpm build` host 11.8 KiB / client 12.0 KiB。实现：`src/contracts/transport.ts` 共享路径与信封契约，`src/host/transport/*`（`UnaryRegistry` + health/unary 两条精确路由，方法表可扩展），`src/client/transport/*`（文档相对 fetch、超时/调用方中止、稳定错误映射），`tests/helpers/fake-host.ts`。真实载体：`vibe-dev` 加 `--patch .tmp/t011-disable-spikes.yml` 临时禁用 s1/s2 同路径路由（不改 profile 文件），raw HTTP 9/9——无 cookie health 401、token 303 + Set-Cookie、认证 health 200、`Origin: http://evil.example` 403、`Host: evil.example` 403、认证 `studio.ping` 200 echo、`text/plain` 415；headless Edge 页面内执行 client transport，文档相对 `api/vibe/health` / `api/vibe/request` 均成功、ping echo `{source:'web'}`、未知方法映射 `not_found/404`、除该预期 404 外 console 0；隔离 Desktop（`.tmp/desktop-home` + 独立 userData + loopback 9223，`dsh-app://app`）health 与 ping 均成功、console 0，进程树已清理。限制：client transport 尚未接入 `src/client/index.ts` 的出厂 bundle（按 T011 文件边界，待后续 UI 任务接线）；未认证/跨源拒绝来自 DSH Connection 自身，插件不重复实现。
 
-### - [ ] T012 测试 harness + fixture
+### - [x] T012 测试 harness + fixture
 
 - **目标**：Vitest、React Testing Library、Playwright 配置；Vite fixture 骨架；假 adapter。
 - **验收**：示例单测/集成/E2E 全绿；fixture 可启动。
 - **验证**：`pnpm test`、`pnpm test:e2e`。
 - **文件**：`tests/*`、`fixtures/vite-basic/*`、`playwright.config.ts`。
+- **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；Vitest 拆为 `node`（smoke/unit/integration）与 `component`（jsdom + 统一 cleanup）两个 project，全量 `pnpm test` 14 文件 / 89 用例通过（原 13/83 + 假 adapter 6 例），`pnpm exec vitest run tests/component/shell` 仍为 3 文件 / 13 用例。新增 `playwright.config.ts`（`channel: 'msedge'`、headless、1280×800、webServer 自动拉起 fixture、产物写 `.tmp/playwright-results`），`pnpm test:e2e` 3/3 通过（首屏与计数、中文表单、`/api/echo` 与 `/api/boom`）；fixture 监听 `127.0.0.1:4320`，测试结束无 LISTENING 残留。`fixtures/vite-basic` 为 React 19 + Vite 8 骨架（计数器、表单、列表、控制台错误按钮，`/api/echo`、`/api/boom`、`/api/slow`），可用 `pnpm fixture:dev` 单独启动。新增 `tests/helpers/fake-adapter.ts` 生命周期替身（并发 start 合并、重复 start 复用、stop 幂等、启动失败态）及 6 个集成用例。`pnpm build` 通过（host 11.8 KiB / client 12.0 KiB）。新增 devDependencies `@playwright/test@1.64.1`、`@types/react-dom@18.0.0`；Playwright 使用本机 Edge，未下载浏览器。
 
-### - [ ] T013 `.vibe` 配置存储
+### - [x] T013 `.vibe` 配置存储
 
 - **目标**：`studio.json` 读写、原子写、校验、默认值、坏数据回退。
 - **验收**：round-trip；坏 JSON 不崩溃；路径限定项目内。
 - **验证**：`pnpm test -- tests/unit/studio-store`。
 - **文件**：`src/host/studio/store.ts`、`tests/unit/studio-store.test.ts`。
+- **验证结果（2026-10-26）**：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/studio-store` 1 文件 / 10 用例通过；全量 `pnpm test` 15 文件 / 99 用例通过；`pnpm build` 通过（host 11.8 KiB / client 12.0 KiB，store 尚未接入 host 入口，体积不变）。实现：`StudioStore` 以 `realpath` 解析项目根、`.vibe` 与 `studio.json` 并做包含校验，拒绝指向项目外的 junction/symlink；读取对缺失文件返回 `missing` + 默认值，对坏 JSON、超版本、超 256 KiB、字段非法返回 `invalid` + 回收后的默认值 + `issues`，不抛异常、不改写原文件；写入先 `parseStudioDocument` 校验（含 origin 归一化、去重、范围检查），再在 `.vibe` 内同目录临时文件 `wx` 写入 + `rename` 原子替换，失败清理临时文件。测试覆盖 round-trip/去重/换行、缺文件、坏 JSON 保留原文件、字段级回收、版本不支持、未知键、非法写入不建目录、超大文件、`.vibe` junction 逃逸、项目目录缺失；临时目录均建在 `.tmp/studio-store-*` 并在用例后删除，无残留。命令更正：本仓库用 `pnpm exec vitest run tests/unit/studio-store`（`pnpm test -- <path>` 不过滤）。
 
-### - [ ] T014 设置面板（基础）
+### - [x] T014 设置面板（基础）
 
 - **目标**：origin 允许列表、保留期、上下文预算、截图开关、日志级别；持久化。
 - **验收**：UI 改动持久化；服务读取同一配置；非法值有提示。
 - **验证**：组件测试 + 手动。
 - **文件**：`src/client/shell/settings/*`、`src/host/studio/settings.ts`。
+- **验证结果（2026-10-27）**：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/studio-settings.test.ts tests/component/shell/settings.test.tsx tests/component/shell/studio-shell.test.tsx` 3 文件 / 19 用例通过；全量 `pnpm test` 17 文件 / 114 用例通过；`pnpm build` 通过（host 25.8 KiB / client 36.8 KiB）。实现：`settings.ts` 懒读 `StudioStore`，把文档值应用到与 health 共享的同一 `VibeStudioConfig` 对象；`studio.settings.get/update` 注册到 unary transport，update 合并后严格校验，非法值返回 `invalid_input` + `issues` 且不落盘；`SettingsPage` 本地校验数字范围与空 origin，Host issues 映射到字段，保存后显示“已保存”。手动：`.tmp/t014-verify.mjs` 在 `vibe-dev` + headless Edge（`--patch .tmp/t014-profile-patch.yml` 临时禁用 s1/s2 同路径路由）两轮启动——首轮为默认值 + “尚未保存”提示；保存后 `.vibe/studio.json` 写入 version 1（retentionDays 14 / contextBudgetBytes 16384 / screenshotEnabled false / logLevel debug / 新增 origin），health 返回同一组值；retentionDays 输入 0 出现字段提示且文件不变；重启后表单仍为保存值、无提示；console 0。测试生成的 `.vibe/` 已删除，4322–4324 仅 TIME_WAIT、无 dsh/Edge 残留。表单加 `noValidate`，避免浏览器原生校验绕过组件内翻译提示。
 
-### - [ ] T015 G1 Foundation 评审 [GATE]
+### - [x] T015 G1 Foundation 评审 [GATE]
 
 - **目标**：干净 `vibe-dev` profile 安装；tab 可见；health 通；全量检查。
 - **验收**：`pnpm typecheck/test/build` 绿；Web/Desktop 均能开 tab；未改 desktop profile。
 - **验证**：上述命令 + 手动；`tasks/todo.md` 勾选记录。
 - **文件**：无。
+- **验证结果（2026-10-27）**：`pnpm typecheck` 0 error；`pnpm test` 17 文件 / 114 用例；`pnpm build` host 25.8 KiB / client 36.8 KiB；`pnpm test:e2e` 3/3。根因处理：`vibe-dev` 的 s1/s2 spike 与 studio 抢 `/api/vibe/health`，在 profile patch 层新增 `disabled: true`（改前备份 `.tmp/logs/vibe-dev-cordis.patch.yml.bak-2026-10-27`，删两行即可恢复）；不带 `--patch` 启动后 `studio.ping` 与 `studio.settings.get` 均 200，health 返回 `plugin: dsh-vibecode-studio`。Web（headless Edge，4327）打开右栏 Vibe Studio：5 页签（预览/检查/标注/API/设置）、设置页回填默认值 + 未保存提示、health 同源，console 0。Desktop（隔离 `DSH_HOME=.tmp/desktop-home`，CDP 9223）同样 5 页签 + 设置页、health 200；真实 `desktop` profile 前后 SHA-256 一致（`850eb26…b6a7c`），未修改。2 条 503 为 Host 就绪前预热轮询噪声，无其他 console 错误。结束后无 LISTENING 端口、无 dsh/Desktop/Edge 残留、未生成 `.vibe`。
 
 ---
 
