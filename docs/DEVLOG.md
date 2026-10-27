@@ -312,6 +312,20 @@
   - 手动 `.tmp/t019-manual.ts`（真实 Vite 8.3.5 + `fixtures/vite-basic`，结果 `.tmp/logs/t019-manual.json`，`pass: true`）：启动 ready 532 ms、日志含 `Local:`/`ready at`；重启 run=2、PID 变化、旧日志已清；停止 `portReleased:true`、`survivors:[]`、端口关闭、无残留 node.exe；端口冲突约 1.6 s 返回 `preview_failed`/`port_in_use`；结束后无 Vite 进程与监听端口。
 - 计划偏差：新增 `tests/helpers/fake-dev-server.ts` 与 `tests/integration/supervisor/` 下的日志/监督用例；无新增依赖。
 
+### T020 — Screencast + 帧路由 + canvas（已完成）
+
+- 目标：CDP `Page.startScreencast` 限速取帧；host 保留最新帧 + 单调 seq；`/api/vibe/stream`（multipart JPEG）为主、`/api/vibe/frame?wait=1&after=<seq>` 为回退；client canvas 渲染；断流切 pull、恢复切回 stream。
+- 结果：
+  - `src/host/preview/frame-buffer.ts`：只保留最新 JPEG，seq 单调；waiter/subscriber 取消或停止时清理，长轮询在 abort 时返回 204。
+  - `src/host/preview/screencast.ts`：收到帧立即 `Page.screencastFrameAck`，base64 解码后做 4 MiB 上限与 SOI 校验，latest-wins；按绝对 deadline 限速（10 ms 轮询、30 fps、quality 70），避免 setTimeout 漂移；停止时清空缓冲。
+  - `src/host/preview/route.ts`：multipart 流带 `Content-Length` 与 `X-Vibe-Seq/Ts/Width/Height`，停止时写结束边界；pull 路由支持 `wait`/`after` 校验（400）、未运行 503、无新帧 204；preview 服务 `start/stop/status` 串行化，状态快照含 fps/quality/lastError。
+  - `src/client/preview/transport.ts`：stream 为主，失败/结束切 pull（2 s 退避）并每 5 s 探测 stream；seq 去重保证切换不重复、不回退；解析器增量处理分块、前导、结束边界与非法元数据。`Canvas.tsx` 用 `createImageBitmap` + 单绘制循环合并最新帧，绘制后 `bitmap.close()`，画布尺寸取自帧元数据。
+- 验证：
+  - `pnpm exec vitest run tests/integration/frames`：4 文件 / 28 用例通过；全量 28 文件 / 199 用例通过；`pnpm typecheck` 0 error；`pnpm build` host 88.2 KiB / client 58.1 KiB。
+  - 手动 Web（`.tmp/t020-web.mjs`，DSH 4328 + 动态回环页，`.tmp/logs/t020-web.json`，`ok:true`）：abort `/api/vibe/stream` → 轮询 25.3 fps、1280×720/12 色；解除后 5 s 内回流失、25.3 fps、13 色；25 s 浸泡 host RSS 最后 5 s +24 KB（稳态 +4.3 MB）、浏览器堆 +190 KB；目标 Edge 全部退出，真实 `desktop` profile 未改。
+  - 手动 Desktop（隔离 `DSH_HOME=.tmp/desktop-home` + 独立 userData、CDP 9223，`.tmp/t020-desktop.mjs`，`.tmp/logs/t020-desktop.json`，`ok:true`）：`dsh-app://app` 5 页签，流式 25.7 fps、1060 帧、1280×720/13 色、渲染器堆 +49 KB、Electron 进程树 RSS 无增长；停止后 Edge 全退出，真实 profile 未改；console 仅有预热 503 与预期中止。
+- 计划偏差：手测发现并修复 detached `window.fetch` 在 Chromium 抛 `Illegal invocation` 导致 Web 无帧；未新增依赖。Desktop 未单独模拟断流（回退由 Web 覆盖）。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -402,6 +416,8 @@
 32. **进程检查会匹配到自己**：用 `CommandLine -like '*playwright_chromiumdev_profile*'` 查残留时，执行检查的 shell/PowerShell 自身也含该字符串，会误报。必须同时限定 `name='msedge.exe'`（或进程名）并匹配 `--user-data-dir=*playwright_chromiumdev_profile*`。
 33. **端口 1 不是“连接被拒”**：Chromium 把它当 unsafe port，`page.goto` 报 `net::ERR_UNSAFE_PORT`，不会命中 `ERR_CONNECTION_REFUSED` 映射。测试用 `net` 临时监听再释放一个端口，拿到真实的 `ERR_CONNECTION_REFUSED`。
 34. **`playwright-core` 必须懒加载且保持 external**：host 用 `packages: 'external'` 打包，动态 `import()` 留在产物里；模块加载不依赖浏览器，缺失时由 `launchEdge` 转成 `target_unavailable`，避免插件启动即崩。打包任务需把它从 devDependency 提升为运行时依赖。
+35. **`fetch` 不能脱离 `window` 调用**：`const f = window.fetch; f(url)` 在 Chromium 抛 `TypeError: Illegal invocation`，而 Node/测试的注入实现不会暴露；`PreviewTransport` 默认改为 `(input, init) => fetch(input, init)`。Web 手测两条通道同时“静默无帧”时先查这里。
+36. **Electron 的 `dsh-app://` 支持流式响应**：Desktop 的手测里 multipart `/api/vibe/stream` 正常持续出帧（25.7 fps），未退化到 pull；但 headless Edge 的 Web 手测才是断流回退的主证据。
 
 ## 4. 已改变的计划假设
 
@@ -420,7 +436,8 @@
 - **T005 G0 已通过（GO）**：帧传输 stream 为主/pull 回退；中文主路径 + 逐字/粘贴回退；截图仅剪贴板；源码三框架适配 + 选择器/DOM 降级。证据见 [`spikes/G0.md`](../spikes/G0.md)。
 - **T006–T017 已完成**：产品包脚手架、host ESM、client loader bundle、host Config/服务位、contracts v1、client shell/右栏 tab、connection 传输、测试 harness 与 Vite fixture、`.vibe` 配置存储、设置面板、G1 评审、target 契约/校验/adapter 注册表、Web adapter（Edge 启动/导航/截图/关闭）均已验证。
 - **T018 已完成**：S8 测量结论（启动 ~0.4 s、treekill 无孤儿、`shell:true` 孤儿风险、端口冲突可读）写入 [`spikes/s8/REPORT.md`](../spikes/s8/REPORT.md)，T019 supervisor 按该结论实现。
-- **T019 及以后（M2）**：dev server supervisor → screencast/frames → 输入 → 中文 IME。T017 已把 web adapter 注册进 `vibeStudio.targets`；T020 需要在同一 adapter 上补 screencast/帧路由，T021 补输入。T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 将随截图与上下文任务逐步消费；T009 的 contracts 由后续页面逐步引用。
+- **T020 已完成**：screencast 限速、最新帧缓冲、stream/pull 双路由与 canvas 渲染已在 Web（含断流回退与恢复）和隔离 Desktop 手测通过；证据 `.tmp/logs/t020-{web,desktop}.json`。
+- **T021 及以后（M2）**：输入转发 → 中文 IME。T020 已在 web adapter 上接好 screencast/帧路由，T021 补输入。T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 将随截图与上下文任务逐步消费；T009 的 contracts 由后续页面逐步引用。
 - **S2 遗留**：如果上游未来公开附件创建/释放 API，再评估直接截图附件；先复测切会话保留和失败清理。
 - **Desktop 遗留**：S2 跨会话未测到，后续需要能稳定创建第二个命名会话的测试环境。
 - **成本**：避免无必要的全仓读取和重复验收；每个任务完成即提交、记录、清理进程。
