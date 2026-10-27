@@ -17,6 +17,8 @@ function fakePage(
     readonly viewport?: { width: number; height: number } | null
     readonly createDelayMs?: number
     readonly sendDelayMs?: number
+    /** CDP methods that reject, to exercise fallback paths. */
+    readonly failMethods?: readonly string[]
   } = {},
 ) {
   const sent: Sent[] = []
@@ -27,6 +29,7 @@ function fakePage(
   const session: ScreencastSessionLike = {
     async send(method, params) {
       if (delays > 0) await new Promise((resolve) => setTimeout(resolve, delays))
+      if (options.failMethods?.includes(method)) throw new Error('blocked')
       sent.push({ method, params })
       return {}
     },
@@ -190,6 +193,58 @@ describe('preview input dispatcher', () => {
 
     await dispatcher.dispatch({ kind: 'key', action: 'down', key: 'ArrowDown' })
     expect(fake.sent[4].params?.windowsVirtualKeyCode).toBe(40)
+    await dispatcher.stop()
+  })
+
+  it('inserts composed text with one Input.insertText call', async () => {
+    const fake = fakePage()
+    const dispatcher = createPreviewInputDispatcher({ page: fake.page })
+
+    const ack = await dispatcher.dispatch({ kind: 'text', text: '你好，世界' })
+    expect(ack).toMatchObject({ viewport: { width: 1280, height: 720 } })
+    expect(ack.point).toBeUndefined()
+    expect(fake.sent).toEqual([
+      { method: 'Input.insertText', params: { text: '你好，世界' } },
+    ])
+    await dispatcher.stop()
+  })
+
+  it('replays text by code point when insertText is rejected', async () => {
+    const fake = fakePage({ failMethods: ['Input.insertText'] })
+    const dispatcher = createPreviewInputDispatcher({ page: fake.page })
+
+    await dispatcher.dispatch({ kind: 'text', text: '你好' })
+    expect(fake.sent.map((entry) => entry.method)).toEqual([
+      'Input.dispatchKeyEvent',
+      'Input.dispatchKeyEvent',
+      'Input.dispatchKeyEvent',
+      'Input.dispatchKeyEvent',
+    ])
+    expect(fake.sent[0].params).toMatchObject({
+      type: 'keyDown',
+      key: '你',
+      text: '你',
+      unmodifiedText: '你',
+    })
+    expect(fake.sent[1].params).toMatchObject({ type: 'keyUp', key: '你' })
+    expect(fake.sent[2].params).toMatchObject({ type: 'keyDown', key: '好' })
+    await dispatcher.stop()
+  })
+
+  it('fails without echoing text when both insert paths reject', async () => {
+    const fake = fakePage({
+      failMethods: ['Input.insertText', 'Input.dispatchKeyEvent'],
+    })
+    const dispatcher = createPreviewInputDispatcher({ page: fake.page })
+
+    const failure = await dispatcher
+      .dispatch({ kind: 'text', text: 'secret-text' })
+      .catch((error: unknown) => error)
+    expect(failure).toMatchObject({
+      code: 'target_unavailable',
+      details: { reason: 'insert_text_failed' },
+    })
+    expect(JSON.stringify(failure)).not.toContain('secret-text')
     await dispatcher.stop()
   })
 

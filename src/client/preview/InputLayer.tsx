@@ -18,12 +18,28 @@ import {
 } from '../../contracts/transport'
 import { createTranslator, type Locale } from '../i18n'
 import { callUnary } from '../transport/client'
+import { ImeInput, type ImeInputHandle } from './ImeInput'
 
 export type InputSender = (event: PreviewInputEvent) => Promise<unknown>
 
 const DEFAULT_INPUT_TIMEOUT_MS = 5_000
 const MAX_QUEUE_LENGTH = 64
 const MOVE_THROTTLE_MS = 30
+
+const imeNoticeStyle: React.CSSProperties = {
+  position: 'absolute',
+  left: 8,
+  right: 8,
+  bottom: 8,
+  margin: 0,
+  padding: '6px 8px',
+  borderRadius: 4,
+  background: 'rgba(0, 0, 0, 0.72)',
+  color: '#fff',
+  font: '11px/1.4 system-ui, sans-serif',
+  pointerEvents: 'none',
+  zIndex: 2,
+}
 
 const layerStyle: React.CSSProperties = {
   position: 'absolute',
@@ -114,12 +130,12 @@ export function textForKey(event: {
  */
 export class InputForwarder {
   private readonly send: InputSender
-  private readonly onError?: (error: unknown) => void
+  private readonly onError?: (error: unknown, event: PreviewInputEvent) => void
   private queue: PreviewInputEvent[] = []
   private inFlight = false
   private disposed = false
 
-  constructor(send: InputSender, onError?: (error: unknown) => void) {
+  constructor(send: InputSender, onError?: (error: unknown, event: PreviewInputEvent) => void) {
     this.send = send
     this.onError = onError
   }
@@ -163,7 +179,7 @@ export class InputForwarder {
         try {
           await this.send(next)
         } catch (error) {
-          this.onError?.(error)
+          this.onError?.(error, next)
         }
       }
     } finally {
@@ -189,10 +205,12 @@ export function InputLayer({
 }: InputLayerProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
   const layerRef = React.useRef<HTMLDivElement | null>(null)
+  const imeRef = React.useRef<ImeInputHandle | null>(null)
   const forwarderRef = React.useRef<InputForwarder | null>(null)
   const lastMoveRef = React.useRef(0)
   const sendRef = React.useRef<InputSender | undefined>(send)
   const errorRef = React.useRef<((error: unknown) => void) | undefined>(onError)
+  const [imeFailed, setImeFailed] = React.useState(false)
   sendRef.current = send
   errorRef.current = onError
 
@@ -202,7 +220,12 @@ export function InputLayer({
         sendRef.current
           ? sendRef.current(event)
           : callUnary(PREVIEW_INPUT_METHOD, event, { timeoutMs: DEFAULT_INPUT_TIMEOUT_MS }),
-      (error) => errorRef.current?.(error),
+      (error, event) => {
+        // A failed composition insert has a dedicated, actionable hint (type
+        // character by character or paste); other failures stay generic.
+        if (event.kind === 'text') setImeFailed(true)
+        else errorRef.current?.(error)
+      },
     )
     forwarderRef.current = forwarder
     return () => {
@@ -210,6 +233,14 @@ export function InputLayer({
       forwarderRef.current = null
     }
   }, [])
+
+  const push = React.useCallback((event: PreviewInputEvent): void => {
+    forwarderRef.current?.push(event)
+  }, [])
+
+  React.useEffect(() => {
+    if (!active) setImeFailed(false)
+  }, [active])
 
   const pointAt = React.useCallback(
     (clientX: number, clientY: number) => {
@@ -250,7 +281,14 @@ export function InputLayer({
     if (point === null) return
 
     if (action === 'down') {
-      layerRef.current?.focus({ preventScroll: true })
+      // Focus the composition box, not the layer: an input method needs a
+      // real editable element and the IME popup should open near the click.
+      const layerRect = layerRef.current?.getBoundingClientRect() ?? null
+      if (imeRef.current && layerRect) {
+        imeRef.current.focusAt(event.clientX - layerRect.left, event.clientY - layerRect.top)
+      } else {
+        layerRef.current?.focus({ preventScroll: true })
+      }
       event.preventDefault()
       try {
         event.currentTarget.setPointerCapture?.(event.pointerId)
@@ -286,7 +324,12 @@ export function InputLayer({
 
   const onKey = (event: React.KeyboardEvent<HTMLDivElement>, action: 'down' | 'up'): void => {
     if (!active) return
-    if (event.nativeEvent.isComposing) return
+    if (event.nativeEvent.isComposing || event.key === 'Process') return
+    // Let the hidden textarea's paste event through: a synthetic Ctrl+V would
+    // not paste in the target, but the pasted text can be inserted as a whole.
+    if (action === 'down' && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v') {
+      return
+    }
     if (event.key.length === 0 || event.key.length > 32) return
     event.preventDefault()
     const text = action === 'down' ? textForKey(event) : undefined
@@ -315,6 +358,20 @@ export function InputLayer({
       onPointerCancel={onPointerEvent}
       onKeyDown={(event) => onKey(event, 'down')}
       onKeyUp={(event) => onKey(event, 'up')}
-    />
+    >
+      <ImeInput
+        ref={imeRef}
+        active={active}
+        push={push}
+        locale={locale}
+        onFailure={() => setImeFailed(true)}
+        onCompositionStart={() => setImeFailed(false)}
+      />
+      {imeFailed ? (
+        <p role="status" data-vibe-ime-notice="1" style={imeNoticeStyle}>
+          {t('preview.input.ime.failed')}
+        </p>
+      ) : null}
+    </div>
   )
 }

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { useRef } from 'react'
+import { createRef, useRef } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import type { PreviewInputEvent } from '../../../src/contracts/transport'
@@ -40,8 +40,10 @@ function setup() {
   const canvas = view.container.querySelector('canvas')
   const layer = view.container.querySelector('[data-vibe-input="1"]')
   if (!canvas || !layer) throw new Error('input layer did not render')
+  const textarea = layer.querySelector('textarea[data-vibe-ime="1"]')
+  if (!textarea) throw new Error('composition textarea did not render')
   vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(RECT)
-  return { send, layer: layer as HTMLElement }
+  return { send, layer: layer as HTMLElement, textarea: textarea as HTMLTextAreaElement }
 }
 
 function sentEvents(send: ReturnType<typeof vi.fn>): PreviewInputEvent[] {
@@ -119,6 +121,60 @@ describe('InputLayer', () => {
     fireEvent.keyDown(layer, { key: 'Enter', code: 'Enter', isComposing: true })
     await Promise.resolve()
     expect(send).not.toHaveBeenCalled()
+  })
+
+  it('focuses the composition box on click and forwards composed text', async () => {
+    const { send, layer, textarea } = setup()
+
+    fireEvent.pointerDown(layer, { clientX: 740, clientY: 410, button: 0, pointerId: 1 })
+    expect(document.activeElement).toBe(textarea)
+
+    fireEvent.compositionStart(textarea)
+    fireEvent.compositionUpdate(textarea, { data: '你好' })
+    fireEvent.compositionEnd(textarea, { data: '你好，世界' })
+
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(2))
+    expect(sentEvents(send).map((event) => event.kind)).toEqual(['pointer', 'text'])
+    expect(sentEvents(send)[1]).toEqual({ kind: 'text', text: '你好，世界' })
+  })
+
+  it('lets the composition box handle paste instead of forwarding Ctrl+V', async () => {
+    const { send, textarea } = setup()
+
+    const notPrevented = fireEvent.keyDown(textarea, { key: 'v', ctrlKey: true })
+    expect(notPrevented).toBe(true)
+    expect(send).not.toHaveBeenCalled()
+
+    fireEvent.paste(textarea, { clipboardData: { getData: () => '你好' } })
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(1))
+  })
+
+  it('shows the IME limitation hint when composed text cannot be sent', async () => {
+    const send = vi.fn(async (event: PreviewInputEvent) => {
+      if (event.kind === 'text') throw new Error('rejected')
+      return {}
+    })
+    const canvasRef = createRef<HTMLCanvasElement>()
+    const view = render(
+      <div>
+        <canvas ref={canvasRef} />
+        <InputLayer canvasRef={canvasRef} send={send as InputSender} />
+      </div>,
+    )
+    const textarea = view.container.querySelector(
+      'textarea[data-vibe-ime="1"]',
+    ) as HTMLTextAreaElement
+
+    fireEvent.compositionStart(textarea)
+    fireEvent.compositionEnd(textarea, { data: '你好，世界' })
+
+    const notice = await waitFor(() => {
+      const node = view.container.querySelector('[data-vibe-ime-notice="1"]')
+      if (!node) throw new Error('no notice yet')
+      return node
+    })
+    expect(notice.textContent).toContain('input method text did not reach the target')
+    expect(view.container.querySelector('[role="alert"]')).toBeNull()
   })
 })
 

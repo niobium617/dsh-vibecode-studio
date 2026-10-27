@@ -142,6 +142,11 @@ describe('preview service input', () => {
       { kind: 'key', action: 'down', key: 'A', text: 'x'.repeat(33) },
       { kind: 'key', action: 'down', key: 'A', code: 'bad code' },
       { kind: 'pointer', action: 'down', x: 0.5, y: 0.5, modifiers: { ctrl: 'yes' } },
+      { kind: 'text', text: '' },
+      { kind: 'text', text: 'x'.repeat(1025) },
+      { kind: 'text', text: '\uD800' },
+      { kind: 'text', text: 'ok', extra: true },
+      { kind: 'text', text: 42 },
     ]
     for (const event of invalid) {
       await expect(service.input(event)).rejects.toMatchObject({ code: 'invalid_input' })
@@ -181,6 +186,20 @@ describe('preview service input', () => {
         modifiers: 8,
       },
     })
+    await service.stop()
+  })
+
+  it('inserts composed text on the live page', async () => {
+    const { fake, service } = await boot()
+    await service.start({ url: 'http://127.0.0.1:4320/' })
+
+    const ack = await service.input({ kind: 'text', text: '你好，世界' })
+    expect(ack).toMatchObject({ viewport: { width: 800, height: 600 } })
+    const calls = inputCalls(fake.sessions)
+    expect(calls).toHaveLength(1)
+    expect(calls[0].sent).toEqual([
+      { method: 'Input.insertText', params: { text: '你好，世界' } },
+    ])
     await service.stop()
   })
 

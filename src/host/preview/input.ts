@@ -147,6 +147,42 @@ function keyEventParams(
   return { method: 'Input.dispatchKeyEvent', params }
 }
 
+/** Per-character replay is a fallback; keep it bounded so a paste cannot stall the queue. */
+const MAX_FALLBACK_CODE_POINTS = 256
+
+/**
+ * Insert composed text (T022). `Input.insertText` is the primary path; targets
+ * that reject it get a bounded per-character replay. Neither failure echoes the
+ * text into the error, which may hold user content.
+ */
+async function insertComposedText(
+  session: ScreencastSessionLike,
+  text: string,
+): Promise<void> {
+  try {
+    await session.send('Input.insertText', { text })
+    return
+  } catch {
+    // Fall through to the replay used by the S3 spike.
+  }
+
+  const characters = Array.from(text)
+  if (characters.length > MAX_FALLBACK_CODE_POINTS) throw unavailable('insert_text_failed')
+  try {
+    for (const character of characters) {
+      await session.send('Input.dispatchKeyEvent', {
+        type: 'keyDown',
+        key: character,
+        text: character,
+        unmodifiedText: character,
+      })
+      await session.send('Input.dispatchKeyEvent', { type: 'keyUp', key: character })
+    }
+  } catch {
+    throw unavailable('insert_text_failed')
+  }
+}
+
 export function createPreviewInputDispatcher(
   options: PreviewInputDispatcherOptions,
 ): PreviewInputDispatcher {
@@ -253,6 +289,11 @@ export function createPreviewInputDispatcher(
     const viewport = requireViewport()
     const active = await ensureSession()
     if (stopped) throw unavailable('stopped')
+
+    if (event.kind === 'text') {
+      await insertComposedText(active, event.text)
+      return { ts: now(), viewport: { width: viewport.width, height: viewport.height } }
+    }
 
     let method: string
     let params: Record<string, unknown>

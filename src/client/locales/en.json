@@ -29,6 +29,8 @@
   "preview.canvas.label": "Preview canvas",
   "preview.input.label": "Preview input surface",
   "preview.input.hint": "Click the preview, then type or scroll. Input is sent to the target page.",
+  "preview.input.ime.label": "Preview composition input",
+  "preview.input.ime.failed": "The input method text did not reach the target. Type character by character, or copy the text and paste it into the preview (Ctrl+V).",
   "preview.error.url": "Enter a local URL to preview.",
   "page.inspect.empty": "Pick an element in the preview to inspect its source.",
   "page.annotations.empty": "Annotations you send to the conversation will appear here.",

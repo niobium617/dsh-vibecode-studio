@@ -173,7 +173,21 @@ export interface PreviewKeyInput {
   readonly modifiers?: PreviewInputModifiers
 }
 
-export type PreviewInputEvent = PreviewPointerInput | PreviewWheelInput | PreviewKeyInput
+/**
+ * Composed text (T022). An IME produces a whole phrase, so it is inserted in
+ * one `Input.insertText` call rather than replayed as per-key events;
+ * intermediate composition updates never leave the panel.
+ */
+export interface PreviewTextInput {
+  readonly kind: 'text'
+  readonly text: string
+}
+
+export type PreviewInputEvent =
+  | PreviewPointerInput
+  | PreviewWheelInput
+  | PreviewKeyInput
+  | PreviewTextInput
 
 export interface PreviewInputAck {
   readonly ts: number
@@ -184,6 +198,8 @@ export interface PreviewInputAck {
 
 export const MAX_WHEEL_DELTA = 2000
 export const MAX_KEY_TEXT_LENGTH = 32
+/** Composition/paste text is inserted in one go; the limit counts code points. */
+export const MAX_INSERT_TEXT_LENGTH = 1024
 const POINTER_ACTIONS: ReadonlySet<string> = new Set(['down', 'up', 'move'])
 const POINTER_BUTTONS: ReadonlySet<string> = new Set(['left', 'middle', 'right'])
 const KEY_ACTIONS: ReadonlySet<string> = new Set(['down', 'up'])
@@ -199,7 +215,10 @@ const POINTER_INPUT_KEYS = new Set([
 ])
 const WHEEL_INPUT_KEYS = new Set(['kind', 'x', 'y', 'deltaX', 'deltaY', 'modifiers'])
 const KEY_INPUT_KEYS = new Set(['kind', 'action', 'key', 'code', 'text', 'modifiers'])
+const TEXT_INPUT_KEYS = new Set(['kind', 'text'])
 const KEY_CODE_PATTERN = /^[A-Za-z0-9]{1,32}$/
+/** A high surrogate without its low half, or a low half on its own. */
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/
 
 function isFraction(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1
@@ -219,6 +238,17 @@ function isModifiers(value: unknown): value is PreviewInputModifiers {
 
 function isPoint(record: Record<string, unknown>): boolean {
   return isFraction(record.x) && isFraction(record.y)
+}
+
+/**
+ * Text that may cross the wire as one insert: non-empty, bounded in code
+ * points (an emoji counts once) and free of lone surrogates.
+ */
+export function isInsertableText(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length === 0) return false
+  if (value.length > MAX_INSERT_TEXT_LENGTH * 2) return false
+  if (Array.from(value).length > MAX_INSERT_TEXT_LENGTH) return false
+  return !LONE_SURROGATE.test(value)
 }
 
 /** Strict shape check; the Host validates again before touching CDP. */
@@ -273,6 +303,11 @@ export function isPreviewInputEvent(value: unknown): value is PreviewInputEvent 
       }
     }
     return true
+  }
+
+  if (record.kind === 'text') {
+    if (!hasOnlyKeys(record, TEXT_INPUT_KEYS)) return false
+    return isInsertableText(record.text)
   }
 
   return false
