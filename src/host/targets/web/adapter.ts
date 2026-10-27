@@ -1,9 +1,9 @@
 /**
  * Web preview adapter (T017): Edge via Playwright, one page per session.
  *
- * The adapter owns the browser lifecycle only; screencast and input consume the
- * CDP handle from `screencastPage()`, while pick/console/network stay declared
- * unsupported until their tasks land. Every failure is mapped to a stable
+ * The adapter owns the browser lifecycle only; screencast, input, console and
+ * network consume the CDP handle from `screencastPage()`, while pick stays
+ * declared unsupported until its task lands. Every failure is mapped to a stable
  * Studio error, and only loopback targets are opened unless the caller
  * explicitly approves a non-local URL.
  */
@@ -30,14 +30,14 @@ import {
 
 export type WebTargetAdapterStatus = 'idle' | 'starting' | 'ready' | 'stopped' | 'failed'
 
-/** Screencast (T020), input (T021) and console (T023) are wired; pick/network follow. */
+/** Screencast (T020), input (T021), console (T023) and network (T024) are wired; pick follows. */
 export const WEB_TARGET_CAPABILITIES: TargetCapabilities = Object.freeze({
   screencast: true,
   input: true,
   pick: false,
   sourceMap: false,
   console: true,
-  network: false,
+  network: true,
   screenshot: true,
 })
 

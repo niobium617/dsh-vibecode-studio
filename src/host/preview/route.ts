@@ -20,6 +20,9 @@ import {
   PREVIEW_CONSOLE_CLEAR_METHOD,
   PREVIEW_CONSOLE_LIST_METHOD,
   PREVIEW_INPUT_METHOD,
+  PREVIEW_NETWORK_BODY_METHOD,
+  PREVIEW_NETWORK_CLEAR_METHOD,
+  PREVIEW_NETWORK_LIST_METHOD,
   PREVIEW_START_METHOD,
   PREVIEW_STATUS_METHOD,
   PREVIEW_STOP_METHOD,
@@ -27,10 +30,15 @@ import {
   STREAM_PATH,
   isPreviewConsoleQuery,
   isPreviewInputEvent,
+  isPreviewNetworkBodyParams,
+  isPreviewNetworkQuery,
   isPreviewStartParams,
   type PreviewConsoleClearResult,
   type PreviewConsoleSnapshot,
   type PreviewFrameMeta,
+  type PreviewNetworkBody,
+  type PreviewNetworkClearResult,
+  type PreviewNetworkSnapshot,
   type PreviewInputAck,
   type PreviewSessionSnapshot,
   type PreviewSessionState,
@@ -54,6 +62,10 @@ import {
   createPreviewInputDispatcher,
   type PreviewInputDispatcher,
 } from './input'
+import {
+  createPreviewNetworkCollector,
+  type PreviewNetworkCollector,
+} from './network'
 import { createScreencastSource, type ScreencastSource } from './screencast'
 
 const PREVIEW_TARGET_ID = 'preview'
@@ -70,6 +82,11 @@ export interface PreviewService {
   consoleList(query?: unknown): PreviewConsoleSnapshot
   /** Clears the Host console buffer; the panel clears its copy too. */
   consoleClear(): PreviewConsoleClearResult
+  /** Bounded request/response history for the live preview (T024). */
+  networkList(query?: unknown): PreviewNetworkSnapshot
+  networkClear(): PreviewNetworkClearResult
+  /** Fetches one response body on demand. */
+  networkBody(params: unknown): Promise<PreviewNetworkBody>
   dispose(): Promise<void>
 }
 
@@ -90,6 +107,10 @@ export interface PreviewServiceOptions {
   readonly createConsole?: (
     page: NonNullable<ReturnType<NonNullable<TargetAdapter['screencastPage']>>>,
   ) => PreviewConsoleCollector
+  /** Test seam: substitutes the CDP network collector. */
+  readonly createNetwork?: (
+    page: NonNullable<ReturnType<NonNullable<TargetAdapter['screencastPage']>>>,
+  ) => PreviewNetworkCollector
 }
 
 function toPreviewError(error: unknown): StudioError {
@@ -114,6 +135,7 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
   let inputDispatcher: PreviewInputDispatcher | undefined
   let inputSupported = false
   let consoleCollector: PreviewConsoleCollector | undefined
+  let networkCollector: PreviewNetworkCollector | undefined
   let targetId: string | null = null
   let url: string | null = null
   let capabilities: TargetCapabilities | null = null
@@ -144,6 +166,9 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     const activeConsole = consoleCollector
     consoleCollector = undefined
     if (activeConsole) await activeConsole.stop().catch(() => undefined)
+    const activeNetwork = networkCollector
+    networkCollector = undefined
+    if (activeNetwork) await activeNetwork.stop().catch(() => undefined)
     const activeInput = inputDispatcher
     inputDispatcher = undefined
     inputSupported = false
@@ -239,12 +264,28 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
       }
     }
 
+    // Network capture degrades the same way: an auxiliary CDP session that
+    // cannot start never blocks the preview itself.
+    let networkReady = false
+    if (session.capabilities.network) {
+      const createdNetwork =
+        options.createNetwork?.(page) ?? createPreviewNetworkCollector({ page })
+      try {
+        await createdNetwork.start()
+        networkCollector = createdNetwork
+        networkReady = true
+      } catch {
+        await createdNetwork.stop().catch(() => undefined)
+      }
+    }
+
     targetId = session.targetId
     url = session.url
-    capabilities =
-      session.capabilities.console && !consoleReady
-        ? { ...session.capabilities, console: false }
-        : session.capabilities
+    capabilities = {
+      ...session.capabilities,
+      ...(session.capabilities.console && !consoleReady ? { console: false } : {}),
+      ...(session.capabilities.network && !networkReady ? { network: false } : {}),
+    }
     state = 'ready'
     return snapshot()
   }
@@ -289,6 +330,40 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
 
   function consoleClear(): PreviewConsoleClearResult {
     return requireConsole().clear()
+  }
+
+  function requireNetwork(): PreviewNetworkCollector {
+    if (state !== 'ready') {
+      throw studioError('target_unavailable', 'vibe-studio: preview is not running')
+    }
+    if (!networkCollector) {
+      throw studioError('unsupported', 'vibe-studio: network capture is unavailable', {
+        capability: 'network',
+      })
+    }
+    return networkCollector
+  }
+
+  function networkList(query?: unknown): PreviewNetworkSnapshot {
+    if (query !== undefined && !isPreviewNetworkQuery(query)) {
+      throw studioError('invalid_input', 'vibe-studio: invalid network query', {
+        field: 'query',
+      })
+    }
+    return requireNetwork().snapshot(query)
+  }
+
+  function networkClear(): PreviewNetworkClearResult {
+    return requireNetwork().clear()
+  }
+
+  async function networkBody(params: unknown): Promise<PreviewNetworkBody> {
+    if (!isPreviewNetworkBodyParams(params)) {
+      throw studioError('invalid_input', 'vibe-studio: invalid network body params', {
+        field: 'params',
+      })
+    }
+    return requireNetwork().body(params)
   }
 
   async function start(params: PreviewStartParams): Promise<PreviewSessionSnapshot> {
@@ -337,6 +412,9 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     input,
     consoleList,
     consoleClear,
+    networkList,
+    networkClear,
+    networkBody,
     async dispose() {
       await stop()
     },
@@ -367,6 +445,15 @@ export function registerPreviewMethods(
   const offConsoleClear = registry.register(PREVIEW_CONSOLE_CLEAR_METHOD, async () =>
     service.consoleClear(),
   )
+  const offNetworkList = registry.register(PREVIEW_NETWORK_LIST_METHOD, async (params) =>
+    service.networkList(params),
+  )
+  const offNetworkClear = registry.register(PREVIEW_NETWORK_CLEAR_METHOD, async () =>
+    service.networkClear(),
+  )
+  const offNetworkBody = registry.register(PREVIEW_NETWORK_BODY_METHOD, async (params) =>
+    service.networkBody(params),
+  )
   return () => {
     offStart()
     offStop()
@@ -374,6 +461,9 @@ export function registerPreviewMethods(
     offInput()
     offConsoleList()
     offConsoleClear()
+    offNetworkList()
+    offNetworkClear()
+    offNetworkBody()
   }
 }
 

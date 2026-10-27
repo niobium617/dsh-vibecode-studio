@@ -12,7 +12,7 @@
  */
 import { isStudioError, type StudioError } from './errors'
 import type { TargetCapabilities } from './target'
-import type { ConsoleEntry } from './telemetry'
+import type { ConsoleEntry, NetworkEntry } from './telemetry'
 
 export const TRANSPORT_VERSION = 1
 
@@ -43,6 +43,10 @@ export const PREVIEW_INPUT_METHOD = 'preview.input'
 /** Console capture is read/clear over unary methods; no extra route (T023). */
 export const PREVIEW_CONSOLE_LIST_METHOD = 'preview.console.list'
 export const PREVIEW_CONSOLE_CLEAR_METHOD = 'preview.console.clear'
+/** Network capture stays unary too; bodies are fetched on demand (T024). */
+export const PREVIEW_NETWORK_LIST_METHOD = 'preview.network.list'
+export const PREVIEW_NETWORK_CLEAR_METHOD = 'preview.network.clear'
+export const PREVIEW_NETWORK_BODY_METHOD = 'preview.network.body'
 
 /** Unary requests carry input events and small commands; 64 KiB is ample. */
 export const MAX_UNARY_BODY_BYTES = 64 * 1024
@@ -361,6 +365,76 @@ export function isPreviewConsoleQuery(value: unknown): value is PreviewConsoleQu
     if (record.limit > MAX_CONSOLE_ENTRIES) return false
   }
   return true
+}
+
+/**
+ * Network capture wire contract (T024). The Host redacts headers and URLs
+ * before an entry enters its bounded buffer. `after` is a revision cursor: an
+ * entry is re-sent when its status, duration or outcome changes, so a row that
+ * started as `pending` can update in place. `lastSeq` is the latest revision,
+ * not the request count; `NetworkEntry.id` keeps the creation sequence.
+ */
+export const MAX_NETWORK_ENTRIES = 300
+/** Response bodies are fetched one at a time and capped before leaving the Host. */
+export const MAX_NETWORK_BODY_BYTES = 64 * 1024
+
+export interface PreviewNetworkQuery {
+  /** Only entries revised after this cursor. */
+  readonly after?: number
+  /** Keep only the last N matching entries. */
+  readonly limit?: number
+}
+
+export interface PreviewNetworkSnapshot {
+  readonly entries: readonly NetworkEntry[]
+  readonly lastSeq: number
+  /** Entries evicted because an entry/byte budget was exceeded. */
+  readonly dropped: number
+}
+
+export interface PreviewNetworkClearResult {
+  readonly cleared: number
+  readonly lastSeq: number
+}
+
+export interface PreviewNetworkBodyParams {
+  readonly id: string
+}
+
+export interface PreviewNetworkBody {
+  readonly id: string
+  readonly status: number | null
+  readonly mimeType: string | null
+  /** Text when `base64Encoded` is false; base64 of the capped bytes otherwise. */
+  readonly body: string
+  readonly base64Encoded: boolean
+  /** True when the Host cut the body at `MAX_NETWORK_BODY_BYTES`. */
+  readonly truncated: boolean
+  /** Byte length of the returned body (decoded for base64). */
+  readonly bytes: number
+}
+
+const PREVIEW_NETWORK_QUERY_KEYS = new Set(['after', 'limit'])
+const NETWORK_ENTRY_ID_PATTERN = /^network-\d{1,12}$/
+
+/** Strict shape check; unknown keys and out-of-range counts are rejected. */
+export function isPreviewNetworkQuery(value: unknown): value is PreviewNetworkQuery {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  if (Object.keys(record).some((key) => !PREVIEW_NETWORK_QUERY_KEYS.has(key))) return false
+  if (record.after !== undefined && !isSafeCount(record.after)) return false
+  if (record.limit !== undefined) {
+    if (!isSafeCount(record.limit) || record.limit === 0) return false
+    if (record.limit > MAX_NETWORK_ENTRIES) return false
+  }
+  return true
+}
+
+export function isPreviewNetworkBodyParams(value: unknown): value is PreviewNetworkBodyParams {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  if (Object.keys(record).length !== 1 || !('id' in record)) return false
+  return typeof record.id === 'string' && NETWORK_ENTRY_ID_PATTERN.test(record.id)
 }
 
 /** Strict shape check; range checks stay in `validateTargetConfig`. */

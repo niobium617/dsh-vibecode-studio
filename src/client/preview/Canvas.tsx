@@ -19,6 +19,7 @@ import { createTranslator, type Locale } from '../i18n'
 import { callUnary } from '../transport/client'
 import { ConsoleDrawer } from './ConsoleDrawer'
 import { InputLayer } from './InputLayer'
+import { NetworkDrawer } from './NetworkDrawer'
 import {
   PreviewTransport,
   type PreviewFrame,
@@ -341,6 +342,9 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
       {state === 'ready' ? <p style={noteStyle}>{t('preview.input.hint')}</p> : null}
       {state === 'ready' && snapshot?.capabilities?.console === true ? (
         <ConsoleDrawer active locale={locale} />
+      ) : null}
+      {state === 'ready' && snapshot?.capabilities?.network === true ? (
+        <NetworkDrawer active locale={locale} />
       ) : null}
     </div>
   )
