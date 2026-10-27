@@ -157,12 +157,13 @@
 
 > 依赖：G1。T016 先做；T017/T018/T019 可在 T016 后并行；T020 依赖 T017/T019；T021 依赖 T020；T022 依赖 T021；T023/T024 依赖 T017；T025 依赖 T016–T024。
 
-### - [ ] T016 Target 模型、配置与 adapter 注册表
+### - [x] T016 Target 模型、配置与 adapter 注册表
 
 - **目标**：目标配置校验、能力声明、adapter 注册、假 adapter、错误码。
 - **验收**：非法配置/未知 adapter 有明确错误；假 adapter 生命周期单测通过。
 - **验证**：`pnpm test -- tests/unit/targets`。
 - **文件**：`src/host/targets/{types,registry,validate}.ts`、tests。
+- **验证结果（2026-10-27）**：`src/host/targets/types.ts` 定义 `TargetAdapter`（id/kind/capabilities/start/stop，可选 navigate/screenshot）与 `ValidatedTargetConfig`、`DEFAULT_VIEWPORT`、`assertCapability`；`validate.ts` 校验 id/name/kind/url/command/cwd/port/viewport，拒绝未知键、非 http(s)、凭证 URL、相对 cwd、越界端口/viewport，错误统一为 `invalid_config` + `details.field`，url 归一化、viewport 默认 1280×720@1；`registry.ts` 每 kind 一个 adapter，重复 kind/id、缺 capability 均 `invalid_config`，未知 kind 报 `unsupported: unknown target adapter "x"`，已知未注册 kind 报 `no target adapter registered`。`apply()` 向 `vibeStudio` 服务增加空 `targets` registry（T017+ 注册）。`tests/helpers/fake-adapter.ts` 改为实现真实契约（保留 status/sessions/logs 观测）。验证：`pnpm exec vitest run tests/unit/targets` 3 文件 / 21 用例通过；`pnpm typecheck` 0 error；全量 `pnpm test` 20 文件 / 135 用例通过；`pnpm build` host 34.6 KiB / client 36.8 KiB。同步更新 `tests/unit/config.test.ts` 的服务槽断言（新增 `targets`）。
 
 ### - [ ] T017 Web target adapter（启动/导航/截图）
 

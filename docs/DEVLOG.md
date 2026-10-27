@@ -7,11 +7,11 @@
 
 ## 1. 当前快照
 
-- 阶段：**Phase 4 实现（M0/G0 已通过，进入 M1）**。
-- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审。
-- 阶段：**M1 已完成并通过 G1**；下一项 **T016 Target 模型、配置与 adapter 注册表**（M2 首项）。
+- 阶段：**Phase 4 实现（M0/G0 已通过，M1 已完成，进入 M2）**。
+- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表。
+- 阶段：**M1 已完成并通过 G1；M2 进行中**，T016 已完成，下一项 **T017 Web target adapter**（T018 S8 spike 可并行）。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
-- T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。S3/S4/T010/T014/T015 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
+- T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`。S3/S4/T010/T014/T015 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
 
 环境：
@@ -180,7 +180,7 @@
   - `vitest.config.ts` 改为两个 project：`node`（smoke、unit、integration）与 `component`（jsdom、`tests/setup/component.ts` 统一 `cleanup()`）。`passWithNoTests` 只能放在根级。
   - `playwright.config.ts`：`testDir: tests/e2e`、`channel: 'msedge'`、headless、1280×800、单 worker、失败截图/trace 写入 `.tmp/playwright-results`；`webServer` 用 `pnpm fixture:dev` 自动启动 fixture，`reuseExistingServer` 仅本地开启。
   - `fixtures/vite-basic/`：React 19 + Vite 8 骨架，含计数器、可提交表单（Name/Note）、列表、控制台错误按钮，以及 dev 插件路由 `POST /api/echo`、`GET /api/boom`（500）、`GET /api/slow?ms=`；`pnpm fixture:dev` 监听 `127.0.0.1:4320`（strictPort）。
-  - `tests/helpers/fake-adapter.ts`：harness 用目标 adapter 生命周期替身（并发 start 合并、重复 start 复用、stop 幂等、失败态保留），`tests/integration/targets/fake-adapter.test.ts` 6 例；T016 定义真实契约时再对齐。
+  - `tests/helpers/fake-adapter.ts`：harness 用目标 adapter 生命周期替身（并发 start 合并、重复 start 复用、stop 幂等、失败态保留），`tests/integration/targets/fake-adapter.test.ts` 6 例；T016 已将其对齐真实 `TargetAdapter` 契约。
   - `tests/e2e/fixture.spec.ts`：3 例（首屏/计数、中文表单、fixture API）。
   - `package.json` 新增 `test:e2e`、`fixture:dev`；`tsconfig.json` 纳入 `fixtures/**` 与 `playwright.config.ts`。
 - 验证：
@@ -254,6 +254,21 @@
   - GitHub 贡献图按**提交自带的时区偏移**归属日期，不是 UTC。M1 凌晨 01:37–01:50（+0800）的 4 条提交落在 10-27 那格，而不是 UTC 的 10-26，实测数据推翻了“按 UTC 算”的假设。
   - 私有仓库的提交只有在 profile → Contribution settings → **Private contributions** 打开后才计入，且只显示匿名格子、不显示仓库名；开关关闭时 `restrictedContributionsCount` 为 0，容易误判成“推送失败”。
   - 默认分支之外的提交（如 `task/m1-foundation`）无论是否推送成功都不计入贡献图，合并进 `main` 后才计入。
+
+### T016 — Target 模型、配置与 adapter 注册表（已完成）
+
+- 目标：目标配置校验、能力声明、adapter 注册、假 adapter、错误码。
+- 结果：
+  - `src/host/targets/types.ts`：`TargetAdapter` 契约（`id`/`kind`/`capabilities`，必选 `start`/`stop`，可选 `navigate`/`screenshot`）、`ValidatedTargetConfig`（viewport 已归一）、`DEFAULT_VIEWPORT` 1280×720@1、`assertCapability`（未声明能力抛 `unsupported`）。
+  - `src/host/targets/validate.ts`：纯校验，返回归一化配置；id 走 `isTargetId`，name/command/cwd/url 长度与空值校验，url 仅 http(s) 且禁凭证、cwd 必须绝对路径、port 1–65535、viewport 64–7680/DSF 0.1–4；未知键、对象形状错误均 `invalid_config` + `details.field`；`url` 与 `command` 至少一项，`api` 必须有 url。
+  - `src/host/targets/registry.ts`：每个 target kind 仅一个 adapter；重复 kind/id、缺 capability、非函数 `navigate`/`screenshot` 均 `invalid_config`；未知 kind 报 `unsupported: unknown target adapter "<kind>"`，已知但未注册报 `no target adapter registered for kind "<kind>"`；unregister 幂等且不会误删后注册的新 adapter。
+  - `apply()` 在 `vibeStudio` 服务槽新增空 `targets` registry，T017+ 注册真实 adapter；未注册前的查找会得到明确 `unsupported`，不会返回 undefined。
+  - `tests/helpers/fake-adapter.ts` 改为实现真实契约，保留 `status`/`sessions`/`logs` 供集成测试观测；`start()` 仍兼容直接传 URL 字符串。
+- 验证：
+  - `pnpm exec vitest run tests/unit/targets`：3 文件 / 21 用例通过（validate 9、registry 6、fake lifecycle 6）。
+  - `pnpm typecheck` 0 error；全量 `pnpm test` 20 文件 / 135 用例通过；`pnpm build` host 34.6 KiB / client 36.8 KiB。
+  - `tests/unit/config.test.ts` 的服务槽断言同步增加 `targets`。
+- 计划偏差：无；文件与 `tasks/todo.md` 一致，仅额外在 `src/host/index.ts` 暴露 registry（服务槽接入）。
 
 ## 3. 踩坑与已验证经验
 
@@ -345,8 +360,8 @@
 
 - **T004 已完成**：30/30 元素源码命中；点击泄漏 0、Esc、console 均通过；限制是仅 dev 模式、未覆盖 TSX/iframe/重复组件选择器。
 - **T005 G0 已通过（GO）**：帧传输 stream 为主/pull 回退；中文主路径 + 逐字/粘贴回退；截图仅剪贴板；源码三框架适配 + 选择器/DOM 降级。证据见 [`spikes/G0.md`](../spikes/G0.md)。
-- **T006–T013 已完成**：产品包脚手架、host ESM、client loader bundle、host Config/服务位、contracts v1、client shell/右栏 tab、connection 传输、测试 harness 与 Vite fixture、`.vibe` 配置存储均已验证；下一项 T014 设置面板。
-- **T014 及以后（M1）**：设置面板、G1 评审；T014 需把 `StudioStore` 接入 host 服务与 UI，并与 T008 的 `Config` 保持单一来源——建议启动时以 `studio.json` 覆盖 Config 默认值，避免 UI 改一份、服务读另一份。T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 待 T014 起消费；T009 的 contracts 由后续页面逐步引用。
+- **T006–T016 已完成**：产品包脚手架、host ESM、client loader bundle、host Config/服务位、contracts v1、client shell/右栏 tab、connection 传输、测试 harness 与 Vite fixture、`.vibe` 配置存储、设置面板、G1 评审、target 契约/校验/adapter 注册表均已验证。
+- **T017 及以后（M2）**：Web target adapter（Playwright/Edge 启动、导航、viewport、截图、关闭）；T017 应复用 T016 的 `TargetAdapter` 契约与 `ValidatedTargetConfig`，把适配器注册进 `vibeStudio.targets`。T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 将随截图与上下文任务逐步消费；T009 的 contracts 由后续页面逐步引用。
 - **S2 遗留**：如果上游未来公开附件创建/释放 API，再评估直接截图附件；先复测切会话保留和失败清理。
 - **Desktop 遗留**：S2 跨会话未测到，后续需要能稳定创建第二个命名会话的测试环境。
 - **成本**：避免无必要的全仓读取和重复验收；每个任务完成即提交、记录、清理进程。
