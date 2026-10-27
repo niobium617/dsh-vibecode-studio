@@ -8,10 +8,10 @@
 ## 1. 当前快照
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，M1 已完成，进入 M2）**。
-- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）、T023 Console 采集与抽屉、T024 Network 采集与抽屉、T025 预览工具栏与生命周期。
-- 阶段：**M1 已完成并通过 G1；M2 进行中**，T016–T025 已完成，下一项 **T026 G2 Preview 评审**。
+- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）、T023 Console 采集与抽屉、T024 Network 采集与抽屉、T025 预览工具栏与生命周期、T026 G2 Preview 评审（通过）。
+- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2**，T016–T026 已完成，下一项 **T027 拾取 overlay 与选择器**。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
-- T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T025 已提交到该分支，尚未推送/合并。S3/S4/T010/T014/T015/T020/T021/T022/T025 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
+- T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T026 已提交到该分支，尚未推送/合并。S3/S4/T010/T014/T015/T020/T021/T022/T025 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
 
 环境：
@@ -397,6 +397,18 @@
   - 手动 Host（真实 Edge + Vite fixture，`.tmp/t025-host.mjs`，`.tmp/logs/t025-host.json`，`ok:true`）：navigate/reload/viewport 生效；崩溃 101 ms 检出且 1.5 s 后仍 `failed`、Edge 进程 0；重启为新会话；stop 调用 301 ms、进程 4471 ms 内全退、无孤儿。
   - 手动 Desktop（隔离 `DSH_HOME` + 独立 userData，CDP 9224，`.tmp/t025-desktop.mjs`，`.tmp/logs/t025-desktop.json`，`ok:true`）：工具栏刷新/视口 900×700/导航生效；Console/Network 抽屉在真实载体有数据；杀 Edge 后出现断开提示且不自动重启；Restart 恢复；内部切“检查”再回“预览”会话保留且无重载；停止后 3820 ms 内 Edge 全退、无孤儿；真实 desktop profile 哈希前后一致。
 - 计划偏差/限制：崩溃后不自动重连（需显式 Restart）；改 DPR 需重启会话；“关闭整个 DSH 面板”触发的 stop 只有单测覆盖；Desktop 的 `window.open` 返回 null 属正常拦截路径。
+
+### T026 — G2 Preview 评审（已通过）
+
+- 目标：验证预览闭环与性能（10 fps、点击/输入/滚动、Console/Network、停止清理、SPEC 相关条目）。
+- 结果：**G2 通过（GO）**，无产品代码改动，仅补手动矩阵脚本与记录。
+- 验证：
+  - 基线 `pnpm typecheck` 0 error、`pnpm test` 41 文件 / 301 用例通过、`pnpm build` host 140.5 KiB / client 115.1 KiB。
+  - Host 真 Edge（`t026-host.mjs` / `t026-host.json`）：1280×800 全页 CSS 动画 10 s 258–259 帧 = 25.8–25.9 fps（p95 间隔 49–50 ms）；点击聚焦、键入 `hello`、计数 0→1、scrollY 0→267；点击到首帧 49–54 ms；Console log/warn/error/异步 throw 全覆盖；Network 200 + 连接失败（`outcome=error`）、body 602 字节；停止 354–377 ms、1357 ms 内 Edge 全退、无孤儿。
+  - Web（`t026-web.mjs` / `t026-web.json`，`vibe-dev` + headless Edge）：24.4 fps；聚焦/键入/点击/滚轮均生效；Console 16 条、Network 39 条；停止 2940 ms、无孤儿。
+  - 隔离 Desktop（`t026-desktop.mjs` / `t026-desktop.json`，CDP 9225）：25.0 fps；聚焦/键入/点击/滚轮均生效；Console 32 条、Network 71 条；停止 4886 ms、无孤儿，真实 desktop profile 哈希未变。
+  - SPEC：FR-PRE-02/04/05/08 本次实测；FR-PRE-01/03/06/07/10 由 T025 与 shell 用例覆盖；FR-PRE-09（多目标独立会话）未验证，当前只注册 web 目标，留到多目标任务。
+- 限制：Desktop 预览 Edge 在后台被遮挡时 Chromium 会节流 rAF/计时器，脚本测量前用 `SetForegroundWindow` 拉起预览窗口；停止清理 Desktop 4886 ms 接近 5 s；真实“关闭整个 DSH 面板”的 stop 仍只有 lifecycle 单测。
 
 ## 3. 踩坑与已验证经验
 
