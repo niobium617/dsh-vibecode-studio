@@ -67,6 +67,15 @@ export type {
   ScreencastSource,
   ScreencastStats,
 } from './preview/screencast'
+export {
+  createPreviewInputDispatcher,
+  mapPoint,
+  modifierMask,
+} from './preview/input'
+export type {
+  PreviewInputDispatcher,
+  PreviewInputDispatcherOptions,
+} from './preview/input'
 export { createWebTargetAdapter, WEB_TARGET_CAPABILITIES } from './targets/web/adapter'
 export type {
   WebTargetAdapter,

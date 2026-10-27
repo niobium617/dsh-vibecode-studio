@@ -17,6 +17,7 @@ import {
 } from '../../contracts/transport'
 import { createTranslator, type Locale } from '../i18n'
 import { callUnary } from '../transport/client'
+import { InputLayer } from './InputLayer'
 import {
   PreviewTransport,
   type PreviewFrame,
@@ -75,6 +76,12 @@ const noteStyle: React.CSSProperties = {
 const errorStyle: React.CSSProperties = {
   margin: 0,
   color: 'var(--dsw-danger-color, #d14343)',
+}
+
+const stageStyle: React.CSSProperties = {
+  position: 'relative',
+  display: 'block',
+  lineHeight: 0,
 }
 
 const canvasStyle: React.CSSProperties = {
@@ -312,13 +319,25 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
         </p>
       )}
 
-      <canvas
-        ref={canvasRef}
-        width={1280}
-        height={720}
-        aria-label={t('preview.canvas.label')}
-        style={canvasStyle}
-      />
+      <div style={stageStyle}>
+        <canvas
+          ref={canvasRef}
+          width={1280}
+          height={720}
+          aria-label={t('preview.canvas.label')}
+          style={canvasStyle}
+        />
+        {state === 'ready' ? (
+          <InputLayer
+            canvasRef={canvasRef}
+            locale={locale}
+            onError={(failure) => {
+              if (mountedRef.current) setError(errorMessage(failure))
+            }}
+          />
+        ) : null}
+      </div>
+      {state === 'ready' ? <p style={noteStyle}>{t('preview.input.hint')}</p> : null}
     </div>
   )
 }

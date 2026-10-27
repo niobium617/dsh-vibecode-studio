@@ -17,13 +17,16 @@ import {
   FRAME_BOUNDARY,
   FRAME_PATH,
   MAX_FRAME_WAIT_MS,
+  PREVIEW_INPUT_METHOD,
   PREVIEW_START_METHOD,
   PREVIEW_STATUS_METHOD,
   PREVIEW_STOP_METHOD,
   STREAM_CONTENT_TYPE,
   STREAM_PATH,
+  isPreviewInputEvent,
   isPreviewStartParams,
   type PreviewFrameMeta,
+  type PreviewInputAck,
   type PreviewSessionSnapshot,
   type PreviewSessionState,
   type PreviewStartParams,
@@ -38,6 +41,10 @@ import {
   type UnaryRegistry,
 } from '../transport'
 import { createPreviewFrameBuffer, type PreviewFrame, type PreviewFrameBuffer } from './frame-buffer'
+import {
+  createPreviewInputDispatcher,
+  type PreviewInputDispatcher,
+} from './input'
 import { createScreencastSource, type ScreencastSource } from './screencast'
 
 const PREVIEW_TARGET_ID = 'preview'
@@ -48,6 +55,8 @@ export interface PreviewService {
   start(params: PreviewStartParams): Promise<PreviewSessionSnapshot>
   stop(): Promise<PreviewSessionSnapshot>
   status(): PreviewSessionSnapshot
+  /** Validates and forwards one pointer/wheel/key event (T021). */
+  input(event: unknown): Promise<PreviewInputAck>
   dispose(): Promise<void>
 }
 
@@ -60,6 +69,10 @@ export interface PreviewServiceOptions {
     page: NonNullable<ReturnType<NonNullable<TargetAdapter['screencastPage']>>>,
     buffer: PreviewFrameBuffer,
   ) => ScreencastSource
+  /** Test seam: substitutes the CDP input dispatcher. */
+  readonly createInput?: (
+    page: NonNullable<ReturnType<NonNullable<TargetAdapter['screencastPage']>>>,
+  ) => PreviewInputDispatcher
 }
 
 function toPreviewError(error: unknown): StudioError {
@@ -81,6 +94,8 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
   let state: PreviewSessionState = 'idle'
   let adapter: TargetAdapter | undefined
   let source: ScreencastSource | undefined
+  let inputDispatcher: PreviewInputDispatcher | undefined
+  let inputSupported = false
   let targetId: string | null = null
   let url: string | null = null
   let capabilities: TargetCapabilities | null = null
@@ -106,6 +121,12 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     source = undefined
     if (activeSource) await activeSource.stop().catch(() => undefined)
     buffer.clear()
+    // Input owns its own CDP session; detach it before the adapter closes the
+    // page so a stopped preview leaves no handle behind.
+    const activeInput = inputDispatcher
+    inputDispatcher = undefined
+    inputSupported = false
+    if (activeInput) await activeInput.stop().catch(() => undefined)
     const activeAdapter = adapter
     adapter = undefined
     if (activeAdapter) await activeAdapter.stop().catch(() => undefined)
@@ -176,11 +197,34 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
       throw mapped
     }
 
+    inputSupported = session.capabilities.input
+    if (inputSupported) {
+      inputDispatcher =
+        options.createInput?.(page) ?? createPreviewInputDispatcher({ page })
+    }
+
     targetId = session.targetId
     url = session.url
     capabilities = session.capabilities
     state = 'ready'
     return snapshot()
+  }
+
+  async function input(event: unknown): Promise<PreviewInputAck> {
+    if (!isPreviewInputEvent(event)) {
+      throw studioError('invalid_input', 'vibe-studio: invalid preview input event', {
+        field: 'event',
+      })
+    }
+    if (state !== 'ready') {
+      throw studioError('target_unavailable', 'vibe-studio: preview is not running')
+    }
+    if (!inputSupported || !inputDispatcher) {
+      throw studioError('unsupported', 'vibe-studio: the target does not support input', {
+        capability: 'input',
+      })
+    }
+    return inputDispatcher.dispatch(event)
   }
 
   async function start(params: PreviewStartParams): Promise<PreviewSessionSnapshot> {
@@ -226,6 +270,7 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     start,
     stop,
     status: snapshot,
+    input,
     async dispose() {
       await stop()
     },
@@ -247,10 +292,14 @@ export function registerPreviewMethods(
   })
   const offStop = registry.register(PREVIEW_STOP_METHOD, async () => service.stop())
   const offStatus = registry.register(PREVIEW_STATUS_METHOD, () => service.status())
+  const offInput = registry.register(PREVIEW_INPUT_METHOD, async (params) =>
+    service.input(params),
+  )
   return () => {
     offStart()
     offStop()
     offStatus()
+    offInput()
   }
 }
 

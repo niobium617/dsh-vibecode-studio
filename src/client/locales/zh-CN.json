@@ -27,6 +27,8 @@
   "preview.mode.pull": "轮询",
   "preview.stats.frames": "帧数",
   "preview.canvas.label": "预览画布",
+  "preview.input.label": "预览输入层",
+  "preview.input.hint": "先点击预览区域，再输入或滚动；输入会发送到目标页面。",
   "preview.error.url": "请输入本地预览地址。",
   "page.inspect.empty": "在预览中拾取元素，查看它的源码位置。",
   "page.annotations.empty": "发送到对话的标注会显示在这里。",

@@ -141,7 +141,7 @@ describe('web target adapter (Edge)', () => {
         expect(session.url).toBe(`${baseUrl}/`)
         expect(session.capabilities.screenshot).toBe(true)
         expect(session.capabilities.screencast).toBe(true)
-        expect(session.capabilities.input).toBe(false)
+        expect(session.capabilities.input).toBe(true)
 
         const image = decodePng(await adapter.screenshot())
         expect(image.width).toBe(800)

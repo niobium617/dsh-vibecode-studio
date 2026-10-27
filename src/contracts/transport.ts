@@ -37,6 +37,8 @@ export const DEFAULT_PREVIEW_QUALITY = 70
 export const PREVIEW_START_METHOD = 'preview.session.start'
 export const PREVIEW_STOP_METHOD = 'preview.session.stop'
 export const PREVIEW_STATUS_METHOD = 'preview.session.status'
+/** Input events use the shared unary route rather than a dedicated route. */
+export const PREVIEW_INPUT_METHOD = 'preview.input'
 
 /** Unary requests carry input events and small commands; 64 KiB is ample. */
 export const MAX_UNARY_BODY_BYTES = 64 * 1024
@@ -125,6 +127,156 @@ export interface PreviewStartParams {
 
 const PREVIEW_START_KEYS = new Set(['url', 'viewport'])
 const PREVIEW_VIEWPORT_KEYS = new Set(['width', 'height', 'deviceScaleFactor'])
+
+/**
+ * Input wire contract (T021). Coordinates are fractions of the preview
+ * viewport in both axes, so the client never needs to know the target's pixel
+ * size or the panel's CSS scale. The Host maps them onto the live viewport.
+ */
+export interface PreviewInputModifiers {
+  readonly alt?: boolean
+  readonly ctrl?: boolean
+  readonly meta?: boolean
+  readonly shift?: boolean
+}
+
+export type PreviewPointerButton = 'left' | 'middle' | 'right'
+export type PreviewPointerAction = 'down' | 'up' | 'move'
+export type PreviewKeyAction = 'down' | 'up'
+
+export interface PreviewPointerInput {
+  readonly kind: 'pointer'
+  readonly action: PreviewPointerAction
+  readonly x: number
+  readonly y: number
+  readonly button?: PreviewPointerButton
+  readonly clickCount?: number
+  readonly modifiers?: PreviewInputModifiers
+}
+
+export interface PreviewWheelInput {
+  readonly kind: 'wheel'
+  readonly x: number
+  readonly y: number
+  readonly deltaX: number
+  readonly deltaY: number
+  readonly modifiers?: PreviewInputModifiers
+}
+
+export interface PreviewKeyInput {
+  readonly kind: 'key'
+  readonly action: PreviewKeyAction
+  readonly key: string
+  readonly code?: string
+  /** Printable character to insert; the Host supplies it for named keys. */
+  readonly text?: string
+  readonly modifiers?: PreviewInputModifiers
+}
+
+export type PreviewInputEvent = PreviewPointerInput | PreviewWheelInput | PreviewKeyInput
+
+export interface PreviewInputAck {
+  readonly ts: number
+  readonly viewport: { readonly width: number; readonly height: number }
+  /** Mapped viewport point for pointer/wheel events. */
+  readonly point?: { readonly x: number; readonly y: number }
+}
+
+export const MAX_WHEEL_DELTA = 2000
+export const MAX_KEY_TEXT_LENGTH = 32
+const POINTER_ACTIONS: ReadonlySet<string> = new Set(['down', 'up', 'move'])
+const POINTER_BUTTONS: ReadonlySet<string> = new Set(['left', 'middle', 'right'])
+const KEY_ACTIONS: ReadonlySet<string> = new Set(['down', 'up'])
+const MODIFIER_KEYS = new Set(['alt', 'ctrl', 'meta', 'shift'])
+const POINTER_INPUT_KEYS = new Set([
+  'kind',
+  'action',
+  'x',
+  'y',
+  'button',
+  'clickCount',
+  'modifiers',
+])
+const WHEEL_INPUT_KEYS = new Set(['kind', 'x', 'y', 'deltaX', 'deltaY', 'modifiers'])
+const KEY_INPUT_KEYS = new Set(['kind', 'action', 'key', 'code', 'text', 'modifiers'])
+const KEY_CODE_PATTERN = /^[A-Za-z0-9]{1,32}$/
+
+function isFraction(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1
+}
+
+function hasOnlyKeys(record: Record<string, unknown>, allowed: ReadonlySet<string>): boolean {
+  return Object.keys(record).every((key) => allowed.has(key))
+}
+
+function isModifiers(value: unknown): value is PreviewInputModifiers {
+  if (value === undefined) return true
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  if (!hasOnlyKeys(record, MODIFIER_KEYS)) return false
+  return Object.values(record).every((entry) => typeof entry === 'boolean')
+}
+
+function isPoint(record: Record<string, unknown>): boolean {
+  return isFraction(record.x) && isFraction(record.y)
+}
+
+/** Strict shape check; the Host validates again before touching CDP. */
+export function isPreviewInputEvent(value: unknown): value is PreviewInputEvent {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  if (!isModifiers(record.modifiers)) return false
+
+  if (record.kind === 'pointer') {
+    if (!hasOnlyKeys(record, POINTER_INPUT_KEYS)) return false
+    if (typeof record.action !== 'string' || !POINTER_ACTIONS.has(record.action)) return false
+    if (!isPoint(record)) return false
+    if (record.button !== undefined) {
+      if (typeof record.button !== 'string' || !POINTER_BUTTONS.has(record.button)) return false
+    }
+    if (record.clickCount !== undefined) {
+      const count = record.clickCount
+      if (typeof count !== 'number' || !Number.isInteger(count) || count < 1 || count > 3) {
+        return false
+      }
+    }
+    return true
+  }
+
+  if (record.kind === 'wheel') {
+    if (!hasOnlyKeys(record, WHEEL_INPUT_KEYS)) return false
+    if (!isPoint(record)) return false
+    for (const axis of ['deltaX', 'deltaY'] as const) {
+      const delta = record[axis]
+      if (typeof delta !== 'number' || !Number.isFinite(delta)) return false
+      if (Math.abs(delta) > MAX_WHEEL_DELTA) return false
+    }
+    return true
+  }
+
+  if (record.kind === 'key') {
+    if (!hasOnlyKeys(record, KEY_INPUT_KEYS)) return false
+    if (typeof record.action !== 'string' || !KEY_ACTIONS.has(record.action)) return false
+    if (typeof record.key !== 'string' || record.key.length === 0 || record.key.length > 32) {
+      return false
+    }
+    if (record.code !== undefined) {
+      if (typeof record.code !== 'string' || !KEY_CODE_PATTERN.test(record.code)) return false
+    }
+    if (record.text !== undefined) {
+      if (
+        typeof record.text !== 'string' ||
+        record.text.length === 0 ||
+        record.text.length > MAX_KEY_TEXT_LENGTH
+      ) {
+        return false
+      }
+    }
+    return true
+  }
+
+  return false
+}
 
 /** Strict shape check; range checks stay in `validateTargetConfig`. */
 export function isPreviewStartParams(value: unknown): value is PreviewStartParams {
