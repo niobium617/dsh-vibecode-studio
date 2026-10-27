@@ -1,43 +1,47 @@
 /**
- * Harness-only fake target adapter.
- *
- * T016 defines the real `TargetAdapter` contract. Until then this helper keeps
- * lifecycle tests (start/stop/coalescing/failure) independent of Playwright and
- * browser processes.
+ * Harness-only fake target adapter implementing the real `TargetAdapter`
+ * contract (T016). It keeps lifecycle tests (start/stop/coalescing/failure)
+ * independent of Playwright and browser processes while exposing the same
+ * status/session/log observability the integration tests use.
  */
+import { asSessionId, asTargetId } from '../../src/contracts/ids'
+import type { TargetCapabilities, TargetSession } from '../../src/contracts/target'
+import type { TargetAdapter, ValidatedTargetConfig } from '../../src/host/targets/types'
+
 export type FakeAdapterStatus = 'idle' | 'starting' | 'running' | 'stopped' | 'failed'
 
-export interface FakeAdapterCapabilities {
-  readonly preview: boolean
-  readonly input: boolean
-  readonly inspect: boolean
-}
-
-export interface FakeSession {
-  readonly id: string
-  readonly url: string
+export interface FakeSession extends TargetSession {
+  /** Mutable test-only marker set by `stop`. */
   closed: boolean
 }
 
 export interface FakeAdapterOptions {
   readonly id?: string
+  readonly kind?: TargetAdapter['kind']
   readonly startDelayMs?: number
   readonly stopDelayMs?: number
   /** When set, every start rejects with this message and the adapter ends `failed`. */
   readonly failStartWith?: string
 }
 
-export interface FakeTargetAdapter {
-  readonly id: string
-  readonly capabilities: FakeAdapterCapabilities
+export interface FakeTargetAdapter extends Omit<TargetAdapter, 'start'> {
   readonly status: FakeAdapterStatus
   readonly sessions: readonly FakeSession[]
   readonly logs: readonly string[]
-  start(url?: string): Promise<FakeSession>
+  start(input?: ValidatedTargetConfig | string): Promise<FakeSession>
   stop(): Promise<void>
 }
 
 const DEFAULT_URL = 'http://127.0.0.1:4320/'
+const CAPABILITIES: TargetCapabilities = Object.freeze({
+  screencast: true,
+  input: true,
+  pick: true,
+  sourceMap: true,
+  console: true,
+  network: true,
+  screenshot: true,
+})
 
 export function createFakeAdapter(options: FakeAdapterOptions = {}): FakeTargetAdapter {
   const startDelayMs = options.startDelayMs ?? 0
@@ -50,13 +54,30 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): FakeTargetA
 
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
-  function start(url = DEFAULT_URL): Promise<FakeSession> {
+  function resolveTarget(input?: ValidatedTargetConfig | string): {
+    url: string
+    targetId: ReturnType<typeof asTargetId>
+    kind: TargetSession['kind']
+  } {
+    if (typeof input === 'string' || input === undefined) {
+      return {
+        url: input ?? DEFAULT_URL,
+        targetId: asTargetId('fake-target'),
+        kind: options.kind ?? 'web',
+      }
+    }
+    const url = input.url ?? (input.port ? `http://127.0.0.1:${input.port}/` : DEFAULT_URL)
+    return { url, targetId: asTargetId(input.id), kind: input.kind }
+  }
+
+  function start(input?: ValidatedTargetConfig | string): Promise<FakeSession> {
     if (status === 'running' && active) return Promise.resolve(active)
     if (status === 'starting' && pendingStart) return pendingStart
     if (status === 'failed') {
       return Promise.reject(new Error(options.failStartWith ?? 'fake adapter failed'))
     }
 
+    const target = resolveTarget(input)
     status = 'starting'
     logs.push('start')
     pendingStart = (async () => {
@@ -67,8 +88,13 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): FakeTargetA
         throw new Error(options.failStartWith)
       }
       const session: FakeSession = {
-        id: `fake-${sessions.length + 1}`,
-        url,
+        id: asSessionId(`fake-${sessions.length + 1}`),
+        targetId: target.targetId,
+        kind: target.kind,
+        status: 'ready',
+        url: target.url,
+        capabilities: CAPABILITIES,
+        startedAt: new Date().toISOString(),
         closed: false,
       }
       sessions.push(session)
@@ -96,7 +122,8 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): FakeTargetA
 
   return {
     id: options.id ?? 'fake-target',
-    capabilities: Object.freeze({ preview: true, input: true, inspect: true }),
+    kind: options.kind ?? 'web',
+    capabilities: CAPABILITIES,
     get status() {
       return status
     },

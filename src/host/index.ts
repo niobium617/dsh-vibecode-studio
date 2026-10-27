@@ -12,6 +12,10 @@ import {
   type StudioSettingsService,
 } from './studio/settings'
 import {
+  createTargetAdapterRegistry,
+  type TargetAdapterRegistry,
+} from './targets/registry'
+import {
   registerTransport,
   type TransportHostContext,
   type UnaryRegistry,
@@ -31,6 +35,15 @@ export {
   UnaryRegistry,
 } from './transport'
 export type { UnaryCallContext, UnaryHandler } from './transport'
+export { createTargetAdapterRegistry } from './targets/registry'
+export type { TargetAdapterRegistry } from './targets/registry'
+export { validateTargetConfig } from './targets/validate'
+export { assertCapability, DEFAULT_VIEWPORT } from './targets/types'
+export type {
+  TargetAdapter,
+  TargetStartOptions,
+  ValidatedTargetConfig,
+} from './targets/types'
 
 export const name = 'dsh-vibecode-studio'
 export const inject = ['connection']
@@ -42,6 +55,8 @@ export interface VibeStudioService {
   readonly transport: UnaryRegistry
   /** `.vibe/studio.json` settings, shared with the panel. */
   readonly settings: StudioSettingsService
+  /** Adapters that can serve each target kind (T016). */
+  readonly targets: TargetAdapterRegistry
 }
 
 /** Minimal Cordis surface used at this stage. */
@@ -56,6 +71,9 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
   // M1 binds the project root to the Host process cwd; `apply` has no session
   // yet. Revisit once preview targets resolve a workspace directory (M2).
   const settings = createStudioSettingsService({ projectDir: process.cwd(), config: resolved })
+  // M2 adapters (T017+) register here; an empty registry fails late lookups
+  // with `unsupported` instead of exposing a half-wired preview.
+  const targets = createTargetAdapterRegistry()
   const setupSettings = () => registerSettingsMethods(registry, settings)
   if (typeof ctx.effect === 'function') {
     ctx.effect(setupSettings, 'vibe-studio: settings methods')
@@ -67,5 +85,6 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
     config: resolved,
     transport: registry,
     settings,
+    targets,
   } satisfies VibeStudioService)
 }
