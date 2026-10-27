@@ -45,6 +45,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 2. T001–T015 已完成并记录验证结果；**T005 G0 与 T015 G1 均已通过（GO）**，T006 脚手架、T007 client loader、T008 host Config、T010 client shell 均已在 `vibe-dev` Web 验证，T009 contracts 由 34 个单测覆盖，T011 transport 由 26 个集成用例 + Web/隔离 Desktop 真实载体验证，T012 harness 由 89 个 Vitest 用例 + 3 个 Playwright E2E 覆盖，T013 store 由 10 个用例覆盖，T014 设置面板由 19 个聚焦用例 + 全量 114 用例覆盖并验证保存/同源/重启持久化，T015 完成干净 profile 安装与 Web/Desktop 双端复核。**M1 完成，新会话从 T016 Target 模型、配置与 adapter 注册表开始（M2）。**
 3. 每个任务完成即勾选，并在任务下记录验证结果；G0/G1 已通过；后续门禁 G2–G6 通过后才进入下一阶段。
 4. 代码与文档按任务分批提交；私有仓库公开前按 `docs/PUBLISHING.md` 清理机器路径与历史。
+5. 分支基线：M1 已以 `--no-ff` 合并入 `main`（`d1f4053`）。M2 从 `main` 开新分支（建议 `task/m2-*`），不要继续在 `task/m1-foundation` 上提交；该分支仅作历史保留。
 
 ### T016 起步提示（下一会话，M2 首项）
 
@@ -130,4 +131,6 @@ dsh --profile vibe-dev --dump-config
 - **G1 通过（GO），M1 完成**：`pnpm typecheck` 0 error、`pnpm test` 17 文件 / 114 用例、`pnpm build`（host 25.8 KiB / client 36.8 KiB）、`pnpm test:e2e` 3/3。
 - 环境变更：`vibe-dev/cordis.patch.yml` 持久禁用 `vibe-s1-spike`/`vibe-s2-spike`（二者与 studio 抢 `/api/vibe/health`）；备份 `.tmp/logs/vibe-dev-cordis.patch.yml.bak-2026-10-27`，删除两条 `disabled: true` 即回滚。真实 `desktop`/`web` profile 未改。
 - 双端手测：Web（4327）与隔离 Desktop（CDP 9223）均打开 Vibe Studio、5 页签、设置页正常；desktop profile SHA-256 前后一致；无 LISTENING 端口、无 dsh/Desktop/Edge 残留、未生成 `.vibe`。
+- **M1 已合并入 `main`**：`git merge --no-ff task/m1-foundation` 生成 `d1f4053 merge: M1 foundation (T006-T015, G1)` 并推送（`221f118..d1f4053`）；`git ls-remote origin main` 与本地一致，工作区干净。`task/m1-foundation` 本地与远端均保留。M2 从 `main` 开新分支。
+- 贡献图：profile 已开启 Private contributions；合并后 10-26 计 17、10-27 计 5。GitHub 按提交自带 `+0800` 时区归属日期（非 UTC），且只统计默认分支上的提交。
 - 下一会话直接粘贴第 5 节启动语；从 T016 Target 模型、配置与 adapter 注册表开始（M2）。

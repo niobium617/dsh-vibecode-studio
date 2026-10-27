@@ -11,7 +11,7 @@
 - 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审。
 - 阶段：**M1 已完成并通过 G1**；下一项 **T016 Target 模型、配置与 adapter 注册表**（M2 首项）。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
-- T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27）。S3/S4/T010/T014/T015 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
+- T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。S3/S4/T010/T014/T015 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
 
 环境：
@@ -239,6 +239,21 @@
   - 脚本 `.tmp/t015-web.mjs`、`.tmp/t015-desktop.mjs`（Desktop 报告存 `.tmp/logs/t015-desktop.json`，`ok: true`）。
   - 结束后 4320/4327/9223 无 LISTENING，无 dsh/Desktop/Edge 残留，未生成 `.vibe`。
 - 结论：**G1 通过（GO）**，M1 完成，进入 M2（T016 起）。
+
+### M1 合并入 `main`（已完成）
+
+- 目标：把 M1 成果纳入默认分支，使 `main` 与开发状态一致；顺便让贡献图计入这批提交。
+- 结果：
+  - 合并前 `main` 为 `221f118`（M0 收尾），是 `task/m1-foundation` 的祖先（领先 18 / 落后 0），可 fast-forward。
+  - 按里程碑边界保留合并点：`git merge --no-ff task/m1-foundation -m "merge: M1 foundation (T006-T015, G1)"`，生成 `d1f4053`，零冲突。
+  - `git push origin main` → `221f118..d1f4053 main -> main`；`task/m1-foundation` 本地与远端均保留，未删。
+- 验证：
+  - `git ls-remote origin main` 返回 `d1f4053e2b13…`，与本地 `git rev-parse main` 一致；`git status -sb` 为 `## main...origin/main`，工作区干净。
+  - GitHub 贡献图：10-26 由 3 → 17、10-27 由 0 → 5，私有贡献合计 10 → 29（18 条 M1 提交 + 1 条合并提交全部计入）。
+- 经验：
+  - GitHub 贡献图按**提交自带的时区偏移**归属日期，不是 UTC。M1 凌晨 01:37–01:50（+0800）的 4 条提交落在 10-27 那格，而不是 UTC 的 10-26，实测数据推翻了“按 UTC 算”的假设。
+  - 私有仓库的提交只有在 profile → Contribution settings → **Private contributions** 打开后才计入，且只显示匿名格子、不显示仓库名；开关关闭时 `restrictedContributionsCount` 为 0，容易误判成“推送失败”。
+  - 默认分支之外的提交（如 `task/m1-foundation`）无论是否推送成功都不计入贡献图，合并进 `main` 后才计入。
 
 ## 3. 踩坑与已验证经验
 
