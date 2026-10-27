@@ -60,6 +60,33 @@ export {
   toStartError,
 } from './targets/web/launch'
 export type { BrowserLauncher, LaunchEdgeOptions } from './targets/web/launch'
+export {
+  createDevServerSupervisor,
+  validateDevServerSpec,
+} from './targets/process/supervisor'
+export type {
+  DevServerChildProcess,
+  DevServerExit,
+  DevServerProcessInfo,
+  DevServerSpec,
+  DevServerSpawn,
+  DevServerSpawnOptions,
+  DevServerStartOptions,
+  DevServerState,
+  DevServerStatus,
+  DevServerStopResult,
+  DevServerSupervisor,
+  DevServerSupervisorOptions,
+  DevServerTreeKill,
+} from './targets/process/supervisor'
+export { createLogRingBuffer, stripAnsi } from './targets/process/logs'
+export type {
+  DevServerLogEntry,
+  DevServerLogStream,
+  LogRingBuffer,
+  LogRingBufferOptions,
+  LogRingBufferSnapshotOptions,
+} from './targets/process/logs'
 
 export const name = 'dsh-vibecode-studio'
 export const inject = ['connection']
