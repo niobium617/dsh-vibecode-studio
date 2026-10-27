@@ -8,8 +8,8 @@
 ## 1. 当前快照
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，M1 已完成，进入 M2）**。
-- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表。
-- 阶段：**M1 已完成并通过 G1；M2 进行中**，T016 已完成，下一项 **T017 Web target adapter**（T018 S8 spike 可并行）。
+- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）。
+- 阶段：**M1 已完成并通过 G1；M2 进行中**，T017 已完成，下一项 **T018 S8 进程生命周期 spike**（T017/T018/T019 可并行；T020 依赖 T017/T019）。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
 - T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`。S3/S4/T010/T014/T015 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
@@ -270,6 +270,21 @@
   - `tests/unit/config.test.ts` 的服务槽断言同步增加 `targets`。
 - 计划偏差：无；文件与 `tasks/todo.md` 一致，仅额外在 `src/host/index.ts` 暴露 registry（服务槽接入）。
 
+### T017 — Web target adapter（已完成）
+
+- 目标：Playwright 启动 Edge（`channel: 'msedge'`）；导航、viewport、截图、关闭；暂不做 screencast。
+- 结果：
+  - `src/host/targets/web/launch.ts`：`playwright-core` 懒加载（缺失 → `target_unavailable`），`launchEdge()` 只用本机 Edge、默认 headless；错误映射 `toStartError`（`Chromium distribution 'msedge' is not found` / `Executable doesn't exist …msedge` → `target_unavailable`，消息不含本机路径；其他 → `preview_failed`）、`toNavigationError`（`Timeout … exceeded` → `timeout`，`net::ERR_CONNECTION_*` → `target_unavailable`，其他 → `preview_failed`）、`toScreenshotError`（`preview_failed`）。
+  - `src/host/targets/web/adapter.ts`：`createWebTargetAdapter()` 实现 `TargetAdapter`；start 合并并发调用、成功后 session `ready`、失败清理并 `failed`、stop 幂等且 session 置 `closed`；上下文使用归一化 viewport + `colorScheme: 'light'`；`navigate()` 成功后更新 session url；`screenshot()` 返回 viewport 大小 PNG（禁用动画、隐藏光标）；默认只允许 loopback（非本地 → `permission_denied`，`allowNonLocal` 才放开），非 http(s) scheme → `unsupported`；能力只声明 `screenshot`。
+  - `apply()` 注册 web adapter；`src/host/index.ts` 导出 adapter/launcher 与错误映射；`tests/helpers/png.ts` 提供无依赖的 8-bit RGB/RGBA PNG 解码（含 5 种 filter），用于像素级截图断言。
+- 验证：
+  - `pnpm exec vitest run tests/integration/web-adapter`：2 文件 / 13 用例通过（真实 Edge + 临时端口 Vite fixture；错误映射与 guard 用注入 launcher）。
+  - 真实截图 800×600：左上角白底、全文 >1000 深色文字像素、顶部 120 px >200；`navigate('…?tab=one')` 后 `adapter.url` 与 session url 同步；不可达本地端口导航返回 `target_unavailable` 且 session 保持 `ready`。
+  - 关闭：`browser.isConnected() === false`，5 s 内无带 `playwright_chromiumdev_profile` 的 `msedge.exe`；停后可再次启动为 `fixture-2`，两个浏览器均已断开。
+  - Edge 缺失：真实调用 Playwright 指向不存在的 `msedge.exe`，其“Executable doesn't exist …”被识别为 `target_unavailable`；模拟缺失 channel 同样映射。
+  - `pnpm typecheck` 0 error；全量 `pnpm test` 22 文件 / 148 用例；`pnpm build` host 43.4 KiB / client 36.8 KiB（`playwright-core` 保持动态 import）；`pnpm test:e2e` 3/3。
+- 计划偏差：文件按 `tasks/todo.md`；另在 `apply()` 注册 adapter、在 `src/host/index.ts` 增加导出、新增 `tests/helpers/png.ts`。`playwright-core` 仍是 devDependency，打包任务需转为运行时依赖。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -345,6 +360,12 @@
 30. **Vue inspector 的 DOM 属性运行时不存在**：`data-v-inspector` 被 `vite-plugin-vue-inspector` 移入 vnode 不可枚举 prop `__v_inspector` 并删除属性；读 DOM 属性会全部失败，应读 `el.__vnode` / `__vue_inspector_store__.vnodeToPos`。
 31. **Svelte 源码只在 dev**：`__svelte_meta` 由 dev 运行时 `assign_location` 设置，生产构建没有；产品里必须能显示“源码不可用”。
 
+### 预览 / 浏览器
+
+32. **进程检查会匹配到自己**：用 `CommandLine -like '*playwright_chromiumdev_profile*'` 查残留时，执行检查的 shell/PowerShell 自身也含该字符串，会误报。必须同时限定 `name='msedge.exe'`（或进程名）并匹配 `--user-data-dir=*playwright_chromiumdev_profile*`。
+33. **端口 1 不是“连接被拒”**：Chromium 把它当 unsafe port，`page.goto` 报 `net::ERR_UNSAFE_PORT`，不会命中 `ERR_CONNECTION_REFUSED` 映射。测试用 `net` 临时监听再释放一个端口，拿到真实的 `ERR_CONNECTION_REFUSED`。
+34. **`playwright-core` 必须懒加载且保持 external**：host 用 `packages: 'external'` 打包，动态 `import()` 留在产物里；模块加载不依赖浏览器，缺失时由 `launchEdge` 转成 `target_unavailable`，避免插件启动即崩。打包任务需把它从 devDependency 提升为运行时依赖。
+
 ## 4. 已改变的计划假设
 
 | 决策 | 原假设 | 当前结论 | 证据 |
@@ -360,8 +381,8 @@
 
 - **T004 已完成**：30/30 元素源码命中；点击泄漏 0、Esc、console 均通过；限制是仅 dev 模式、未覆盖 TSX/iframe/重复组件选择器。
 - **T005 G0 已通过（GO）**：帧传输 stream 为主/pull 回退；中文主路径 + 逐字/粘贴回退；截图仅剪贴板；源码三框架适配 + 选择器/DOM 降级。证据见 [`spikes/G0.md`](../spikes/G0.md)。
-- **T006–T016 已完成**：产品包脚手架、host ESM、client loader bundle、host Config/服务位、contracts v1、client shell/右栏 tab、connection 传输、测试 harness 与 Vite fixture、`.vibe` 配置存储、设置面板、G1 评审、target 契约/校验/adapter 注册表均已验证。
-- **T017 及以后（M2）**：Web target adapter（Playwright/Edge 启动、导航、viewport、截图、关闭）；T017 应复用 T016 的 `TargetAdapter` 契约与 `ValidatedTargetConfig`，把适配器注册进 `vibeStudio.targets`。T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 将随截图与上下文任务逐步消费；T009 的 contracts 由后续页面逐步引用。
+- **T006–T017 已完成**：产品包脚手架、host ESM、client loader bundle、host Config/服务位、contracts v1、client shell/右栏 tab、connection 传输、测试 harness 与 Vite fixture、`.vibe` 配置存储、设置面板、G1 评审、target 契约/校验/adapter 注册表、Web adapter（Edge 启动/导航/截图/关闭）均已验证。
+- **T018 及以后（M2）**：S8 进程生命周期 spike → dev server supervisor → screencast/frames → 输入 → 中文 IME。T017 已把 web adapter 注册进 `vibeStudio.targets`；T020 需要在同一 adapter 上补 screencast/帧路由，T021 补输入。T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 将随截图与上下文任务逐步消费；T009 的 contracts 由后续页面逐步引用。
 - **S2 遗留**：如果上游未来公开附件创建/释放 API，再评估直接截图附件；先复测切会话保留和失败清理。
 - **Desktop 遗留**：S2 跨会话未测到，后续需要能稳定创建第二个命名会话的测试环境。
 - **成本**：避免无必要的全仓读取和重复验收；每个任务完成即提交、记录、清理进程。
@@ -396,6 +417,7 @@ pnpm spike:s4
 - 任务与验收：[todo.md](../tasks/todo.md)。
 - 测试 harness：`vitest.config.ts`、`playwright.config.ts`、`fixtures/vite-basic/`、`tests/e2e/fixture.spec.ts`。
 - 配置存储：`src/host/studio/store.ts`、`tests/unit/studio-store.test.ts`。
+- Web 预览：`src/host/targets/web/{adapter,launch}.ts`、`tests/integration/web-adapter/`、`tests/helpers/png.ts`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。
 - 发布检查：[PUBLISHING.md](./PUBLISHING.md)。
 - 私有仓库：`https://github.com/niobium617/dsh-vibecode-studio`（当前为 private）。

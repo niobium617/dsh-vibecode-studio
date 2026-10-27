@@ -165,12 +165,13 @@
 - **文件**：`src/host/targets/{types,registry,validate}.ts`、tests。
 - **验证结果（2026-10-27）**：`src/host/targets/types.ts` 定义 `TargetAdapter`（id/kind/capabilities/start/stop，可选 navigate/screenshot）与 `ValidatedTargetConfig`、`DEFAULT_VIEWPORT`、`assertCapability`；`validate.ts` 校验 id/name/kind/url/command/cwd/port/viewport，拒绝未知键、非 http(s)、凭证 URL、相对 cwd、越界端口/viewport，错误统一为 `invalid_config` + `details.field`，url 归一化、viewport 默认 1280×720@1；`registry.ts` 每 kind 一个 adapter，重复 kind/id、缺 capability 均 `invalid_config`，未知 kind 报 `unsupported: unknown target adapter "x"`，已知未注册 kind 报 `no target adapter registered`。`apply()` 向 `vibeStudio` 服务增加空 `targets` registry（T017+ 注册）。`tests/helpers/fake-adapter.ts` 改为实现真实契约（保留 status/sessions/logs 观测）。验证：`pnpm exec vitest run tests/unit/targets` 3 文件 / 21 用例通过；`pnpm typecheck` 0 error；全量 `pnpm test` 20 文件 / 135 用例通过；`pnpm build` host 34.6 KiB / client 36.8 KiB。同步更新 `tests/unit/config.test.ts` 的服务槽断言（新增 `targets`）。
 
-### - [ ] T017 Web target adapter（启动/导航/截图）
+### - [x] T017 Web target adapter（启动/导航/截图）
 
 - **目标**：Playwright 启动 Edge（`channel: 'msedge'`）；导航、viewport、截图、关闭；暂不做 screencast。
 - **验收**：fixture 页面可打开；截图正确；Edge 缺失时有明确提示；关闭无残留。
-- **验证**：`pnpm test -- tests/integration/web-adapter`。
+- **验证**：`pnpm exec vitest run tests/integration/web-adapter`。
 - **文件**：`src/host/targets/web/{adapter,launch}.ts`、tests。
+- **验证结果（2026-10-27）**：`src/host/targets/web/launch.ts` 懒加载 `playwright-core`（缺失 → `target_unavailable`），`launchEdge()` 仅用本机 `channel: 'msedge'`、默认 headless；`toStartError`（缺失 Edge → `target_unavailable`，消息不含本机路径；其他 → `preview_failed`）、`toNavigationError`（超时 → `timeout`，`net::ERR_CONNECTION_*` → `target_unavailable`，其他 → `preview_failed`）、`toScreenshotError`。`adapter.ts` 实现 `TargetAdapter` 生命周期（start 合并并发调用、stop 幂等、失败可重试）、viewport/deviceScaleFactor/colorScheme=light 上下文、`navigate`（成功后更新 session url）、`screenshot`（PNG、viewport 尺寸、动画禁用）、非 loopback 目标默认 `permission_denied`（`allowNonLocal` 显式放开）、`file:`/`chrome:` 等 scheme `unsupported`；能力声明只开 `screenshot`。`apply()` 注册 web adapter。验证：`pnpm exec vitest run tests/integration/web-adapter` 2 文件 / 13 用例通过；`pnpm typecheck` 0 error；全量 `pnpm test` 22 文件 / 148 用例通过；`pnpm build` host 43.4 KiB / client 36.8 KiB，产物中 `playwright-core` 仍为懒加载；`pnpm test:e2e` 3/3。真实 Edge + 临时端口 Vite fixture：800×600 PNG 解码校验（左上白底、>1000 深色文字像素）、导航 query 生效、关闭后 `browser.isConnected()===false` 且无 `playwright_chromiumdev_profile` msedge 进程、可再次启动为 `fixture-2`；不可达端口导航稳定返回 `target_unavailable` 且 session 保持 ready；用真实 Playwright「可执行文件不存在」错误与模拟缺失 channel 验证 Edge 缺失提示。附加测试助手 `tests/helpers/png.ts`（无第三方依赖的 8-bit PNG 解码）。
 
 ### - [ ] T018 S8 进程生命周期 spike [P]
 
