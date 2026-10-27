@@ -8,10 +8,10 @@
 ## 1. 当前快照
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，M1 已完成，进入 M2）**。
-- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督。
-- 阶段：**M1 已完成并通过 G1；M2 进行中**，T016–T019 已完成，下一项 **T020 Screencast + 帧路由 + canvas**（依赖 T017/T019）。
+- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）。
+- 阶段：**M1 已完成并通过 G1；M2 进行中**，T016–T021 已完成，下一项 **T022 中文输入**（依赖 T021；系统 IME 手测）。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
-- T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`。S3/S4/T010/T014/T015 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
+- T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T021 已提交到该分支（截至实现提交 `1e62a88`），尚未推送/合并。S3/S4/T010/T014/T015/T020/T021 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
 
 环境：
@@ -60,7 +60,7 @@
   - 输入最大 26.8/25.2 ms（滚轮最高）；点击、ASCII 键盘、中文 `insertText`、逐字 `type`、模拟 IME 提交均在 1–9 ms，全部 < 200 ms。
   - 中文三条路径写入正确；IME 触发 5 个 `composition*` / 6 个 `isComposing` 事件；焦点 click→text、Tab→ime、Esc 正常；0 console error。
 - 决策：D4 保持“输入走精确 fetch 一元请求”；T020 增加帧节奏控制（30 fps 目标）；T022 采用“客户端组合 → host `Input.insertText`”，并保留逐字/粘贴回退。
-- 限制：真实系统 IME 未在 DSH Web/Desktop 载体手测（T022 补）；headful 是 Playwright Edge 而非 Electron，不能替代 Desktop 输入栈证据；输入→新帧到达未联合测量（T021 补）。
+- 限制：真实系统 IME 未在 DSH Web/Desktop 载体手测（T022 补）；headful 是 Playwright Edge 而非 Electron，不能替代 Desktop 输入栈证据；输入→新帧到达未联合测量（T021 只测了请求延迟与目标 DOM 副作用，留后续联合测量）。
 - 证据：[`spikes/s3/REPORT.md`](../spikes/s3/REPORT.md)、[`spikes/s3/results.json`](../spikes/s3/results.json)。
 
 ### T004 — S4 拾取 + 源码 spike（已完成）
@@ -326,6 +326,21 @@
   - 手动 Desktop（隔离 `DSH_HOME=.tmp/desktop-home` + 独立 userData、CDP 9223，`.tmp/t020-desktop.mjs`，`.tmp/logs/t020-desktop.json`，`ok:true`）：`dsh-app://app` 5 页签，流式 25.7 fps、1060 帧、1280×720/13 色、渲染器堆 +49 KB、Electron 进程树 RSS 无增长；停止后 Edge 全退出，真实 profile 未改；console 仅有预热 503 与预期中止。
 - 计划偏差：手测发现并修复 detached `window.fetch` 在 Chromium 抛 `Illegal invocation` 导致 Web 无帧；未新增依赖。Desktop 未单独模拟断流（回退由 Web 覆盖）。
 
+### T021 — 输入转发（点击/滚轮/键盘）（已完成）
+
+- 目标：通过 CDP `Input.*` 转发点击、滚轮与键盘；坐标按视口比例映射；支持修饰键；端到端延迟 < 200 ms。
+- 结果：
+  - `src/contracts/transport.ts` 新增 `PreviewInputEvent`（pointer/wheel/key）与 `isPreviewInputEvent` 严格校验：拒绝未知键、NaN/越界坐标、非法 action/button、clickCount 不在 1–3、|delta| > 2000、key 长度 0 或 > 32、非法 code、text 长度 1–32、非布尔 modifiers。
+  - `src/host/preview/input.ts`：懒建单一 CDP 会话；按实时 viewport 把 [0,1] 映射为 CSS px，四舍五入并夹到 width−1/height−1；维护按下按钮集合，move 与 release 都带正确 `buttons` 位掩码（释放发 0）；modifiers 转 CDP 位掩码（alt=1/ctrl=2/meta=4/shift=8）；命中键表覆盖 Enter/Tab/方向键/修饰键等，可打印键带 `text`/`unmodifiedText` 与虚拟键码；串行队列保证 press 先于 release；`stop()` 级联 detach 且幂等，错误统一 `target_unavailable`（`stopped`/`no_viewport`/`cdp_session`/`cdp_failed`，不回显 Playwright 文本）。
+  - 路由复用 unary `preview.input`（`/api/vibe/request`），未新增精确路由；Web adapter 能力补 `input: true`，真实 Edge 集成断言同步改为 `true`。
+  - `src/client/preview/InputLayer.tsx`：canvas 上的透明覆盖层，点击聚焦、best-effort pointer capture、原生非 passive wheel 监听、IME 组合期按键忽略；`InputForwarder` 单飞行请求 + 合并排队 move + 队列上限 64，卸载/停止 `dispose`；`Canvas` 在 ready 时挂载覆盖层与输入提示，en/zh-CN 文案补齐。
+- 验证：
+  - `pnpm exec vitest run tests/integration/input tests/component/preview`：3 文件 / 23 用例通过；全量 `pnpm test`：31 文件 / 222 用例通过；`pnpm typecheck` 0 error；`pnpm build` host 99.1 KiB / client 66.0 KiB。
+  - 手动 Host（`.tmp/t021-host.mjs`，真实 Edge + Vite fixture，`.tmp/logs/t021-host.json`，`ok:true`）：点击后焦点 `INPUT#item-name`、键入 `hello`、计数器 `Count: 1`、滚轮 scrollY 0→347；15 次派发最大 26.3 ms / 平均 4.7 ms；停止后目标 Edge PID `[]`。
+  - 手动 Web（`.tmp/t021-web.mjs`，DSH 4331 + 回环表单 beacon 页，`.tmp/logs/t021-web.json`，`ok:true`）：覆盖层与 canvas 同为 615×345.9 @ (809,234.2)；点击后覆盖层持焦，目标收到 focus 与 h/he/hel/hell/hello；click 计数 1、scrollY 500；18 个 `preview.input` 全部 HTTP 200，端到端最大 39.3 ms / 平均 13.1 ms；目标 Edge 全退、真实 `desktop` profile SHA-256 未变、无意外 console error。
+  - 手动 Desktop（隔离 `DSH_HOME` + 独立 userData，CDP 9223，`.tmp/t021-desktop.mjs`，`.tmp/logs/t021-desktop.json`，`ok:true`）：覆盖层与 canvas 同为 543.3×305.6；focus/输入/点击/滚动均达目标；18 个请求全部 200，最大 14.3 ms / 平均 9.4 ms；目标 Edge 全退、真实 profile 未改。
+- 计划偏差：输入走 unary 而非新路由；未新增依赖。Desktop 自动化按 25 ms/字符合成键入时目标只收到首字符，150 ms/字符全部到达；Web 25 ms 与 host 直连连续按键正常，判断为 Desktop 载体下 Edge 对过密合成键事件的合并/节流，真实输入不受影响，留 T022 真 IME 手测复核。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -403,6 +418,7 @@
 25. **输入延迟测量要写清边界**：S3 测的是 CDP 派发→页面事件/下一 rAF 绘制（1–27 ms），不含 client→host HTTP 与排队；T021 的端到端 <200 ms 必须单独实测。
 26. **模拟 IME ≠ 系统 IME**：CDP `Input.imeSetComposition` + `Input.insertText` 只验证页面事件链和 host 提交路径；T022 必须在 `vibe-dev` Web 与 Desktop 用 Microsoft Pinyin 手测，失败启用逐字/粘贴回退。
 27. **headful Edge 不等于 Desktop Electron**：Playwright 的 headful 只覆盖 host 侧同一 CDP 面，客户端输入栈不同；不要把它当 Desktop 证据。
+36. **Desktop 载体的合成键盘过快会丢字符**：在 Desktop Electron 里通过面板按 25 ms/字符键入，目标 Edge 只收到首个字符；150 ms/字符（接近人类速度）时完整到达。同一脚本下 Web 25 ms 与 host 直连 fixture 连续按键均正常，说明是 Desktop 载体的合成键节奏问题，不是输入转发链路丢失；真实键盘/IME 手测不要用 25 ms 自动化结论代替。
 
 ### 拾取 / 源码
 
@@ -436,8 +452,9 @@
 - **T005 G0 已通过（GO）**：帧传输 stream 为主/pull 回退；中文主路径 + 逐字/粘贴回退；截图仅剪贴板；源码三框架适配 + 选择器/DOM 降级。证据见 [`spikes/G0.md`](../spikes/G0.md)。
 - **T006–T017 已完成**：产品包脚手架、host ESM、client loader bundle、host Config/服务位、contracts v1、client shell/右栏 tab、connection 传输、测试 harness 与 Vite fixture、`.vibe` 配置存储、设置面板、G1 评审、target 契约/校验/adapter 注册表、Web adapter（Edge 启动/导航/截图/关闭）均已验证。
 - **T018 已完成**：S8 测量结论（启动 ~0.4 s、treekill 无孤儿、`shell:true` 孤儿风险、端口冲突可读）写入 [`spikes/s8/REPORT.md`](../spikes/s8/REPORT.md)，T019 supervisor 按该结论实现。
-- **T020 已完成**：screencast 限速、最新帧缓冲、stream/pull 双路由与 canvas 渲染已在 Web（含断流回退与恢复）和隔离 Desktop 手测通过；证据 `.tmp/logs/t020-{web,desktop}.json`。
-- **T021 及以后（M2）**：输入转发 → 中文 IME。T020 已在 web adapter 上接好 screencast/帧路由，T021 补输入。T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 将随截图与上下文任务逐步消费；T009 的 contracts 由后续页面逐步引用。
+- **T019–T020 已完成**：dev server supervisor（真实 Vite 验证）与 screencast/帧路由/canvas（Web 断流回退与恢复、隔离 Desktop 手测）均通过；证据 `.tmp/logs/t019-manual.json`、`.tmp/logs/t020-{web,desktop}.json`。
+- **T021 已完成**：输入转发点击/滚轮/键盘在 Host 直连、Web 与隔离 Desktop 均达目标，端到端最大 39.3 ms；证据 `.tmp/logs/t021-{host,web,desktop}.json`。
+- **T022 及以后（M2）**：中文 IME → 后续任务。T021 已接好 `preview.input`、InputLayer 与 Web adapter `input` 能力；T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 将随截图与上下文任务逐步消费；T009 的 contracts 由后续页面逐步引用。
 - **S2 遗留**：如果上游未来公开附件创建/释放 API，再评估直接截图附件；先复测切会话保留和失败清理。
 - **Desktop 遗留**：S2 跨会话未测到，后续需要能稳定创建第二个命名会话的测试环境。
 - **成本**：避免无必要的全仓读取和重复验收；每个任务完成即提交、记录、清理进程。
