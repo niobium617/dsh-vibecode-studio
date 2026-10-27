@@ -173,12 +173,13 @@
 - **文件**：`src/host/targets/web/{adapter,launch}.ts`、tests。
 - **验证结果（2026-10-27）**：`src/host/targets/web/launch.ts` 懒加载 `playwright-core`（缺失 → `target_unavailable`），`launchEdge()` 仅用本机 `channel: 'msedge'`、默认 headless；`toStartError`（缺失 Edge → `target_unavailable`，消息不含本机路径；其他 → `preview_failed`）、`toNavigationError`（超时 → `timeout`，`net::ERR_CONNECTION_*` → `target_unavailable`，其他 → `preview_failed`）、`toScreenshotError`。`adapter.ts` 实现 `TargetAdapter` 生命周期（start 合并并发调用、stop 幂等、失败可重试）、viewport/deviceScaleFactor/colorScheme=light 上下文、`navigate`（成功后更新 session url）、`screenshot`（PNG、viewport 尺寸、动画禁用）、非 loopback 目标默认 `permission_denied`（`allowNonLocal` 显式放开）、`file:`/`chrome:` 等 scheme `unsupported`；能力声明只开 `screenshot`。`apply()` 注册 web adapter。验证：`pnpm exec vitest run tests/integration/web-adapter` 2 文件 / 13 用例通过；`pnpm typecheck` 0 error；全量 `pnpm test` 22 文件 / 148 用例通过；`pnpm build` host 43.4 KiB / client 36.8 KiB，产物中 `playwright-core` 仍为懒加载；`pnpm test:e2e` 3/3。真实 Edge + 临时端口 Vite fixture：800×600 PNG 解码校验（左上白底、>1000 深色文字像素）、导航 query 生效、关闭后 `browser.isConnected()===false` 且无 `playwright_chromiumdev_profile` msedge 进程、可再次启动为 `fixture-2`；不可达端口导航稳定返回 `target_unavailable` 且 session 保持 ready；用真实 Playwright「可执行文件不存在」错误与模拟缺失 channel 验证 Edge 缺失提示。附加测试助手 `tests/helpers/png.ts`（无第三方依赖的 8-bit PNG 解码）。
 
-### - [ ] T018 S8 进程生命周期 spike [P]
+### - [x] T018 S8 进程生命周期 spike [P]
 
 - **目标**：Vite 启动、端口探测、Windows 进程树清理、端口冲突。
 - **验收**：启动 < 10 s；停止无孤儿；端口冲突有可读错误；报告结论。
 - **验证**：`pnpm tsx spikes/s8/run.ts`；`spikes/s8/REPORT.md`。
 - **文件**：`spikes/s8/{run.ts,REPORT.md}`。
+- **验证结果（2026-10-27）**：`spikes/s8/run.ts` 用真实 Vite 8.3.5 + `fixtures/vite-basic`，逐场景测量启动、停止、孤儿与端口冲突；原始数据 `.tmp/logs/s8-results.json`。启动 9 次 spawn 的 HTTP 就绪 393–469 ms（中位 417 ms，预算 10 s），ready 日志 362–380 ms。停止：直接 `child.kill()` 14–15 ms、0 存活（Node 24 对非 detached 子进程使用 job object，`IsProcessInJob=true`，不依赖此行为）；`taskkill /T /F` 435–598 ms、3/3 无存活；`cmd.exe` 中转（`shell:true`）只杀 cmd 时 1 个 vite node 存活且仍占端口，按记录 PID 直接强杀后清零——证明必须记录 PID 并校验。端口冲突 exit 1、366–484 ms，stderr `Error: Port <port> is already in use`。结束时残留进程 0、监听端口 0。`pnpm exec tsc --noEmit` 0 error。报告给出 T019 的启动/就绪/停止/兜底/错误映射结论；`spikes/s8/` 仅 `run.ts` 与 `REPORT.md` 两个文件。
 
 ### - [ ] T019 Dev server 进程监督
 

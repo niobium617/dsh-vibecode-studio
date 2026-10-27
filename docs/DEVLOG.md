@@ -285,6 +285,19 @@
   - `pnpm typecheck` 0 error；全量 `pnpm test` 22 文件 / 148 用例；`pnpm build` host 43.4 KiB / client 36.8 KiB（`playwright-core` 保持动态 import）；`pnpm test:e2e` 3/3。
 - 计划偏差：文件按 `tasks/todo.md`；另在 `apply()` 注册 adapter、在 `src/host/index.ts` 增加导出、新增 `tests/helpers/png.ts`。`playwright-core` 仍是 devDependency，打包任务需转为运行时依赖。
 
+### T018 — S8 进程生命周期 spike（已完成）
+
+- 目标：Vite 启动、端口探测、Windows 进程树清理、端口冲突；只测量，不写 supervisor。
+- 结果：
+  - `spikes/s8/run.ts` 用真实 Vite 8.3.5 + `fixtures/vite-basic` 串行跑五组场景：空闲端口探测 5 次、3 次冷启、直接 kill、`taskkill /T /F`、`cmd.exe` 中转孤儿、占用端口冲突。
+  - 启动就绪：TCP ~380–410 ms、HTTP 200 ~393–469 ms（9 次 spawn 中位 417 ms），ready 日志 362–380 ms；10 s 预算余量充足。
+  - 停止：直接 `child.kill()` 14–15 ms 且 0 存活；`taskkill /T /F` 435–598 ms 且 3/3 无存活；结束后残留进程 0、监听端口 0。
+  - 孤儿：`node → cmd.exe → node(vite)` 只杀 cmd 时 1 个 vite node 存活并继续占用端口，按记录 PID + 命令行匹配直接强杀后清零。
+  - 端口冲突：`--strictPort` + 占用端口 → exit 1、366–484 ms、stderr `Error: Port <port> is already in use`。
+  - `IsProcessInJob` 实测 Node 24 的非 detached 子进程在 job object 内；作为现象记录，不作为 T019 的实现依赖。
+- 验证：`pnpm tsx spikes/s8/run.ts` 输出 `overall: PASS`；`pnpm exec tsc --noEmit` 0 error；原始数据 `.tmp/logs/s8-results.json`；结论见 `spikes/s8/REPORT.md`。
+- 计划偏差：无；`spikes/s8/` 仅 `run.ts` 与 `REPORT.md`，结果 JSON 写到 `.tmp/logs/`。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -310,6 +323,13 @@
 47. **原子写的临时文件放目标同目录**：跨卷 `rename` 会失败；临时文件写在 `.vibe` 的真实路径内，用 `flag: 'wx'` 防覆盖，`rename` 成功后原文件才变化，失败时删除临时文件。
 48. **坏数据回退要保留原文件**：读取只返回默认值和 `issues`，不自动 `write()` 修复，否则用户手写的注释/未知字段会在一次读取后消失；修复应由 UI 显式保存触发。
 49. **`pnpm test -- <path>` 不过滤**：`--` 后的路径会作为普通参数传给 vitest，实际跑全量；本仓库用 `pnpm exec vitest run <path>`。
+
+### 进程 / Windows（S8）
+
+50. **Node 24 的 job object 会“顺手”清树，但不可依赖**：非 detached 子进程 `IsProcessInJob=true`，父进程被终止后子进程随之消失，直接 `child.kill()` 看似无孤儿；这是实现细节（版本/启动方式相关），T019 仍必须 `taskkill /T /F` 并校验。
+51. **`shell:true`（cmd.exe 中转）会绕过 job，产生真实孤儿**：只杀 cmd.exe 时 vite node 存活且继续占端口；此时再 `taskkill /T` 已找不到子进程（父链已断）。supervisor 必须在杀之前记录后代 PID，并在清理时按 PID + 命令行匹配兜底。
+52. **按 PID 强杀前必须复核命令行**：PID 会被复用；清理脚本对每个记录 PID 先确认命令行仍含 `vite.js`/fixture 路径，避免误杀无关进程。
+53. **端口探测有竞态**：`listen(0)` 释放后到真正启动之间端口可能被抢；冲突以 `--strictPort` 的真实退出码与 stderr（`Error: Port <port> is already in use`）为准，不要静默换端口。
 
 ### 传输 / DSH 插件
 
@@ -382,7 +402,8 @@
 - **T004 已完成**：30/30 元素源码命中；点击泄漏 0、Esc、console 均通过；限制是仅 dev 模式、未覆盖 TSX/iframe/重复组件选择器。
 - **T005 G0 已通过（GO）**：帧传输 stream 为主/pull 回退；中文主路径 + 逐字/粘贴回退；截图仅剪贴板；源码三框架适配 + 选择器/DOM 降级。证据见 [`spikes/G0.md`](../spikes/G0.md)。
 - **T006–T017 已完成**：产品包脚手架、host ESM、client loader bundle、host Config/服务位、contracts v1、client shell/右栏 tab、connection 传输、测试 harness 与 Vite fixture、`.vibe` 配置存储、设置面板、G1 评审、target 契约/校验/adapter 注册表、Web adapter（Edge 启动/导航/截图/关闭）均已验证。
-- **T018 及以后（M2）**：S8 进程生命周期 spike → dev server supervisor → screencast/frames → 输入 → 中文 IME。T017 已把 web adapter 注册进 `vibeStudio.targets`；T020 需要在同一 adapter 上补 screencast/帧路由，T021 补输入。T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 将随截图与上下文任务逐步消费；T009 的 contracts 由后续页面逐步引用。
+- **T018 已完成**：S8 测量结论（启动 ~0.4 s、treekill 无孤儿、`shell:true` 孤儿风险、端口冲突可读）写入 [`spikes/s8/REPORT.md`](../spikes/s8/REPORT.md)，T019 supervisor 按该结论实现。
+- **T019 及以后（M2）**：dev server supervisor → screencast/frames → 输入 → 中文 IME。T017 已把 web adapter 注册进 `vibeStudio.targets`；T020 需要在同一 adapter 上补 screencast/帧路由，T021 补输入。T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 将随截图与上下文任务逐步消费；T009 的 contracts 由后续页面逐步引用。
 - **S2 遗留**：如果上游未来公开附件创建/释放 API，再评估直接截图附件；先复测切会话保留和失败清理。
 - **Desktop 遗留**：S2 跨会话未测到，后续需要能稳定创建第二个命名会话的测试环境。
 - **成本**：避免无必要的全仓读取和重复验收；每个任务完成即提交、记录、清理进程。
@@ -399,6 +420,7 @@ pnpm spike:s1
 pnpm spike:s2:build
 pnpm spike:s3 --seconds 10
 pnpm spike:s4
+pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 ```
 
 1. 读 [`tasks/HANDOFF.md`](../tasks/HANDOFF.md) 确认阶段和下一任务。
@@ -414,6 +436,7 @@ pnpm spike:s4
 - S3 screencast/输入/中文：[REPORT](../spikes/s3/REPORT.md)、[results.json](../spikes/s3/results.json)。
 - S4 拾取/源码：[REPORT](../spikes/s4/REPORT.md)、[results.json](../spikes/s4/results.json)。
 - G0 评审：[G0.md](../spikes/G0.md)。
+- S8 进程生命周期：[REPORT](../spikes/s8/REPORT.md)、[run.ts](../spikes/s8/run.ts)；原始数据 `.tmp/logs/s8-results.json`。
 - 任务与验收：[todo.md](../tasks/todo.md)。
 - 测试 harness：`vitest.config.ts`、`playwright.config.ts`、`fixtures/vite-basic/`、`tests/e2e/fixture.spec.ts`。
 - 配置存储：`src/host/studio/store.ts`、`tests/unit/studio-store.test.ts`。
