@@ -15,6 +15,7 @@ import {
   createTargetAdapterRegistry,
   type TargetAdapterRegistry,
 } from './targets/registry'
+import { createWebTargetAdapter } from './targets/web/adapter'
 import {
   registerTransport,
   type TransportHostContext,
@@ -44,6 +45,21 @@ export type {
   TargetStartOptions,
   ValidatedTargetConfig,
 } from './targets/types'
+export { createWebTargetAdapter, WEB_TARGET_CAPABILITIES } from './targets/web/adapter'
+export type {
+  WebTargetAdapter,
+  WebTargetAdapterOptions,
+  WebTargetAdapterStatus,
+} from './targets/web/adapter'
+export {
+  EDGE_CHANNEL,
+  isEdgeMissingError,
+  launchEdge,
+  toNavigationError,
+  toScreenshotError,
+  toStartError,
+} from './targets/web/launch'
+export type { BrowserLauncher, LaunchEdgeOptions } from './targets/web/launch'
 
 export const name = 'dsh-vibecode-studio'
 export const inject = ['connection']
@@ -71,9 +87,10 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
   // M1 binds the project root to the Host process cwd; `apply` has no session
   // yet. Revisit once preview targets resolve a workspace directory (M2).
   const settings = createStudioSettingsService({ projectDir: process.cwd(), config: resolved })
-  // M2 adapters (T017+) register here; an empty registry fails late lookups
-  // with `unsupported` instead of exposing a half-wired preview.
+  // M2 adapters register here; T017 provides the web/Edge adapter. Desktop and
+  // API kinds stay unregistered and fail late lookups with `unsupported`.
   const targets = createTargetAdapterRegistry()
+  targets.register(createWebTargetAdapter())
   const setupSettings = () => registerSettingsMethods(registry, settings)
   if (typeof ctx.effect === 'function') {
     ctx.effect(setupSettings, 'vibe-studio: settings methods')
