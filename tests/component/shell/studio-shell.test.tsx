@@ -30,9 +30,8 @@ describe('StudioShell', () => {
     expect(selected[0]?.textContent).toBe('Preview')
 
     expect(screen.getByRole('tabpanel').id).toBe('vibe-studio-panel-preview')
-    expect(
-      screen.getByText('No preview target yet. Start a local app and open it here.'),
-    ).toBeTruthy()
+    expect(screen.getByLabelText('Preview URL')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Start' })).toBeTruthy()
   })
 
   it('switches internal pages and updates the panel', () => {
@@ -67,6 +66,6 @@ describe('StudioShell', () => {
 
     expect(screen.getByRole('heading', { name: 'Vibe Studio' })).toBeTruthy()
     expect(tabNames()).toEqual(['预览', '检查', '标注', 'API', '设置'])
-    expect(screen.getByText('暂无内容')).toBeTruthy()
+    expect(screen.getByLabelText('预览地址')).toBeTruthy()
   })
 })

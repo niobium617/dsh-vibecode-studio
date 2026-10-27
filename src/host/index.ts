@@ -7,6 +7,12 @@
  */
 import { Config, resolveConfig, type VibeStudioConfig } from './config'
 import {
+  createPreviewService,
+  registerPreviewMethods,
+  registerPreviewRoutes,
+  type PreviewService,
+} from './preview/route'
+import {
   createStudioSettingsService,
   registerSettingsMethods,
   type StudioSettingsService,
@@ -41,10 +47,26 @@ export type { TargetAdapterRegistry } from './targets/registry'
 export { validateTargetConfig } from './targets/validate'
 export { assertCapability, DEFAULT_VIEWPORT } from './targets/types'
 export type {
+  ScreencastPageLike,
+  ScreencastSessionLike,
   TargetAdapter,
   TargetStartOptions,
   ValidatedTargetConfig,
 } from './targets/types'
+export {
+  createPreviewService,
+  registerPreviewMethods,
+  registerPreviewRoutes,
+} from './preview/route'
+export type { PreviewService, PreviewServiceOptions } from './preview/route'
+export { createPreviewFrameBuffer, PreviewFrameBuffer } from './preview/frame-buffer'
+export type { FrameListener, PreviewFrame } from './preview/frame-buffer'
+export { createScreencastSource } from './preview/screencast'
+export type {
+  ScreencastOptions,
+  ScreencastSource,
+  ScreencastStats,
+} from './preview/screencast'
 export { createWebTargetAdapter, WEB_TARGET_CAPABILITIES } from './targets/web/adapter'
 export type {
   WebTargetAdapter,
@@ -100,6 +122,8 @@ export interface VibeStudioService {
   readonly settings: StudioSettingsService
   /** Adapters that can serve each target kind (T016). */
   readonly targets: TargetAdapterRegistry
+  /** Preview session + shared latest-frame buffer (T020). */
+  readonly preview: PreviewService
 }
 
 /** Minimal Cordis surface used at this stage. */
@@ -125,10 +149,27 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
     setupSettings()
   }
 
+  // T020 preview: unary lifecycle methods plus the stream/pull frame routes.
+  const preview = createPreviewService({ targets })
+  const setupPreview = () => {
+    const disposeMethods = registerPreviewMethods(registry, preview)
+    return async () => {
+      disposeMethods()
+      await preview.dispose()
+    }
+  }
+  if (typeof ctx.effect === 'function') {
+    ctx.effect(setupPreview, 'vibe-studio: preview methods')
+  } else {
+    void setupPreview()
+  }
+  registerPreviewRoutes(ctx, preview)
+
   ctx.provide('vibeStudio', {
     config: resolved,
     transport: registry,
     settings,
     targets,
+    preview,
   } satisfies VibeStudioService)
 }

@@ -25,6 +25,23 @@ export interface TargetStartOptions {
 }
 
 /**
+ * Narrow CDP surface used for `Page.startScreencast` (T020). Playwright's
+ * `CDPSession` satisfies it structurally; tests substitute a fake.
+ */
+export interface ScreencastSessionLike {
+  send(method: string, params?: Record<string, unknown>): Promise<unknown>
+  on(event: string, listener: (params: unknown) => void): void
+  off?(event: string, listener: (params: unknown) => void): void
+  detach(): Promise<void>
+}
+
+/** Live page handle a screencast source can attach to. */
+export interface ScreencastPageLike {
+  viewport(): { readonly width: number; readonly height: number } | null
+  createCdpSession(): Promise<ScreencastSessionLike>
+}
+
+/**
  * One adapter instance drives one target kind (web, desktop, api). Starting a
  * second time while running must return the same session; `stop` releases the
  * process/page and is idempotent. Feature methods are optional and are only
@@ -37,6 +54,8 @@ export interface TargetAdapter {
   start(config: ValidatedTargetConfig, options?: TargetStartOptions): Promise<TargetSession>
   navigate?(url: string): Promise<void>
   screenshot?(): Promise<Uint8Array>
+  /** Present when `capabilities.screencast` is true; undefined before start. */
+  screencastPage?(): ScreencastPageLike | undefined
   stop(): Promise<void>
 }
 

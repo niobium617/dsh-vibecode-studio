@@ -11,12 +11,32 @@
  * module never invents its own credential scheme.
  */
 import { isStudioError, type StudioError } from './errors'
+import type { TargetCapabilities } from './target'
 
 export const TRANSPORT_VERSION = 1
 
 export const VIBE_API_PREFIX = '/api/vibe'
 export const HEALTH_PATH = `${VIBE_API_PREFIX}/health`
 export const REQUEST_PATH = `${VIBE_API_PREFIX}/request`
+
+/** Exact frame routes (T020, plan D3): stream first, long-poll fallback. */
+export const STREAM_PATH = `${VIBE_API_PREFIX}/stream`
+export const FRAME_PATH = `${VIBE_API_PREFIX}/frame`
+
+export const FRAME_BOUNDARY = 'vibe-frame'
+export const STREAM_CONTENT_TYPE = `multipart/x-mixed-replace; boundary=${FRAME_BOUNDARY}`
+
+/** A screencast frame is bounded so an untrusted page cannot grow Host memory. */
+export const MAX_PREVIEW_FRAME_BYTES = 4 * 1024 * 1024
+/** Long-poll budget for `/api/vibe/frame?wait=1`. */
+export const MAX_FRAME_WAIT_MS = 2000
+/** Plan D3 default pace; S3 measured ~99 fps and ~20 KB/frame as the ceiling. */
+export const DEFAULT_PREVIEW_FPS = 30
+export const DEFAULT_PREVIEW_QUALITY = 70
+
+export const PREVIEW_START_METHOD = 'preview.session.start'
+export const PREVIEW_STOP_METHOD = 'preview.session.stop'
+export const PREVIEW_STATUS_METHOD = 'preview.session.status'
 
 /** Unary requests carry input events and small commands; 64 KiB is ample. */
 export const MAX_UNARY_BODY_BYTES = 64 * 1024
@@ -70,6 +90,59 @@ export interface PingResult {
   readonly serverTime: string
   readonly transportVersion: number
   readonly echo: unknown
+}
+
+/** Preview lifecycle as seen by the panel (T020; the toolbar lands in T025). */
+export type PreviewSessionState = 'idle' | 'ready' | 'failed'
+
+export interface PreviewFrameMeta {
+  readonly seq: number
+  /** Host wall-clock time when the frame was published. */
+  readonly ts: number
+  readonly width: number
+  readonly height: number
+}
+
+export interface PreviewSessionSnapshot {
+  readonly status: PreviewSessionState
+  readonly targetId: string | null
+  readonly url: string | null
+  readonly capabilities: TargetCapabilities | null
+  readonly frame: PreviewFrameMeta | null
+  readonly fps: number
+  readonly quality: number
+  readonly lastError?: StudioError
+}
+
+export interface PreviewStartParams {
+  readonly url: string
+  readonly viewport?: {
+    readonly width: number
+    readonly height: number
+    readonly deviceScaleFactor?: number
+  }
+}
+
+const PREVIEW_START_KEYS = new Set(['url', 'viewport'])
+const PREVIEW_VIEWPORT_KEYS = new Set(['width', 'height', 'deviceScaleFactor'])
+
+/** Strict shape check; range checks stay in `validateTargetConfig`. */
+export function isPreviewStartParams(value: unknown): value is PreviewStartParams {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const candidate = value as Record<string, unknown>
+  if (Object.keys(candidate).some((key) => !PREVIEW_START_KEYS.has(key))) return false
+  if (typeof candidate.url !== 'string') return false
+  if (candidate.url.trim().length === 0 || candidate.url.length > 2048) return false
+  if (candidate.viewport === undefined) return true
+  const viewport = candidate.viewport
+  if (!viewport || typeof viewport !== 'object' || Array.isArray(viewport)) return false
+  const size = viewport as Record<string, unknown>
+  if (Object.keys(size).some((key) => !PREVIEW_VIEWPORT_KEYS.has(key))) return false
+  if (!Number.isFinite(size.width) || !Number.isFinite(size.height)) return false
+  if (size.deviceScaleFactor !== undefined && !Number.isFinite(size.deviceScaleFactor)) {
+    return false
+  }
+  return true
 }
 
 /**

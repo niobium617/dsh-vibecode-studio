@@ -10,7 +10,13 @@ import type { Browser, BrowserContext, Page } from 'playwright-core'
 import { isStudioError, studioError, type StudioError } from '../../../contracts/errors'
 import { asSessionId } from '../../../contracts/ids'
 import type { TargetCapabilities, TargetSession } from '../../../contracts/target'
-import type { TargetAdapter, TargetStartOptions, ValidatedTargetConfig } from '../types'
+import type {
+  ScreencastPageLike,
+  ScreencastSessionLike,
+  TargetAdapter,
+  TargetStartOptions,
+  ValidatedTargetConfig,
+} from '../types'
 import {
   EDGE_CHANNEL,
   launchEdge,
@@ -23,9 +29,9 @@ import {
 
 export type WebTargetAdapterStatus = 'idle' | 'starting' | 'ready' | 'stopped' | 'failed'
 
-/** Only screenshot is wired in M2/T017; later tasks extend this declaration. */
+/** Screencast arrives in T020; input/pick/console/network stay off until wired. */
 export const WEB_TARGET_CAPABILITIES: TargetCapabilities = Object.freeze({
-  screencast: false,
+  screencast: true,
   input: false,
   pick: false,
   sourceMap: false,
@@ -51,6 +57,7 @@ export interface WebTargetAdapterOptions {
 export interface WebTargetAdapter extends TargetAdapter {
   navigate(url: string): Promise<void>
   screenshot(): Promise<Uint8Array>
+  screencastPage(): ScreencastPageLike | undefined
   readonly status: WebTargetAdapterStatus
   readonly session: TargetSession | undefined
   readonly lastError: StudioError | undefined
@@ -255,6 +262,26 @@ export function createWebTargetAdapter(
     }
   }
 
+  /**
+   * Handle for CDP screencast. The page is re-read on each call so a session
+   * that stopped after being handed out fails with `target_unavailable` from
+   * Playwright rather than capturing a stale page.
+   */
+  function screencastPage(): ScreencastPageLike | undefined {
+    const activePage = status === 'ready' ? page : undefined
+    if (!activePage) return undefined
+    return {
+      viewport() {
+        const size = activePage.viewportSize()
+        return size === null ? null : { width: size.width, height: size.height }
+      },
+      async createCdpSession(): Promise<ScreencastSessionLike> {
+        const session = await activePage.context().newCDPSession(activePage)
+        return session as unknown as ScreencastSessionLike
+      },
+    }
+  }
+
   async function stop(): Promise<void> {
     if (status === 'starting' && pendingStart) await pendingStart.catch(() => undefined)
     await dispose()
@@ -269,6 +296,7 @@ export function createWebTargetAdapter(
     start,
     navigate,
     screenshot,
+    screencastPage,
     stop,
     get status() {
       return status

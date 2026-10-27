@@ -73,7 +73,7 @@ function assertAdapter(adapter: TargetAdapter): void {
       )
     }
   }
-  for (const method of ['navigate', 'screenshot'] as const) {
+  for (const method of ['navigate', 'screenshot', 'screencastPage'] as const) {
     const value = adapter[method]
     if (value !== undefined && typeof value !== 'function') {
       throw studioError(
