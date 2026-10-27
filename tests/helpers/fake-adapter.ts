@@ -5,12 +5,18 @@
  * status/session/log observability the integration tests use.
  */
 import { asSessionId, asTargetId } from '../../src/contracts/ids'
-import type { TargetCapabilities, TargetSession } from '../../src/contracts/target'
-import type { TargetAdapter, ValidatedTargetConfig } from '../../src/host/targets/types'
+import type { TargetCapabilities, TargetSession, TargetViewport } from '../../src/contracts/target'
+import type {
+  ScreencastPageLike,
+  TargetAdapter,
+  ValidatedTargetConfig,
+} from '../../src/host/targets/types'
 
 export type FakeAdapterStatus = 'idle' | 'starting' | 'running' | 'stopped' | 'failed'
 
-export interface FakeSession extends TargetSession {
+export interface FakeSession extends Omit<TargetSession, 'url'> {
+  /** Mutable so `navigate` can update the fake's session like the real one. */
+  url: string
   /** Mutable test-only marker set by `stop`. */
   closed: boolean
 }
@@ -22,14 +28,26 @@ export interface FakeAdapterOptions {
   readonly stopDelayMs?: number
   /** When set, every start rejects with this message and the adapter ends `failed`. */
   readonly failStartWith?: string
+  /** Toolbar failures (T025): each rejects once per call while set. */
+  readonly failNavigateWith?: string
+  readonly failReloadWith?: string
+  readonly failViewportWith?: string
 }
 
 export interface FakeTargetAdapter extends Omit<TargetAdapter, 'start'> {
   readonly status: FakeAdapterStatus
   readonly sessions: readonly FakeSession[]
   readonly logs: readonly string[]
+  /** URLs passed to `navigate`, in order. */
+  readonly navigations: readonly string[]
+  /** Last viewport applied through `setViewport`. */
+  readonly lastViewport: TargetViewport | undefined
   start(input?: ValidatedTargetConfig | string): Promise<FakeSession>
   stop(): Promise<void>
+  /** Simulates a crashed browser: still `running`, but `isAlive()` is false. */
+  crash(): void
+  /** Simulates a closed tab without a process crash. */
+  closePage(): void
 }
 
 const DEFAULT_URL = 'http://127.0.0.1:4320/'
@@ -48,9 +66,12 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): FakeTargetA
   const stopDelayMs = options.stopDelayMs ?? 0
   const sessions: FakeSession[] = []
   const logs: string[] = []
+  const navigations: string[] = []
   let status: FakeAdapterStatus = 'idle'
   let active: FakeSession | undefined
   let pendingStart: Promise<FakeSession> | undefined
+  let alive = false
+  let lastViewport: TargetViewport | undefined
 
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
@@ -99,6 +120,8 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): FakeTargetA
       }
       sessions.push(session)
       active = session
+      alive = true
+      lastViewport = input && typeof input !== 'string' ? input.viewport : undefined
       status = 'running'
       return session
     })().finally(() => {
@@ -116,8 +139,67 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): FakeTargetA
     if (stopDelayMs > 0) await sleep(stopDelayMs)
     for (const session of sessions) session.closed = true
     active = undefined
+    alive = false
     status = 'stopped'
     logs.push('stop')
+  }
+
+  async function navigate(url: string): Promise<void> {
+    if (status !== 'running' || !active) {
+      throw new Error('fake adapter is not running')
+    }
+    logs.push('navigate')
+    if (options.failNavigateWith) throw new Error(options.failNavigateWith)
+    navigations.push(url)
+    active.url = url
+  }
+
+  async function reload(): Promise<void> {
+    if (status !== 'running' || !active) {
+      throw new Error('fake adapter is not running')
+    }
+    logs.push('reload')
+    if (options.failReloadWith) throw new Error(options.failReloadWith)
+  }
+
+  async function setViewport(viewport: TargetViewport): Promise<void> {
+    if (status !== 'running' || !active) {
+      throw new Error('fake adapter is not running')
+    }
+    logs.push('viewport')
+    if (options.failViewportWith) throw new Error(options.failViewportWith)
+    lastViewport = viewport
+  }
+
+  function isAlive(): boolean {
+    return status === 'running' && active !== undefined && alive
+  }
+
+  /** Enough surface for the preview service's screencast handshake. */
+  function screencastPage(): ScreencastPageLike | undefined {
+    if (!isAlive()) return undefined
+    return {
+      viewport: () =>
+        lastViewport === undefined
+          ? null
+          : { width: lastViewport.width, height: lastViewport.height },
+      async createCdpSession() {
+        return {
+          async send() {
+            return {}
+          },
+          on() {
+            // No events in the fake.
+          },
+          off() {
+            // No events in the fake.
+          },
+          async detach() {
+            // Nothing to detach.
+          },
+        }
+      },
+    }
   }
 
   return {
@@ -133,7 +215,26 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): FakeTargetA
     get logs() {
       return logs
     },
+    get navigations() {
+      return navigations
+    },
+    get lastViewport() {
+      return lastViewport
+    },
     start,
+    navigate,
+    reload,
+    setViewport,
+    isAlive,
+    screencastPage,
     stop,
+    crash() {
+      alive = false
+      logs.push('crash')
+    },
+    closePage() {
+      alive = false
+      logs.push('close-page')
+    },
   }
 }

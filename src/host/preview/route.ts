@@ -1,427 +1,51 @@
 /**
- * Preview session service and its exact routes (T020).
+ * Preview routes (T020, toolbar methods T025).
  *
- * `preview.session.{start,stop,status}` are unary methods on the shared
- * authenticated transport. Frames use two exact routes: a multipart stream
- * (`/api/vibe/stream`) as the primary channel and a long-poll
- * (`/api/vibe/frame?wait=1&after=<seq>`) the client falls back to when the
- * stream breaks. Both read the same latest-frame buffer, so the two channels
- * cannot drift and only one JPEG is retained in Host memory.
+ * `preview.session.{start,stop,status,navigate,reload,viewport}` plus the
+ * console/network methods are unary calls on the shared authenticated
+ * transport; `preview.targets` feeds the toolbar's target select. Frames use
+ * two exact routes: a multipart stream (`/api/vibe/stream`) as the primary
+ * channel and a long-poll (`/api/vibe/frame?wait=1&after=<seq>`) the client
+ * falls back to when the stream breaks. Both read the same latest-frame
+ * buffer, so the two channels cannot drift and only one JPEG is retained in
+ * Host memory.
  */
-import type { StudioError } from '../../contracts/errors'
-import { isStudioError, studioError } from '../../contracts/errors'
-import type { TargetCapabilities, TargetSession } from '../../contracts/target'
+import { isStudioError, studioError, type StudioError } from '../../contracts/errors'
 import {
-  DEFAULT_PREVIEW_FPS,
-  DEFAULT_PREVIEW_QUALITY,
   FRAME_BOUNDARY,
   FRAME_PATH,
   MAX_FRAME_WAIT_MS,
   PREVIEW_CONSOLE_CLEAR_METHOD,
   PREVIEW_CONSOLE_LIST_METHOD,
   PREVIEW_INPUT_METHOD,
+  PREVIEW_NAVIGATE_METHOD,
   PREVIEW_NETWORK_BODY_METHOD,
   PREVIEW_NETWORK_CLEAR_METHOD,
   PREVIEW_NETWORK_LIST_METHOD,
+  PREVIEW_RELOAD_METHOD,
   PREVIEW_START_METHOD,
   PREVIEW_STATUS_METHOD,
   PREVIEW_STOP_METHOD,
+  PREVIEW_TARGETS_METHOD,
+  PREVIEW_VIEWPORT_METHOD,
   STREAM_CONTENT_TYPE,
   STREAM_PATH,
-  isPreviewConsoleQuery,
-  isPreviewInputEvent,
-  isPreviewNetworkBodyParams,
-  isPreviewNetworkQuery,
   isPreviewStartParams,
-  type PreviewConsoleClearResult,
-  type PreviewConsoleSnapshot,
-  type PreviewFrameMeta,
-  type PreviewNetworkBody,
-  type PreviewNetworkClearResult,
-  type PreviewNetworkSnapshot,
-  type PreviewInputAck,
-  type PreviewSessionSnapshot,
-  type PreviewSessionState,
-  type PreviewStartParams,
 } from '../../contracts/transport'
-import type { TargetAdapter } from '../targets/types'
-import { validateTargetConfig } from '../targets/validate'
-import type { TargetAdapterRegistry } from '../targets/registry'
+import { jsonResponse, type ConnectionFetchRouteLike, type TransportHostContext, type UnaryRegistry } from '../transport'
+import type { PreviewFrame } from './frame-buffer'
 import {
-  jsonResponse,
-  type ConnectionFetchRouteLike,
-  type TransportHostContext,
-  type UnaryRegistry,
-} from '../transport'
-import {
-  createPreviewConsoleCollector,
-  type PreviewConsoleCollector,
-} from './console'
-import { createPreviewFrameBuffer, type PreviewFrame, type PreviewFrameBuffer } from './frame-buffer'
-import {
-  createPreviewInputDispatcher,
-  type PreviewInputDispatcher,
-} from './input'
-import {
-  createPreviewNetworkCollector,
-  type PreviewNetworkCollector,
-} from './network'
-import { createScreencastSource, type ScreencastSource } from './screencast'
+  createPreviewService,
+  type PreviewService,
+  type PreviewServiceOptions,
+} from './session'
 
-const PREVIEW_TARGET_ID = 'preview'
+export { createPreviewService }
+export type { PreviewService, PreviewServiceOptions }
+
 const encoder = new TextEncoder()
 
-export interface PreviewService {
-  readonly buffer: PreviewFrameBuffer
-  start(params: PreviewStartParams): Promise<PreviewSessionSnapshot>
-  stop(): Promise<PreviewSessionSnapshot>
-  status(): PreviewSessionSnapshot
-  /** Validates and forwards one pointer/wheel/key event (T021). */
-  input(event: unknown): Promise<PreviewInputAck>
-  /** Bounded console history for the live preview (T023). */
-  consoleList(query?: unknown): PreviewConsoleSnapshot
-  /** Clears the Host console buffer; the panel clears its copy too. */
-  consoleClear(): PreviewConsoleClearResult
-  /** Bounded request/response history for the live preview (T024). */
-  networkList(query?: unknown): PreviewNetworkSnapshot
-  networkClear(): PreviewNetworkClearResult
-  /** Fetches one response body on demand. */
-  networkBody(params: unknown): Promise<PreviewNetworkBody>
-  dispose(): Promise<void>
-}
-
-export interface PreviewServiceOptions {
-  readonly targets: TargetAdapterRegistry
-  readonly fps?: number
-  readonly quality?: number
-  /** Test seam: substitutes the CDP source. */
-  readonly createSource?: (
-    page: NonNullable<ReturnType<NonNullable<TargetAdapter['screencastPage']>>>,
-    buffer: PreviewFrameBuffer,
-  ) => ScreencastSource
-  /** Test seam: substitutes the CDP input dispatcher. */
-  readonly createInput?: (
-    page: NonNullable<ReturnType<NonNullable<TargetAdapter['screencastPage']>>>,
-  ) => PreviewInputDispatcher
-  /** Test seam: substitutes the CDP console collector. */
-  readonly createConsole?: (
-    page: NonNullable<ReturnType<NonNullable<TargetAdapter['screencastPage']>>>,
-  ) => PreviewConsoleCollector
-  /** Test seam: substitutes the CDP network collector. */
-  readonly createNetwork?: (
-    page: NonNullable<ReturnType<NonNullable<TargetAdapter['screencastPage']>>>,
-  ) => PreviewNetworkCollector
-}
-
-function toPreviewError(error: unknown): StudioError {
-  if (isStudioError(error)) return error
-  const message = error instanceof Error ? error.message : typeof error
-  return studioError('preview_failed', `vibe-studio: preview failed: ${message}`)
-}
-
-function frameMeta(frame: PreviewFrame | null): PreviewFrameMeta | null {
-  if (frame === null) return null
-  return { seq: frame.seq, ts: frame.ts, width: frame.width, height: frame.height }
-}
-
-export function createPreviewService(options: PreviewServiceOptions): PreviewService {
-  const fps = options.fps ?? DEFAULT_PREVIEW_FPS
-  const quality = options.quality ?? DEFAULT_PREVIEW_QUALITY
-  const buffer = createPreviewFrameBuffer()
-
-  let state: PreviewSessionState = 'idle'
-  let adapter: TargetAdapter | undefined
-  let source: ScreencastSource | undefined
-  let inputDispatcher: PreviewInputDispatcher | undefined
-  let inputSupported = false
-  let consoleCollector: PreviewConsoleCollector | undefined
-  let networkCollector: PreviewNetworkCollector | undefined
-  let targetId: string | null = null
-  let url: string | null = null
-  let capabilities: TargetCapabilities | null = null
-  let lastError: StudioError | undefined
-  let startPromise: Promise<PreviewSessionSnapshot> | undefined
-  let stopPromise: Promise<PreviewSessionSnapshot> | undefined
-
-  function snapshot(): PreviewSessionSnapshot {
-    const base: PreviewSessionSnapshot = {
-      status: state,
-      targetId,
-      url,
-      capabilities,
-      frame: frameMeta(buffer.latest()),
-      fps: source?.fps ?? fps,
-      quality: source?.quality ?? quality,
-    }
-    return lastError === undefined ? base : { ...base, lastError }
-  }
-
-  async function release(): Promise<void> {
-    const activeSource = source
-    source = undefined
-    if (activeSource) await activeSource.stop().catch(() => undefined)
-    buffer.clear()
-    // Console and input own their own CDP sessions; stop them before the
-    // adapter closes the page so a stopped preview leaves no handle behind.
-    const activeConsole = consoleCollector
-    consoleCollector = undefined
-    if (activeConsole) await activeConsole.stop().catch(() => undefined)
-    const activeNetwork = networkCollector
-    networkCollector = undefined
-    if (activeNetwork) await activeNetwork.stop().catch(() => undefined)
-    const activeInput = inputDispatcher
-    inputDispatcher = undefined
-    inputSupported = false
-    if (activeInput) await activeInput.stop().catch(() => undefined)
-    const activeAdapter = adapter
-    adapter = undefined
-    if (activeAdapter) await activeAdapter.stop().catch(() => undefined)
-  }
-
-  async function runStart(params: PreviewStartParams): Promise<PreviewSessionSnapshot> {
-    let config
-    try {
-      config = validateTargetConfig({
-        id: PREVIEW_TARGET_ID,
-        name: 'Preview',
-        kind: 'web',
-        url: params.url,
-        ...(params.viewport === undefined ? {} : { viewport: params.viewport }),
-      })
-    } catch (error) {
-      // Normalized config errors are caller mistakes; keep the field hint.
-      throw toPreviewError(error)
-    }
-
-    let selected: TargetAdapter
-    try {
-      selected = options.targets.get('web')
-    } catch (error) {
-      throw toPreviewError(error)
-    }
-    if (!selected.capabilities.screencast || typeof selected.screencastPage !== 'function') {
-      throw studioError('unsupported', 'vibe-studio: the web target does not support screencast')
-    }
-
-    lastError = undefined
-    adapter = selected
-    let session: TargetSession
-    try {
-      session = await selected.start(config)
-    } catch (error) {
-      const mapped = toPreviewError(error)
-      await release()
-      state = 'failed'
-      lastError = mapped
-      throw mapped
-    }
-
-    const page = selected.screencastPage?.()
-    if (!page) {
-      const mapped = studioError(
-        'target_unavailable',
-        'vibe-studio: preview target has no live page for screencast',
-      )
-      await release()
-      state = 'failed'
-      lastError = mapped
-      throw mapped
-    }
-
-    const createSource = options.createSource
-    const created = createSource
-      ? createSource(page, buffer)
-      : createScreencastSource({ page, buffer, fps, quality })
-    source = created
-    try {
-      await created.start()
-    } catch (error) {
-      const mapped = toPreviewError(error)
-      await release()
-      state = 'failed'
-      lastError = mapped
-      throw mapped
-    }
-
-    inputSupported = session.capabilities.input
-    if (inputSupported) {
-      inputDispatcher =
-        options.createInput?.(page) ?? createPreviewInputDispatcher({ page })
-    }
-
-    // Console capture is auxiliary: if CDP refuses Runtime.enable the preview
-    // still runs, but the snapshot stops advertising the capability.
-    let consoleReady = false
-    if (session.capabilities.console) {
-      const createdConsole =
-        options.createConsole?.(page) ?? createPreviewConsoleCollector({ page })
-      try {
-        await createdConsole.start()
-        consoleCollector = createdConsole
-        consoleReady = true
-      } catch {
-        await createdConsole.stop().catch(() => undefined)
-      }
-    }
-
-    // Network capture degrades the same way: an auxiliary CDP session that
-    // cannot start never blocks the preview itself.
-    let networkReady = false
-    if (session.capabilities.network) {
-      const createdNetwork =
-        options.createNetwork?.(page) ?? createPreviewNetworkCollector({ page })
-      try {
-        await createdNetwork.start()
-        networkCollector = createdNetwork
-        networkReady = true
-      } catch {
-        await createdNetwork.stop().catch(() => undefined)
-      }
-    }
-
-    targetId = session.targetId
-    url = session.url
-    capabilities = {
-      ...session.capabilities,
-      ...(session.capabilities.console && !consoleReady ? { console: false } : {}),
-      ...(session.capabilities.network && !networkReady ? { network: false } : {}),
-    }
-    state = 'ready'
-    return snapshot()
-  }
-
-  async function input(event: unknown): Promise<PreviewInputAck> {
-    if (!isPreviewInputEvent(event)) {
-      throw studioError('invalid_input', 'vibe-studio: invalid preview input event', {
-        field: 'event',
-      })
-    }
-    if (state !== 'ready') {
-      throw studioError('target_unavailable', 'vibe-studio: preview is not running')
-    }
-    if (!inputSupported || !inputDispatcher) {
-      throw studioError('unsupported', 'vibe-studio: the target does not support input', {
-        capability: 'input',
-      })
-    }
-    return inputDispatcher.dispatch(event)
-  }
-
-  function requireConsole(): PreviewConsoleCollector {
-    if (state !== 'ready') {
-      throw studioError('target_unavailable', 'vibe-studio: preview is not running')
-    }
-    if (!consoleCollector) {
-      throw studioError('unsupported', 'vibe-studio: console capture is unavailable', {
-        capability: 'console',
-      })
-    }
-    return consoleCollector
-  }
-
-  function consoleList(query?: unknown): PreviewConsoleSnapshot {
-    if (query !== undefined && !isPreviewConsoleQuery(query)) {
-      throw studioError('invalid_input', 'vibe-studio: invalid console query', {
-        field: 'query',
-      })
-    }
-    return requireConsole().snapshot(query)
-  }
-
-  function consoleClear(): PreviewConsoleClearResult {
-    return requireConsole().clear()
-  }
-
-  function requireNetwork(): PreviewNetworkCollector {
-    if (state !== 'ready') {
-      throw studioError('target_unavailable', 'vibe-studio: preview is not running')
-    }
-    if (!networkCollector) {
-      throw studioError('unsupported', 'vibe-studio: network capture is unavailable', {
-        capability: 'network',
-      })
-    }
-    return networkCollector
-  }
-
-  function networkList(query?: unknown): PreviewNetworkSnapshot {
-    if (query !== undefined && !isPreviewNetworkQuery(query)) {
-      throw studioError('invalid_input', 'vibe-studio: invalid network query', {
-        field: 'query',
-      })
-    }
-    return requireNetwork().snapshot(query)
-  }
-
-  function networkClear(): PreviewNetworkClearResult {
-    return requireNetwork().clear()
-  }
-
-  async function networkBody(params: unknown): Promise<PreviewNetworkBody> {
-    if (!isPreviewNetworkBodyParams(params)) {
-      throw studioError('invalid_input', 'vibe-studio: invalid network body params', {
-        field: 'params',
-      })
-    }
-    return requireNetwork().body(params)
-  }
-
-  async function start(params: PreviewStartParams): Promise<PreviewSessionSnapshot> {
-    if (!isPreviewStartParams(params)) {
-      throw studioError('invalid_input', 'vibe-studio: invalid preview start params', {
-        field: 'params',
-      })
-    }
-    if (state === 'ready') return snapshot()
-    if (startPromise) return startPromise
-    if (stopPromise) await stopPromise
-    startPromise = runStart(params)
-    try {
-      return await startPromise
-    } finally {
-      startPromise = undefined
-    }
-  }
-
-  async function runStop(): Promise<PreviewSessionSnapshot> {
-    await release()
-    state = 'idle'
-    lastError = undefined
-    targetId = null
-    url = null
-    capabilities = null
-    return snapshot()
-  }
-
-  async function stop(): Promise<PreviewSessionSnapshot> {
-    if (startPromise) await startPromise.catch(() => undefined)
-    if (stopPromise) return stopPromise
-    stopPromise = runStop()
-    try {
-      return await stopPromise
-    } finally {
-      stopPromise = undefined
-    }
-  }
-
-  return {
-    buffer,
-    start,
-    stop,
-    status: snapshot,
-    input,
-    consoleList,
-    consoleClear,
-    networkList,
-    networkClear,
-    networkBody,
-    async dispose() {
-      await stop()
-    },
-  }
-}
-
-/** Registers the three unary methods; returns an idempotent unregister. */
+/** Registers the unary methods; returns an idempotent unregister. */
 export function registerPreviewMethods(
   registry: UnaryRegistry,
   service: PreviewService,
@@ -454,6 +78,18 @@ export function registerPreviewMethods(
   const offNetworkBody = registry.register(PREVIEW_NETWORK_BODY_METHOD, async (params) =>
     service.networkBody(params),
   )
+  // T025 toolbar: target list plus the three session mutations. Each validates
+  // inside the service so route and service cannot disagree about the shape.
+  const offTargets = registry.register(PREVIEW_TARGETS_METHOD, async () =>
+    service.listTargets(),
+  )
+  const offNavigate = registry.register(PREVIEW_NAVIGATE_METHOD, async (params) =>
+    service.navigate(params),
+  )
+  const offReload = registry.register(PREVIEW_RELOAD_METHOD, async () => service.reload())
+  const offViewport = registry.register(PREVIEW_VIEWPORT_METHOD, async (params) =>
+    service.setViewport(params),
+  )
   return () => {
     offStart()
     offStop()
@@ -464,6 +100,10 @@ export function registerPreviewMethods(
     offNetworkList()
     offNetworkClear()
     offNetworkBody()
+    offTargets()
+    offNavigate()
+    offReload()
+    offViewport()
   }
 }
 

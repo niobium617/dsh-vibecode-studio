@@ -10,7 +10,7 @@
 import type { Browser, BrowserContext, Page } from 'playwright-core'
 import { isStudioError, studioError, type StudioError } from '../../../contracts/errors'
 import { asSessionId } from '../../../contracts/ids'
-import type { TargetCapabilities, TargetSession } from '../../../contracts/target'
+import type { TargetCapabilities, TargetSession, TargetViewport } from '../../../contracts/target'
 import type {
   ScreencastPageLike,
   ScreencastSessionLike,
@@ -57,8 +57,11 @@ export interface WebTargetAdapterOptions {
 
 export interface WebTargetAdapter extends TargetAdapter {
   navigate(url: string): Promise<void>
+  reload(): Promise<void>
+  setViewport(viewport: TargetViewport): Promise<void>
   screenshot(): Promise<Uint8Array>
   screencastPage(): ScreencastPageLike | undefined
+  isAlive(): boolean
   readonly status: WebTargetAdapterStatus
   readonly session: TargetSession | undefined
   readonly lastError: StudioError | undefined
@@ -249,6 +252,41 @@ export function createWebTargetAdapter(
     if (session) session = { ...session, url: activePage.url() }
   }
 
+  async function reload(): Promise<void> {
+    const activePage = await requirePage()
+    let origin = ''
+    try {
+      origin = new URL(activePage.url()).origin
+    } catch {
+      // A closed/crashed page is reported by `requirePage`/Playwright below.
+    }
+    try {
+      await activePage.reload({ waitUntil: 'load', timeout: navigationTimeoutMs })
+    } catch (error) {
+      throw isStudioError(error) ? error : toNavigationError(error, origin)
+    }
+    if (session) session = { ...session, url: activePage.url() }
+  }
+
+  async function setViewport(viewport: TargetViewport): Promise<void> {
+    const activePage = await requirePage()
+    try {
+      await activePage.setViewportSize({ width: viewport.width, height: viewport.height })
+    } catch {
+      throw studioError('preview_failed', 'preview viewport could not be applied')
+    }
+  }
+
+  /**
+   * Playwright reports a crashed browser through the connection and a closed
+   * page through `isClosed`; either one means the session needs a restart.
+   */
+  function isAlive(): boolean {
+    if (status !== 'ready' || !browser || !page) return false
+    if (!browser.isConnected()) return false
+    return !page.isClosed()
+  }
+
   async function screenshot(): Promise<Uint8Array> {
     const activePage = await requirePage()
     try {
@@ -296,8 +334,11 @@ export function createWebTargetAdapter(
     capabilities: WEB_TARGET_CAPABILITIES,
     start,
     navigate,
+    reload,
+    setViewport,
     screenshot,
     screencastPage,
+    isAlive,
     stop,
     get status() {
       return status

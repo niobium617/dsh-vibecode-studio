@@ -11,7 +11,12 @@
  * module never invents its own credential scheme.
  */
 import { isStudioError, type StudioError } from './errors'
-import type { TargetCapabilities } from './target'
+import {
+  TARGET_KINDS,
+  type TargetCapabilities,
+  type TargetKind,
+  type TargetViewport,
+} from './target'
 import type { ConsoleEntry, NetworkEntry } from './telemetry'
 
 export const TRANSPORT_VERSION = 1
@@ -38,6 +43,12 @@ export const DEFAULT_PREVIEW_QUALITY = 70
 export const PREVIEW_START_METHOD = 'preview.session.start'
 export const PREVIEW_STOP_METHOD = 'preview.session.stop'
 export const PREVIEW_STATUS_METHOD = 'preview.session.status'
+/** Toolbar operations (T025); all reuse the shared unary route. */
+export const PREVIEW_NAVIGATE_METHOD = 'preview.session.navigate'
+export const PREVIEW_RELOAD_METHOD = 'preview.session.reload'
+export const PREVIEW_VIEWPORT_METHOD = 'preview.session.viewport'
+/** Registered adapters, so the toolbar's target select is data-driven. */
+export const PREVIEW_TARGETS_METHOD = 'preview.targets'
 /** Input events use the shared unary route rather than a dedicated route. */
 export const PREVIEW_INPUT_METHOD = 'preview.input'
 /** Console capture is read/clear over unary methods; no extra route (T023). */
@@ -116,7 +127,11 @@ export interface PreviewFrameMeta {
 export interface PreviewSessionSnapshot {
   readonly status: PreviewSessionState
   readonly targetId: string | null
+  /** Adapter kind serving the session; null while idle. */
+  readonly kind: TargetKind | null
   readonly url: string | null
+  /** Viewport the live page is rendered at; null while idle. */
+  readonly viewport: TargetViewport | null
   readonly capabilities: TargetCapabilities | null
   readonly frame: PreviewFrameMeta | null
   readonly fps: number
@@ -126,6 +141,8 @@ export interface PreviewSessionSnapshot {
 
 export interface PreviewStartParams {
   readonly url: string
+  /** Target adapter kind; defaults to "web". */
+  readonly kind?: TargetKind
   readonly viewport?: {
     readonly width: number
     readonly height: number
@@ -133,8 +150,35 @@ export interface PreviewStartParams {
   }
 }
 
-const PREVIEW_START_KEYS = new Set(['url', 'viewport'])
+export interface PreviewTargetSummary {
+  readonly id: string
+  readonly kind: TargetKind
+}
+
+export interface PreviewTargetsResult {
+  readonly targets: readonly PreviewTargetSummary[]
+}
+
+export interface PreviewNavigateParams {
+  readonly url: string
+}
+
+export interface PreviewViewportParams {
+  readonly viewport: {
+    readonly width: number
+    readonly height: number
+  }
+}
+
+const PREVIEW_START_KEYS = new Set(['url', 'kind', 'viewport'])
 const PREVIEW_VIEWPORT_KEYS = new Set(['width', 'height', 'deviceScaleFactor'])
+const PREVIEW_NAVIGATE_KEYS = new Set(['url'])
+const PREVIEW_SET_VIEWPORT_KEYS = new Set(['viewport'])
+const PREVIEW_SET_VIEWPORT_SIZE_KEYS = new Set(['width', 'height'])
+
+function isTargetKind(value: unknown): value is TargetKind {
+  return typeof value === 'string' && (TARGET_KINDS as readonly string[]).includes(value)
+}
 
 /**
  * Input wire contract (T021). Coordinates are fractions of the preview
@@ -444,6 +488,7 @@ export function isPreviewStartParams(value: unknown): value is PreviewStartParam
   if (Object.keys(candidate).some((key) => !PREVIEW_START_KEYS.has(key))) return false
   if (typeof candidate.url !== 'string') return false
   if (candidate.url.trim().length === 0 || candidate.url.length > 2048) return false
+  if (candidate.kind !== undefined && !isTargetKind(candidate.kind)) return false
   if (candidate.viewport === undefined) return true
   const viewport = candidate.viewport
   if (!viewport || typeof viewport !== 'object' || Array.isArray(viewport)) return false
@@ -454,6 +499,30 @@ export function isPreviewStartParams(value: unknown): value is PreviewStartParam
     return false
   }
   return true
+}
+
+/** Strict shape check; the adapter owns scheme and loopback checks. */
+export function isPreviewNavigateParams(value: unknown): value is PreviewNavigateParams {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const candidate = value as Record<string, unknown>
+  if (Object.keys(candidate).some((key) => !PREVIEW_NAVIGATE_KEYS.has(key))) return false
+  return (
+    typeof candidate.url === 'string' &&
+    candidate.url.trim().length > 0 &&
+    candidate.url.length <= 2048
+  )
+}
+
+/** Strict shape check; the Host validates the size range before resizing. */
+export function isPreviewViewportParams(value: unknown): value is PreviewViewportParams {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const candidate = value as Record<string, unknown>
+  if (Object.keys(candidate).some((key) => !PREVIEW_SET_VIEWPORT_KEYS.has(key))) return false
+  const viewport = candidate.viewport
+  if (!viewport || typeof viewport !== 'object' || Array.isArray(viewport)) return false
+  const size = viewport as Record<string, unknown>
+  if (Object.keys(size).some((key) => !PREVIEW_SET_VIEWPORT_SIZE_KEYS.has(key))) return false
+  return Number.isFinite(size.width) && Number.isFinite(size.height)
 }
 
 /**

@@ -7,7 +7,13 @@
  * halfway through a session.
  */
 import { studioError, type StudioError } from '../../contracts/errors'
-import type { TargetCapabilities, TargetConfig, TargetKind, TargetSession, TargetViewport } from '../../contracts/target'
+import type {
+  TargetCapabilities,
+  TargetConfig,
+  TargetKind,
+  TargetSession,
+  TargetViewport,
+} from '../../contracts/target'
 
 export const DEFAULT_VIEWPORT: TargetViewport = Object.freeze({
   width: 1280,
@@ -53,9 +59,19 @@ export interface TargetAdapter {
   readonly capabilities: TargetCapabilities
   start(config: ValidatedTargetConfig, options?: TargetStartOptions): Promise<TargetSession>
   navigate?(url: string): Promise<void>
+  /** Reloads the current page in place (toolbar refresh). */
+  reload?(): Promise<void>
+  /** Resizes the live page; DPR changes need a restart and are not offered. */
+  setViewport?(viewport: TargetViewport): Promise<void>
   screenshot?(): Promise<Uint8Array>
   /** Present when `capabilities.screencast` is true; undefined before start. */
   screencastPage?(): ScreencastPageLike | undefined
+  /**
+   * Liveness probe. A crashed browser or closed page reports false while the
+   * session still holds its handles; the preview service turns that into a
+   * visible `failed` snapshot that can be restarted.
+   */
+  isAlive?(): boolean
   stop(): Promise<void>
 }
 

@@ -8,10 +8,10 @@
 ## 1. 当前快照
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，M1 已完成，进入 M2）**。
-- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）、T023 Console 采集与抽屉、T024 Network 采集与抽屉。
-- 阶段：**M1 已完成并通过 G1；M2 进行中**，T016–T024 已完成，下一项 **T025 预览工具栏与生命周期**。
+- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）、T023 Console 采集与抽屉、T024 Network 采集与抽屉、T025 预览工具栏与生命周期。
+- 阶段：**M1 已完成并通过 G1；M2 进行中**，T016–T025 已完成，下一项 **T026 G2 Preview 评审**。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
-- T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T023 已提交到该分支，尚未推送/合并。S3/S4/T010/T014/T015/T020/T021/T022 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
+- T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T024 已提交到该分支（T025 待提交），尚未推送/合并。S3/S4/T010/T014/T015/T020/T021/T022/T025 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
 
 环境：
@@ -370,6 +370,34 @@
   - 手动 Host（真实 Edge + Vite fixture，`.tmp/t023-host.mjs`，`.tmp/logs/t023-host.json`，`ok:true`）：info/warn/error 与异步 throw 入缓冲（异常文本含 `boom-exception`）；510 条 `console.log` 后恰为 500 条、`lastSeq=517`、`dropped=17`、首条 `bulk-10`；clear 返回 `{cleared:500,lastSeq:517}` 且 seq 不变，随后 `console.error('after-clear')` 得到唯一 `console-518`；停止后目标 Edge 全退。
 - 计划偏差/限制：T023 验证只要求 integration + component，未做 Web/隔离 Desktop 载体手测；异常 `description` 可能自带堆栈，受单条文本上限约束；清空只清 Host 缓冲，页面自身 `console.clear()` 被忽略（按 type 过滤）。
 
+### T024 — Network 采集与抽屉（已完成）
+
+- 目标：CDP Network 事件；请求/响应摘要；body 按需；上限与脱敏；UI。
+- 结果：
+  - `src/contracts/transport.ts`：新增 `preview.network.list` / `preview.network.clear` / `preview.network.body` 一元方法，`after`/`limit` 严格校验，`MAX_NETWORK_ENTRIES=300`、`MAX_NETWORK_BODY_BYTES=64 KiB`。
+  - `src/host/preview/network.ts`：独立 CDP 会话先挂 `requestWillBeSent`/`responseReceived`/`loadingFinished`/`loadingFailed` 再 `Network.enable`；请求/响应按 `requestId` 合并，4xx/5xx 记 `error`，`loadingFailed` 的 `canceled` 记 `aborted`；header 上限 64 条、单值 512 字节并先 `redactHeaders`，URL 先 `redactUrl` 再截 512 字节；ring buffer 300 条 / 256 KiB；revision 游标让 pending 行更新后重发；body 仅按需读取并按 UTF-8/base64 截断；`stop()` 移除监听、detach、清空。
+  - `src/host/preview/route.ts`：`release()` 顺序 console → network → input → adapter；能力缺失 `unsupported`，未运行 `target_unavailable`。
+  - `src/client/preview/NetworkDrawer.tsx`：500 ms revision 增量轮询、按 id 原位更新、`clearEpoch` 防回填、All/Failed 过滤、4xx/5xx 标记、清空同步 Host、展开懒加载 body 并缓存、纯文本渲染；仅当 `capabilities.network` 为 true 时挂载；en/zh-CN 文案补齐。
+- 验证：
+  - `pnpm exec vitest run tests/integration/network tests/component/preview/network-drawer.test.tsx`：3 文件 / 27 用例通过；全量 `pnpm test`：38 文件 / 287 用例通过；`pnpm typecheck` 0 error；`pnpm build` host 134.2 KiB / client 102.1 KiB。
+- 计划偏差/限制：T024 验证只要求 integration + component，未做真实 Edge 手测；POST body/WebSocket/SSE 未采集；T025 已在隔离 Desktop 确认抽屉有数据。
+
+### T025 — 预览工具栏与生命周期（已完成）
+
+- 目标：工具栏（目标/URL/刷新/视口/外部打开）；浏览器崩溃/断线提示；关 tab/停目标清理。
+- 结果：
+  - `src/contracts/transport.ts`：新增 `preview.session.navigate` / `preview.session.reload` / `preview.session.viewport` / `preview.targets` 四个一元方法；`PreviewSessionSnapshot` 增加 `kind`，`PreviewStartParams` 增加可选 `kind`（仅 `web` 已实现）；URL 1..2048 去空白、viewport 有限数值的严格校验；不新增全局路由。
+  - `src/host/preview/session.ts`（服务从 `route.ts` 迁入）：`snapshot()`/stream/`start()` 调 `checkHealth()`，adapter `isAlive()` 为 false 置 `failed` + `target_unavailable`，只提示不自动重连；重启先 `release()` 旧句柄；reload 无实现时回退 `navigate(url)`；`setViewport` 复用目标配置校验并保留 `deviceScaleFactor`，越界 `invalid_input`；`listTargets()` 仅暴露 `{id,kind}`。
+  - `src/host/targets/web/adapter.ts`：新增 `reload`/`setViewport`/`isAlive`（`ready && browser.isConnected() && !page.isClosed()`）；registry 可选方法校验扩展。
+  - `src/client/preview/Toolbar.tsx`：目标下拉、URL 表单（Start/Go）、Reload、视口 64–7680 Apply、外部打开仅 loopback、状态行；崩溃提示 `role="alert"` + Restart/Stop。
+  - `src/client/preview/lifecycle.ts`：模块级 active 标记区分内部 tab 切换与面板关闭，仅 shell 卸载调用 stop（15 s 超时），失败不复活标记。
+  - `src/client/preview/Canvas.tsx`：1 s 状态轮询、500 ms 帧统计、动作 busy/错误包装、崩溃后显式重启；`local-url.ts` 校验 loopback；en/zh-CN 文案补齐。
+- 验证：
+  - `pnpm exec vitest run tests/integration/preview/session-lifecycle.test.ts tests/component/preview/toolbar.test.tsx tests/unit/preview/lifecycle.test.ts`：3 文件 / 14 用例通过；全量 `pnpm test`：41 文件 / 301 用例通过；`pnpm typecheck` 0 error；`pnpm build` host 140.5 KiB / client 115.1 KiB。
+  - 手动 Host（真实 Edge + Vite fixture，`.tmp/t025-host.mjs`，`.tmp/logs/t025-host.json`，`ok:true`）：navigate/reload/viewport 生效；崩溃 101 ms 检出且 1.5 s 后仍 `failed`、Edge 进程 0；重启为新会话；stop 调用 301 ms、进程 4471 ms 内全退、无孤儿。
+  - 手动 Desktop（隔离 `DSH_HOME` + 独立 userData，CDP 9224，`.tmp/t025-desktop.mjs`，`.tmp/logs/t025-desktop.json`，`ok:true`）：工具栏刷新/视口 900×700/导航生效；Console/Network 抽屉在真实载体有数据；杀 Edge 后出现断开提示且不自动重启；Restart 恢复；内部切“检查”再回“预览”会话保留且无重载；停止后 3820 ms 内 Edge 全退、无孤儿；真实 desktop profile 哈希前后一致。
+- 计划偏差/限制：崩溃后不自动重连（需显式 Restart）；改 DPR 需重启会话；“关闭整个 DSH 面板”触发的 stop 只有单测覆盖；Desktop 的 `window.open` 返回 null 属正常拦截路径。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -486,8 +514,9 @@
 - **T021 已完成**：输入转发点击/滚轮/键盘在 Host 直连、Web 与隔离 Desktop 均达目标，端到端最大 39.3 ms；证据 `.tmp/logs/t021-{host,web,desktop}.json`。
 - **T022 已完成**：中文组合只提交最终文本，Web/Desktop 提交 `你好，世界`、无中间态请求；失败提示与恢复、粘贴回退均验证，端到端最大 59.6 ms（Desktop）/ 15.7 ms（Web）；证据 `.tmp/logs/t022-{host,web,desktop}.json`。限制：CDP 模拟 IME 不能替代 Microsoft Pinyin 系统级手测。
 - **T023 已完成**：console/exception 采集、500 条上限、seq 单调、清空与抽屉过滤均通过单测与真实 Edge 手测；证据 `.tmp/logs/t023-host.json`。
-- **T024 已完成**：Network 事件采集（4xx/5xx 标记、header/URL 脱敏、300 条 / 256 KiB 上限、body 按需 64 KiB 截断）、revision 游标增量轮询与网络抽屉（原位更新、Failed 过滤、body 懒加载）均通过集成与组件测试；未做真实 Edge 手测，载体布局留 T025/G2。
-- **T025 及以后（M2）**：预览工具栏/生命周期 → G2 评审。T020/T021 已接好预览会话与输入覆盖层；T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 将随截图与上下文任务逐步消费；T009 的 contracts 由后续页面逐步引用。
+- **T024 已完成**：Network 事件采集（4xx/5xx 标记、header/URL 脱敏、300 条 / 256 KiB 上限、body 按需 64 KiB 截断）、revision 游标增量轮询与网络抽屉（原位更新、Failed 过滤、body 懒加载）均通过集成与组件测试；T025 已在隔离 Desktop 确认抽屉有数据。
+- **T025 已完成**：工具栏 navigate/reload/viewport/外部打开、崩溃提示与显式重启、内部切 tab 保会话、停止后 5 s 内进程全退且无孤儿，Host 真 Edge 与隔离 Desktop 均 `ok:true`；证据 `.tmp/logs/t025-{host,desktop}.json`。限制：崩溃不自动重连、改 DPR 需重启。
+- **T026（M2）**：G2 Preview 评审，复核闭环/性能（10 fps、输入、Console/Network、停止清理）与 SPEC 条目。T020/T021 已接好预览会话与输入覆盖层；T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 将随截图与上下文任务逐步消费；T009 的 contracts 由后续页面逐步引用。
 - **S2 遗留**：如果上游未来公开附件创建/释放 API，再评估直接截图附件；先复测切会话保留和失败清理。
 - **Desktop 遗留**：S2 跨会话未测到，后续需要能稳定创建第二个命名会话的测试环境。
 - **成本**：避免无必要的全仓读取和重复验收；每个任务完成即提交、记录、清理进程。
@@ -525,6 +554,7 @@ pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 - 测试 harness：`vitest.config.ts`、`playwright.config.ts`、`fixtures/vite-basic/`、`tests/e2e/fixture.spec.ts`。
 - 配置存储：`src/host/studio/store.ts`、`tests/unit/studio-store.test.ts`。
 - Web 预览：`src/host/targets/web/{adapter,launch}.ts`、`tests/integration/web-adapter/`、`tests/helpers/png.ts`。
+- 预览生命周期：`src/host/preview/session.ts`、`src/client/preview/{Toolbar.tsx,lifecycle.ts,local-url.ts}`、`tests/integration/preview/session-lifecycle.test.ts`、`.tmp/logs/t025-{host,desktop}.json`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。
 - 发布检查：[PUBLISHING.md](./PUBLISHING.md)。
 - 私有仓库：`https://github.com/niobium617/dsh-vibecode-studio`（当前为 private）。

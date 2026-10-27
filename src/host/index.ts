@@ -7,11 +7,11 @@
  */
 import { Config, resolveConfig, type VibeStudioConfig } from './config'
 import {
-  createPreviewService,
   registerPreviewMethods,
   registerPreviewRoutes,
   type PreviewService,
 } from './preview/route'
+import { createPreviewService } from './preview/session'
 import {
   createStudioSettingsService,
   registerSettingsMethods,
@@ -53,12 +53,9 @@ export type {
   TargetStartOptions,
   ValidatedTargetConfig,
 } from './targets/types'
-export {
-  createPreviewService,
-  registerPreviewMethods,
-  registerPreviewRoutes,
-} from './preview/route'
-export type { PreviewService, PreviewServiceOptions } from './preview/route'
+export { registerPreviewMethods, registerPreviewRoutes } from './preview/route'
+export { createPreviewService } from './preview/session'
+export type { PreviewService, PreviewServiceOptions } from './preview/session'
 export { createPreviewFrameBuffer, PreviewFrameBuffer } from './preview/frame-buffer'
 export type { FrameListener, PreviewFrame } from './preview/frame-buffer'
 export { createScreencastSource } from './preview/screencast'

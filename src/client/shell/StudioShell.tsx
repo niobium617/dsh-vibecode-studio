@@ -6,6 +6,7 @@
 import * as React from 'react'
 import { browserLocale, createTranslator, type Locale } from '../i18n'
 import { PreviewPage } from '../preview/Canvas'
+import { stopPreviewSession } from '../preview/lifecycle'
 import { SettingsPage } from './settings/SettingsPage'
 import { EmptyState, ShellErrorBoundary } from './StateViews'
 import { useShellState, setActiveTab } from './store'
@@ -76,6 +77,15 @@ export function StudioShell({ locale }: StudioShellProps): React.ReactElement {
     STUDIO_TAB_DEFINITIONS.find((tab) => tab.id === activeTab) ??
     STUDIO_TAB_DEFINITIONS.find((tab) => tab.id === DEFAULT_TAB)!
   const panelId = `vibe-studio-panel-${current.id}`
+
+  // Closing the DSH panel unmounts the shell; an internal tab switch only
+  // unmounts PreviewPage and keeps the live target. The lifecycle flag makes
+  // that distinction, so a plain shell teardown never calls the Host.
+  React.useEffect(() => {
+    return () => {
+      void stopPreviewSession()
+    }
+  }, [])
 
   return (
     <div data-vibe-shell="1" style={rootStyle}>
