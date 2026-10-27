@@ -8,10 +8,10 @@
 ## 1. 当前快照
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，M1 已完成，进入 M2）**。
-- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）。
-- 阶段：**M1 已完成并通过 G1；M2 进行中**，T016–T022 已完成，下一项 **T023 Console 采集与抽屉**（依赖 T020/T021 的预览会话与覆盖层）。
+- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）、T023 Console 采集与抽屉。
+- 阶段：**M1 已完成并通过 G1；M2 进行中**，T016–T023 已完成，下一项 **T024 Network 采集与抽屉**（复用预览会话与 CDP 连接）。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
-- T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T022 已提交到该分支（截至实现提交 `d5e6ef1`），尚未推送/合并。S3/S4/T010/T014/T015/T020/T021/T022 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
+- T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T023 已提交到该分支，尚未推送/合并。S3/S4/T010/T014/T015/T020/T021/T022 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
 
 环境：
@@ -357,6 +357,19 @@
   - 手动 Desktop（隔离 `DSH_HOME` + 独立 userData，CDP 9223，`.tmp/t022-desktop.mjs`，`.tmp/logs/t022-desktop.json`，`ok:true`）：同一流程通过；200 请求最大 59.6 ms / 平均 16.7 ms；目标 Edge 全退、真实 profile 未改。
 - 计划偏差/限制：自动化使用 CDP IME 模拟组合，未替代 Microsoft Pinyin 系统级手测；Desktop 的 500 注入通过渲染进程 fetch 包装完成（`dsh-app://` 不能被 Playwright route 拦截），未改产品代码。
 
+### T023 — Console 采集与抽屉（已完成）
+
+- 目标：CDP `Runtime.consoleAPICalled` / `exceptionThrown`；有界 ring buffer；UI 过滤与清空。
+- 结果：
+  - `src/contracts/transport.ts`：新增 `preview.console.list` / `preview.console.clear` 一元方法与 `PreviewConsoleQuery`/`Snapshot`/`ClearResult`；`after`/`limit` 只允许安全非负整数，`limit` 1–500，拒绝未知键。
+  - `src/host/preview/console.ts`：独立 CDP 会话在 `Runtime.enable` 前挂两个监听（避免漏事件）；console 按类型映射 info/debug/warn/error，异常合并 `exceptionDetails.text` 与 `description`；来源 `redactUrl` 后截 512 字节、行号/列号 +1；文本去 ANSI/控制字符、归一 CRLF、按 UTF-8 截断；ring buffer 默认 500 条 / 64 KiB / 单条 500 字节，逐出最旧并累计 `dropped`，`seq` 跨 `clear()` 单调；`stop()` 用 `off?.()` 移除监听、detach、清空缓冲，`start`/`stop` 竞态用 epoch 保护；`Runtime.enable` 失败统一 `preview_failed` 并清理会话。
+  - `src/host/preview/route.ts`：`release()` 先停 console 采集器再停 input/adapter；`consoleList`/`consoleClear` 校验 query 与运行态；采集器启动失败只把快照能力降为 `console:false`，预览仍 `ready`；Web adapter 能力补 `console: true`。
+  - `src/client/preview/ConsoleDrawer.tsx`：1 s 轮询 `after` 增量、按 id 去重、本地 500 上限、Host `lastSeq` 回退时全量重取、`clearEpoch` 防在途轮询回填；all/error/warn/info 过滤（info 含 debug）、错误/警告计数、清空同时清 Host 与本地；失败显示 `role="status"`，来源按纯文本渲染；`Canvas` 仅在 `capabilities.console` 为 true 时挂载；en/zh-CN 文案补齐。
+- 验证：
+  - `pnpm exec vitest run tests/integration/console tests/component/preview/console-drawer.test.tsx`：3 文件 / 22 用例通过；全量 `pnpm test`：35 文件 / 260 用例通过；`pnpm typecheck` 0 error；`pnpm build` host 116.1 KiB / client 83.4 KiB。
+  - 手动 Host（真实 Edge + Vite fixture，`.tmp/t023-host.mjs`，`.tmp/logs/t023-host.json`，`ok:true`）：info/warn/error 与异步 throw 入缓冲（异常文本含 `boom-exception`）；510 条 `console.log` 后恰为 500 条、`lastSeq=517`、`dropped=17`、首条 `bulk-10`；clear 返回 `{cleared:500,lastSeq:517}` 且 seq 不变，随后 `console.error('after-clear')` 得到唯一 `console-518`；停止后目标 Edge 全退。
+- 计划偏差/限制：T023 验证只要求 integration + component，未做 Web/隔离 Desktop 载体手测；异常 `description` 可能自带堆栈，受单条文本上限约束；清空只清 Host 缓冲，页面自身 `console.clear()` 被忽略（按 type 过滤）。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -472,7 +485,8 @@
 - **T019–T020 已完成**：dev server supervisor（真实 Vite 验证）与 screencast/帧路由/canvas（Web 断流回退与恢复、隔离 Desktop 手测）均通过；证据 `.tmp/logs/t019-manual.json`、`.tmp/logs/t020-{web,desktop}.json`。
 - **T021 已完成**：输入转发点击/滚轮/键盘在 Host 直连、Web 与隔离 Desktop 均达目标，端到端最大 39.3 ms；证据 `.tmp/logs/t021-{host,web,desktop}.json`。
 - **T022 已完成**：中文组合只提交最终文本，Web/Desktop 提交 `你好，世界`、无中间态请求；失败提示与恢复、粘贴回退均验证，端到端最大 59.6 ms（Desktop）/ 15.7 ms（Web）；证据 `.tmp/logs/t022-{host,web,desktop}.json`。限制：CDP 模拟 IME 不能替代 Microsoft Pinyin 系统级手测。
-- **T023 及以后（M2）**：Console 采集与抽屉 → Network → 后续任务。T020/T021 已接好预览会话与输入覆盖层；T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 将随截图与上下文任务逐步消费；T009 的 contracts 由后续页面逐步引用。
+- **T023 已完成**：console/exception 采集、500 条上限、seq 单调、清空与抽屉过滤均通过单测与真实 Edge 手测；证据 `.tmp/logs/t023-host.json`。
+- **T024 及以后（M2）**：Network 采集与抽屉 → 预览工具栏/生命周期 → G2 评审。T020/T021 已接好预览会话与输入覆盖层；T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 将随截图与上下文任务逐步消费；T009 的 contracts 由后续页面逐步引用。
 - **S2 遗留**：如果上游未来公开附件创建/释放 API，再评估直接截图附件；先复测切会话保留和失败清理。
 - **Desktop 遗留**：S2 跨会话未测到，后续需要能稳定创建第二个命名会话的测试环境。
 - **成本**：避免无必要的全仓读取和重复验收；每个任务完成即提交、记录、清理进程。
