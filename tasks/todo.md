@@ -353,12 +353,21 @@
   - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm test` 56 文件 / 446 用例；`pnpm build` host 192.8 KiB / client 179.4 KiB。日志 `.tmp/logs/t031-{typecheck,test,build}.log`。
   - 限制：队列只在面板会话内存中，重开 DSH 面板即清空（持久化/历史属 T033）；未做 `vibe-dev` + headless Edge 的真实气泡定位截图，3 步闭环的真机证据留 G3/T034；尚未接 composer，发送目前落到剪贴板；气泡位置在视口变化后不重算（拾取时一次计算），滚动页面时元素框仍是拾取瞬间的值。
 
-### - [ ] T032 Composer handoff
+### - [x] T032 Composer handoff
 
 - **目标**：按 S2 结论走公开 API 插入草稿；不自动发送；截图/剪贴板回退。
 - **验收**：文本 100% 成功；不自动提交；附件路径或剪贴板回退可用；切会话不串。
 - **验证**：手动 Web/Desktop + integration。
 - **文件**：`src/client/inspect/handoff.ts`、`src/client/inspect/handoff.test.ts`。
+- **验证结果（2026-10-28）**：
+  - 桥接：`src/client/inspect/handoff.ts` 用 `conversation.input.left` 的作用域 slot（id + order + `inject: (sessionId) => ({ sessionId })`）取公开 `inputActions`；模块级 `Map<sessionId, attachment>` + `activeSessionId`，只在快照变化时通知；`ComposerHandoffSlot` 为 null 渲染，只 attach/detach 并用 `useInput` 镜像草稿/阶段，不写输入。
+  - 插入：`handoffAnnotationText` 优先 `captureInsertion()` + `insertText(text, span)`（用户已有草稿时前置 `\n\n`），`insertText` 明确返回 `false` 时才 `setDraft(草稿 + 文本)`；抛错或没有 composer 时 `copyTextToClipboard` 回退。任何路径都不调用 `submit`，发送器 `createComposerHandoffSender` 返回“已插入对话草稿，尚未发送。”或剪贴板文案。
+  - 接线：`src/client/index.ts` 注册 slot；`StudioShell.tsx` 把发送器注入 T031 `AnnotationQueue` 的 `send`；两语各 +1 key（`annotation.item.inserted`），复用 `renderAnnotationText`。
+  - 验收对应：`tests/component/annotation/composer-handoff.test.tsx` 20 用例覆盖光标插入/分隔符/`false`→`setDraft`/抛错与缺 composer→剪贴板/从不 submit/会话隔离（后挂载生效、过期 detach 忽略、退回上一会话、各会话草稿独立）/快照稳定性与通知次数/两语文案；`tests/component/annotation` 4 文件 / 52 用例。
+  - 手动 Web（`.tmp/logs/t032-web.json`，`ok:true`）：真实会话拾取 → 队列 1 → 发送后 composer 含完整标注、面板外 marker 0、3 s 后仍在（未自动提交）、队列清空、草稿按会话持久化（`localStorage['dsh.conversation.<id>']`）；新建会话 composer 为空且新会话草稿不含 marker；切回原会话草稿仍在、marker 仅出现在 composer；console 0 error。
+  - 手动隔离 Desktop（`.tmp/logs/t032-desktop.json`，`ok:true`）：拾取 `#root > main > section:nth-of-type(2) > form`（唯一 1）→ 保存 → 发送后状态“已插入对话草稿，尚未发送。”、composer 含完整标注、面板外 0（点击前/后/3 s 后）、队列清空、草稿按会话持久化；停止预览目标 Edge 9 个 PID → 0、真实 `desktop` profile 哈希未变；3 条启动期 503 属隔离宿主预热噪声，无 pageerror。
+  - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/component/annotation` 4 文件 / 52 用例；`pnpm test` 57 文件 / 466 用例；`pnpm build` host 192.8 KiB / client 184.7 KiB。日志 `.tmp/logs/t032-{typecheck,test,build}.log`。
+  - 限制：未接附件（S2 无公开附件 API，截图仍“复制 + 手动粘贴”，T034/G3 复核）；隔离 Desktop 载体点 `新建会话` 不建会话（`.tmp/logs/t032-desktop-probe{,2}.json`：行不变、无 toast、无报错），跨会话隔离以 Web 手动 + 组件测试为准；草稿持久化依赖 DSH 自身 `localStorage`，本项目不另存。
 
 ### - [ ] T033 标注历史
 
