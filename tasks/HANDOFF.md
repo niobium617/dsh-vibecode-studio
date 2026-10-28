@@ -87,7 +87,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 - 关键约束（后续任务沿用）：适配器同样经 `toString()` 序列化，必须自包含（`MAX_*`、`cleanFile` 等写在函数体内）；页面对象属性必须 enumerable 才在 `Object.keys` 里；Vite JS API 不重置 `NODE_ENV`，测试里 build 前须显式设 `production`，否则 dev server 先启动会让 Vue/Svelte 生产产物仍带源码。
 - 遗留：源码行依赖目标项目 dev 构建插件（React 19 需 inspector babel 插件）；Vue `__file` 回退无行号、不计命中；Svelte 4 的 `add_location` 未单独适配；真实项目版本差异留 G3。
 - 环境提示：`pnpm test:e2e` 紧接 `pnpm test` 时，Playwright 的 Edge 可能尚未退完，`picker-edge.test.ts` 的“无残留进程”断言会误报；两个命令间留几秒或单独重跑。
-- 提交：`0e64b1b feat(inspect): T029 source adapters for React, Vue, Svelte`（`task/m3-inspect`，未 push）。
+- 提交：`ecbe9cd feat(inspect): T029 source adapters for React, Vue, Svelte`（`task/m3-inspect`，未 push）。
 
 ### T026 遗留
 
