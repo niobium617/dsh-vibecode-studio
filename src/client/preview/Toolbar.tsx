@@ -19,6 +19,7 @@ import type {
   PreviewTargetSummary,
 } from '../../contracts/transport'
 import { createTranslator, type Locale } from '../i18n'
+import { PickToggle } from '../inspect/Picker'
 import { isLocalPreviewUrl } from './local-url'
 import type { PreviewTransportStats } from './transport'
 
@@ -39,6 +40,10 @@ export interface ToolbarProps {
   readonly stats: PreviewTransportStats | null
   /** Measured preview stage, used by the "fit panel" viewport preset. */
   readonly stageSize?: StageSize | null
+  /** Pick mode is on in the target page (T027). */
+  readonly picking?: boolean
+  /** The live target advertises `pick`; the toggle disables itself otherwise. */
+  readonly canPick?: boolean
   onKindChange(kind: TargetKind): void
   onUrlChange(url: string): void
   /** Submits the URL: starts an idle session, navigates a live one. */
@@ -47,6 +52,8 @@ export interface ToolbarProps {
   onReload(): void
   onViewportChange(viewport: Pick<TargetViewport, 'width' | 'height'>): void
   onOpenExternal(): void
+  /** Toggles pick mode; omitted hosts and idle sessions render no toggle. */
+  onPickToggle?(): void
 }
 
 /** Built-in presets; custom sizes live in Settings → Preview. */
@@ -241,6 +248,8 @@ export function Toolbar({
   busy,
   stats,
   stageSize,
+  picking = false,
+  canPick = false,
   onKindChange,
   onUrlChange,
   onSubmit,
@@ -248,6 +257,7 @@ export function Toolbar({
   onReload,
   onViewportChange,
   onOpenExternal,
+  onPickToggle,
 }: ToolbarProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
   const state = snapshot?.status ?? 'idle'
@@ -533,6 +543,15 @@ export function Toolbar({
         <button type="submit" style={buttonStyle} disabled={disabled}>
           {submitLabel}
         </button>
+        {ready && onPickToggle ? (
+          <PickToggle
+            locale={locale}
+            picking={picking}
+            available={canPick}
+            disabled={disabled}
+            onToggle={onPickToggle}
+          />
+        ) : null}
         {ready ? (
           <button
             type="button"

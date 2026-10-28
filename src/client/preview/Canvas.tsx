@@ -30,6 +30,7 @@ import {
   type PreviewTargetsResult,
 } from '../../contracts/transport'
 import { createTranslator, type Locale } from '../i18n'
+import { PickCard, usePicker } from '../inspect/Picker'
 import { callUnary } from '../transport/client'
 import { ConsoleDrawer, type ConsoleCounts } from './ConsoleDrawer'
 import { InputLayer } from './InputLayer'
@@ -171,6 +172,21 @@ const inputHintStyle: React.CSSProperties = {
   pointerEvents: 'none',
 }
 
+const pickHintStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: 8,
+  left: 8,
+  right: 8,
+  zIndex: 2,
+  margin: 0,
+  padding: '2px 6px',
+  borderRadius: 4,
+  background: 'rgba(59, 130, 246, 0.88)',
+  color: '#fff',
+  font: '11px/1.4 system-ui, sans-serif',
+  pointerEvents: 'none',
+}
+
 function drawerLayerStyle(open: boolean): React.CSSProperties {
   return {
     display: open ? 'grid' : 'none',
@@ -231,6 +247,21 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
   const [networkCounts, setNetworkCounts] = React.useState<NetworkCounts>({
     total: 0,
     failed: 0,
+  })
+
+  const state = snapshot?.status ?? 'idle'
+  const ready = state === 'ready'
+  // Stop releases the host collectors before the session reports idle. Keep the
+  // drawers from polling that half-torn-down session (it answers `unsupported`)
+  // and close any open drawer as soon as the user asks to stop.
+  const stopping = busy === 'stop'
+  const canPick = ready && !stopping && snapshot?.capabilities?.pick === true
+
+  // The picker polls the Host, which owns the page overlay; the panel only
+  // reads its snapshot (T027).
+  const picker = usePicker({
+    enabled: canPick,
+    onError: (failure) => setError(errorMessage(failure)),
   })
 
   const stageRef = React.useRef<HTMLDivElement | null>(null)
@@ -490,12 +521,6 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
     window.open(target, '_blank', 'noopener,noreferrer')
   }
 
-  const state = snapshot?.status ?? 'idle'
-  const ready = state === 'ready'
-  // Stop releases the host collectors before the session reports idle. Keep the
-  // drawers from polling that half-torn-down session (it answers `unsupported`)
-  // and close any open drawer as soon as the user asks to stop.
-  const stopping = busy === 'stop'
   const canConsole = ready && !stopping && snapshot?.capabilities?.console === true
   const canNetwork = ready && !stopping && snapshot?.capabilities?.network === true
 
@@ -534,6 +559,8 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
         busy={busy}
         stats={stats}
         stageSize={stageSize}
+        picking={picker.picking}
+        canPick={canPick}
         onKindChange={setKind}
         onUrlChange={setUrl}
         onSubmit={() => void (ready ? handleNavigate() : handleStart())}
@@ -541,6 +568,7 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
         onReload={() => void handleReload()}
         onViewportChange={(viewport) => void handleViewport(viewport)}
         onOpenExternal={handleOpenExternal}
+        onPickToggle={picker.toggle}
       />
 
       <div ref={stageRef} data-vibe-stage="1" style={stageStyle}>
@@ -556,6 +584,7 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
             <InputLayer
               canvasRef={canvasRef}
               locale={locale}
+              picking={picker.picking}
               onError={(failure) => {
                 if (mountedRef.current) setError(errorMessage(failure))
               }}
@@ -596,10 +625,20 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
           </div>
         ) : null}
 
-        {ready ? (
+        {ready && !picker.picking ? (
           <p data-vibe-input-hint="1" style={inputHintStyle}>
             {t('preview.input.hint')}
           </p>
+        ) : null}
+
+        {picker.picking ? (
+          <p data-vibe-pick-hint="1" role="status" style={pickHintStyle}>
+            {t('preview.pick.hint.active')}
+          </p>
+        ) : null}
+
+        {picker.pick ? (
+          <PickCard locale={locale} pick={picker.pick} onClose={picker.dismiss} />
         ) : null}
 
         {error === null ? null : (

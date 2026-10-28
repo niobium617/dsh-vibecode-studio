@@ -88,6 +88,16 @@ export type {
   PreviewConsoleCollectorOptions,
   PreviewConsoleStats,
 } from './preview/console'
+export {
+  buildPickerScript,
+  createPreviewPicker,
+  normalizePickedElement,
+  PICK_BINDING_NAME,
+  PICK_OVERLAY_ID,
+} from './inspect/inject'
+export type { PreviewPicker, PreviewPickerOptions } from './inspect/inject'
+export { buildSelector } from './inspect/selector'
+export type { SelectorResult } from './inspect/selector'
 export { createWebTargetAdapter, WEB_TARGET_CAPABILITIES } from './targets/web/adapter'
 export type {
   WebTargetAdapter,

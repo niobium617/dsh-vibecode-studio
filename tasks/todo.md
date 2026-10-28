@@ -280,12 +280,20 @@
 
 > 依赖：G2 + **U01**（画布几何定稿，T027 overlay 依赖它）。T028 可在 U01 后与 T027 并行。T030 依赖 T009；T031 依赖 T010/T030；T032 依赖 T031；T033 依赖 T030。
 
-### - [ ] T027 拾取 overlay 与选择器
+### - [x] T027 拾取 overlay 与选择器
 
 - **目标**：注入脚本、Shadow DOM overlay、hover/click、`Esc`、`Alt+Click`；选择器生成。
 - **验收**：不触发页面原点击；选择器唯一或标注“非唯一”；10 个元素抽测通过。
 - **验证**：复用 S4 harness + integration。
 - **文件**：`src/host/inspect/{inject.ts,selector.ts}`、`src/client/inspect/Picker.tsx`、tests。
+- **验证结果（2026-10-28）**：
+  - 静态检查：`pnpm typecheck` 0 error；`pnpm test` 49 文件 / 363 用例通过（新增 `unit/preview/picker.test.ts`、`component/inspect/{selector,page-script,picker-ui}.test.ts*`、`integration/preview/{picker-service,picker-edge}.test.ts`，toolbar 用例补 2 条）；`pnpm build` host 159.6 KiB / client 149.1 KiB。完整日志 `.tmp/logs/t027-full.log`、`.tmp/logs/t027-build.log`。
+  - 真实 Edge（`tests/integration/preview/picker-edge.test.ts`，Vite fixture 临时端口 + 900×700）：10 种形状全部通过——`data-testid`、唯一 `id`、`aria-label`、`name`、语义 class、`#pick-panel > ul > li:nth-of-type(2)`、重复 class、生成式 `css-1x2y3z`、开放 Shadow DOM `#inner`、深层 `div:nth-of-type(2) > span`；每次 hover 均画出 overlay，点击后 `element.getRootNode().querySelector(selector) === element` 为 true，box 与元素 rect 一致，`unique` 均为 true。
+  - 不触发页面原点击：10 次拾取期间页面自身 `click`/`pointerdown` 计数均为 0；关闭模式下的普通点击泄漏 `click:1` 且不计为拾取；`Alt+Click` 在关闭状态下仍拾取 `#email` 并吞掉事件；`Esc` 上报 cancel、移除 overlay、保留上一次拾取；teardown 后 overlay 移除、无 Edge 进程残留。
+  - 机制：CDP `Runtime.enable → Runtime.addBinding → Page.addScriptToEvaluateOnNewDocument → Runtime.evaluate`；选择器函数随脚本序列化（模块常量已移入函数体，避免页面内 free variable），`buildPickerScript` 拒绝 esbuild `keepNames` 泄漏；open Shadow DOM overlay（`all: initial`、z-index 2147483647、`pointer-events:none`）、仅顶层帧安装、`pointermove` 穿透 open shadow 命中、捕获阶段吞掉 press/click、重复安装替换旧实例。
+  - 降级与生命周期：脚本被页面拒绝时 `capabilities.pick=false` 且预览不失败；navigate/reload 重置 active；释放会话时先 dispose picker 再停 adapter（单测覆盖命令顺序与幂等）。
+  - 客户端：工具栏 `⌖` 开关（仅 ready 且 `capabilities.pick` 时可用）、拾取中顶栏提示 + 画布 crosshair、拾取卡片（selector 可整段选中复制、唯一/非唯一徽标、tag/classes/box、可收起）；轮询 active 300 ms / idle 1000 ms；Esc 由页面上报后 UI 自动同步。
+  - 限制：拾取卡片只做组件测试（T027 验证要求为 S4 harness + integration），未做 `vibe-dev` 截图；`text/html/role/source` 仍为空占位，由 T028/T029 填充。
 
 ### - [ ] T028 元素上下文提取
 

@@ -473,6 +473,20 @@
   - `main` 验证：`pnpm typecheck` 0 error、`pnpm test` 43 / 319、`pnpm build` host 140.5 KiB / client 139.2 KiB。
   - `task/m2-target-model` 本地与远端均保留，未删；下一任务从 `main` 新建分支。
 
+### T027 — 拾取 overlay 与选择器（已完成，2026-10-28）
+
+- 背景：S4 spike 已验证 CDP 注入 + Shadow DOM overlay 可行，本任务落成产品代码。契约新增 `PickSnapshot`（`active/seq/pick/ts`）与三个一元方法 `preview.pick.{start,stop,status}`。
+- 结果：
+  - `src/host/inspect/selector.ts`（新增）：`buildSelector()` 按 SPEC §6.4 分级——唯一 `data-testid` → 唯一 `id` → `aria-label`/`name`（先带 tag 再全局）→ 语义 class（跳过 >40 字符、非标识符、纯数字、`[_-][a-f0-9]{5,}`/`css-*` 生成式）→ `nth-of-type` 路径，并在最近的唯一 `id`/`data-testid` 祖先处截短；每个候选在 `getRootNode()` 作用域内验证，结果带 `unique`。
+  - `src/host/inspect/inject.ts`（新增）：`installVibePicker()` 在页面内创建 open Shadow DOM overlay（`all: initial` + `z-index: 2147483647` + `pointer-events:none`），仅顶层帧安装，`pointermove` 穿透 open shadow 命中并画框/标签，捕获阶段吞掉 press 与 click，`Esc` 取消（上报 `{kind:'cancel'}`），`Alt+Click` 免模式拾取，重复安装先 `dispose()` 旧实例；`createPreviewPicker()` 用独立 CDP 会话完成 `Runtime.enable → Runtime.addBinding → Page.addScriptToEvaluateOnNewDocument → Runtime.evaluate`，页面回传的 payload 全部重新校验/截断（selector 512、id 256、tag 64、≤8×64 classes、box ±1e6、≤8 KiB）。
+  - `src/host/preview/{session,route}.ts`、`src/host/targets/web/adapter.ts`、`src/host/index.ts`：picker 随会话创建，脚本被页面拒绝时把 `capabilities.pick` 降为 false 而不让预览失败；navigate/reload 后 `reset()`；释放顺序为 input → picker → adapter。
+  - `src/client/inspect/Picker.tsx`（新增）：`usePicker()` 轮询 `preview.pick.status`（active 300 ms / idle 1000 ms）、`PickToggle`（工具栏 `⌖`，`aria-pressed`）、`PickCard`（selector 整段可选中复制、唯一/非唯一徽标、tag/classes/box、可收起）。
+  - `src/client/preview/{Toolbar,Canvas,InputLayer}.tsx`：工具栏新增拾取开关；画布拾取中显示蓝色提示条与 crosshair（`data-vibe-picking`），拾取结果卡片浮在舞台右上；`src/client/locales/{en,zh-CN}.json` 新增 10 个 key，两语仍一致。
+  - 关键约束：`buildSelector`/`installVibePicker` 经 `Function.prototype.toString()` 序列化进页面，**模块级常量在页面里是 free variable**——选择器里的 `MAX_CLASS_CHARS`/`MAX_CLASS_CANDIDATES` 已移入函数体，`buildPickerScript` 另拒绝 esbuild `keepNames` 的 `__name(` 泄漏（否则页面内 ReferenceError 且点击无上报）。`Runtime.enable` 也是必需的，否则 `Runtime.bindingCalled` 不投递到该会话。
+  - 测试：新增 `tests/unit/preview/picker.test.ts`（11）、`tests/component/inspect/selector.test.ts`（9）、`tests/component/inspect/page-script.test.ts`（8）、`tests/component/inspect/picker-ui.test.tsx`（6）、`tests/integration/preview/picker-service.test.ts`（4）、`tests/integration/preview/picker-edge.test.ts`（真实 Edge，10 元素抽测），toolbar 用例补 2 条。
+- 验证：`pnpm typecheck` 0 error；`pnpm test` 49 文件 / **363 用例全通过**；`pnpm build` host 159.6 KiB / client 149.1 KiB。真实 Edge 验收细节见 `tasks/todo.md` T027“验证结果”。
+- 计划偏差/限制：拾取卡片只做组件测试，未做 `vibe-dev` 截图（任务验证要求为 S4 harness + integration）；`text/html/role/source` 仍是空占位，T028/T029 填充。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体

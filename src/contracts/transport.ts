@@ -17,6 +17,7 @@ import {
   type TargetKind,
   type TargetViewport,
 } from './target'
+import type { ElementContext } from './inspect'
 import type { ConsoleEntry, NetworkEntry } from './telemetry'
 
 export const TRANSPORT_VERSION = 1
@@ -58,6 +59,10 @@ export const PREVIEW_CONSOLE_CLEAR_METHOD = 'preview.console.clear'
 export const PREVIEW_NETWORK_LIST_METHOD = 'preview.network.list'
 export const PREVIEW_NETWORK_CLEAR_METHOD = 'preview.network.clear'
 export const PREVIEW_NETWORK_BODY_METHOD = 'preview.network.body'
+/** Element picking (T027); the page overlay reports through a CDP binding. */
+export const PREVIEW_PICK_START_METHOD = 'preview.pick.start'
+export const PREVIEW_PICK_STOP_METHOD = 'preview.pick.stop'
+export const PREVIEW_PICK_STATUS_METHOD = 'preview.pick.status'
 
 /** Unary requests carry input events and small commands; 64 KiB is ample. */
 export const MAX_UNARY_BODY_BYTES = 64 * 1024
@@ -137,6 +142,20 @@ export interface PreviewSessionSnapshot {
   readonly fps: number
   readonly quality: number
   readonly lastError?: StudioError
+}
+
+/**
+ * Picker state (T027). `seq` advances on every pick and cancel so the panel can
+ * tell a repeated pick of the same element from "no new event". The pick reuses
+ * `ElementContext`; T027 fills selector/identity/box, while text, html, role and
+ * source stay empty until T028/T029 extract them.
+ */
+export interface PickSnapshot {
+  readonly active: boolean
+  readonly seq: number
+  readonly pick: ElementContext | null
+  /** Host wall-clock time of the last pick or cancel; null before the first. */
+  readonly ts: number | null
 }
 
 export interface PreviewStartParams {
