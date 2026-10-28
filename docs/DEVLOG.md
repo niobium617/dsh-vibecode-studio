@@ -11,7 +11,7 @@
 - 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）、T023 Console 采集与抽屉、T024 Network 采集与抽屉、T025 预览工具栏与生命周期、T026 G2 Preview 评审（通过）。
 - 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），下一项 **T027 拾取 overlay 与选择器**。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
-- T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T026 已提交并推送到 `origin/task/m2-target-model`（`ebee1e5`，文档至 `92ecc32`），尚未合并入 `main`；其后 `9c19501..88a4070`（方向/手册文档、U01 实现、去重复标题）已推送到 `origin/task/m2-target-model`（`92ecc32..88a4070`，2026-10-28），尚未合并入 `main`。手动复测入口见 `docs/2026-10-28-手动测试手册.md`；界面/产品方向见 `docs/2026-10-28-界面与项目方向.md`。S3/S4/T010/T014/T015/T020/T021/T022/T025 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
+- T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T026 已提交并推送到 `origin/task/m2-target-model`（`ebee1e5`，文档至 `92ecc32`），尚未合并入 `main`；其后 `9c19501..88a4070`（方向/手册文档、U01 实现、去重复标题）已推送到 `origin/task/m2-target-model`（`92ecc32..88a4070`，2026-10-28）；`f64e928`（清理残留 locale key 与过期布局引用）推送后，以 `--no-ff` 合并入 `main`（合并提交 `768e129`，`main` 树与分支一致），功能分支保留。手动复测入口见 `docs/2026-10-28-手动测试手册.md`；界面/产品方向见 `docs/2026-10-28-界面与项目方向.md`。S3/S4/T010/T014/T015/T020/T021/T022/T025 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
 
 环境：
@@ -453,6 +453,25 @@
 - 过程中一次假失败：人工验证会话在跑时，`tests/integration/web-adapter/edge.test.ts` 的“无 Playwright Edge 残留”断言收到 8 个 pid——那是用户预览的 Edge，与测试共用 `playwright_chromiumdev_profile` 前缀；会话停止后同一用例通过。**教训：真机手测期间不要跑全局进程断言类集成测试。**
 - 影响：预览舞台可用高度增加约 56 px（同一面板高度下舞台占比进一步上升）；设置页与空状态页现在紧贴页签行。
   - 设置页“预览”分组只改目标页视口，不改 DSH 窗口尺寸；不新增 host 契约。
+
+### 残留清理（2026-10-28，`f64e928`）
+
+- 背景：U01 重写工具栏与设置页后，旧文案 key 与旧布局描述留在仓库里；合并入 `main` 前清一遍。
+- 结果：
+  - `src/client/locales/{en,zh-CN}.json`：删除 12 个无引用的 key（`state.loading`、`preview.state.label`、`preview.stats.frames`、`preview.reload.busy`、`preview.target.label`、`preview.viewport.{label,width,height,apply,applying}`、`preview.crash.{title,hint}`），140 → 128，两语仍完全一致；动态拼接的 key（`preview.console.filter.*`、`preview.network.filter.*`、`preview.network.outcome.*`、`preview.target.<kind>`）核对后保留。
+  - `tasks/todo.md`：U01 的“文件”字段改为实际改动文件（含 `PreviewTabs`/`PreviewSettings`，注明实现无 CSS）。
+  - `docs/SPEC-vibecoding-studio.md` §6.3：页签数量 4 → 5（预览/检查/标注/API/设置），并加实现注：视口/目标/停止已按 Layout v2 收进设置与“更多”，线框为设计基线。
+  - 其余核查通过：`src/` 无未被引用的模块、无孤立 CSS（全部内联样式）、无 `.tmp`/`lib`/`.vibe` 入库、`tsconfig` 仍开 `noUnusedLocals`/`noUnusedParameters`（这些 key 是 JSON 数据，编译器查不到）。
+- 验证：`pnpm typecheck` 0 error、`pnpm test` 43 文件 / 319 用例、`pnpm build` host 140.5 KiB / client 139.2 KiB（client 减少 1.1 KiB 即删掉的 key）。
+
+### M2 + M2.5 合并入 `main`（2026-10-28）
+
+- 前提：用户人工验证完成并批准合并。
+- 结果：
+  - 合并前 `main` 为 `01f9055`，是 `task/m2-target-model` 的祖先（领先 32 / 落后 0）。
+  - `git merge --no-ff task/m2-target-model -m "merge: M2 preview + M2.5 layout v2 (T016-T026, U01, G2 GO)"` → 合并提交 `768e129`，零冲突；`git diff --stat f64e928 HEAD` 为空，即 `main` 树与分支末端完全一致。
+  - `main` 验证：`pnpm typecheck` 0 error、`pnpm test` 43 / 319、`pnpm build` host 140.5 KiB / client 139.2 KiB。
+  - `task/m2-target-model` 本地与远端均保留，未删；下一任务从 `main` 新建分支。
 
 ## 3. 踩坑与已验证经验
 
