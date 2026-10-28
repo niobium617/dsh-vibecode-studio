@@ -369,12 +369,21 @@
   - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/component/annotation` 4 文件 / 52 用例；`pnpm test` 57 文件 / 466 用例；`pnpm build` host 192.8 KiB / client 184.7 KiB。日志 `.tmp/logs/t032-{typecheck,test,build}.log`。
   - 限制：未接附件（S2 无公开附件 API，截图仍“复制 + 手动粘贴”，T034/G3 复核）；隔离 Desktop 载体点 `新建会话` 不建会话（`.tmp/logs/t032-desktop-probe{,2}.json`：行不变、无 toast、无报错），跨会话隔离以 Web 手动 + 组件测试为准；草稿持久化依赖 DSH 自身 `localStorage`，本项目不另存。
 
-### - [ ] T033 标注历史
+### - [x] T033 标注历史
 
 - **目标**：列表、搜索、重新打开、删除；持久化。
 - **验收**：重启后仍在；坏数据不崩溃；删除生效。
 - **验证**：`pnpm test -- tests/unit/annotation-history` + 手动。
 - **文件**：`src/host/inspect/history.ts`、`src/client/inspect/History.tsx`、tests。
+- **验证结果（2026-10-28）**：
+  - 契约：`src/contracts/annotation.ts` 新增 `AnnotationHistoryQuery`/`Entry`/`Result` 与 `isAnnotationHistoryQuery`、`isAnnotationIdParams`、`matchesAnnotationQuery`、`toAnnotationHistoryEntry`；查询上限 200 字符，`limit` 默认 50、最大 200；搜索对 id/targetId/意见/选择器/标签/可访问名/文本/源码文件做大小写不敏感子串匹配（中文同样生效）；列表项只带摘要（意见截断 300 字符 + `…`、选择器/标签/源码位置），不带 `element.html`。`src/contracts/transport.ts` 新增 `annotation.history.{list,get,save,remove}`。
+  - Host：`src/host/inspect/history.ts` 新增 `AnnotationHistoryService`（`list`/`get`/`save`/`remove`）与 `registerAnnotationHistoryMethods`；`list` 返回 `{entries,total,skipped}`，`get` 对缺失/损坏返回 `not_found`，`remove` 对未知 id 返回 `{removed:false}`；store 错误映射为稳定码（`invalid_annotation`/`annotation_too_large`→`invalid_input`、`project_missing`→`not_found`、`path_outside_project`→`permission_denied`、`invalid_project_path`→`invalid_config`、`io`→`internal`）。`annotation-store.ts` 新增 `listWithIssues()`（`list()` 委托它），坏 JSON、空文件、字段不合法、超 64 KiB、符号链接/越界文件计 `skipped` 而不抛错；`src/host/index.ts` 用 `ctx.effect` 注册四个方法并把 `annotationHistory` 放进 `ctx.provide('vibeStudio')`。
+  - Client store：`src/client/inspect/history-store.ts` 沿用 T031 模块级写法（`useSyncExternalStore` + 注入式 `AnnotationHistoryApi`），`requestSeq` 保证快速输入时最新请求胜出；`persistAnnotation` 失败返回 `false` 不抛；`reopenAnnotationFromHistory` 只把记录放回队列，`removeHistoryAnnotation` 删除后刷新列表。
+  - UI：`src/client/inspect/History.tsx` 渲染标题/计数、搜索框、加载/错误（可重试）/空态/无匹配（可清空搜索）/坏数据提示，条目显示选择器、本地时间、源码末段、意见，动作为“重新打开/删除”，删除需二次确认；全部动作带 `data-vibe-history-*` 钩子。`StudioShell.tsx` 在标注页签把队列与历史并列，并向队列注入 `persist`；`Canvas.tsx` 气泡保存后写入历史，失败只把提示降级为“已加入队列，但没能保存到历史。”；`AnnotationQueue.tsx` 编辑保存后写穿历史（`persist` 可选，既有队列用例不受影响）。两语各 +23 key，key 集合 184/184 一致。
+  - 验收对应：`tests/unit/annotation-history/history.test.ts` 27 用例（排序/摘要字段/意见截断/空目录/limit 与 total/坏文件与超限跳过/查询校验/越界链接/搜索各字段与中文/`get` 缺失与损坏/保存校验与覆盖/删除与重启后仍删除/unary 信封 400 与 404/注入 store）；`tests/component/annotation/annotation-history.test.tsx` 14 用例（空态、条目渲染、坏数据提示、错误重试、中文、搜索与清空、重新打开入队且不发送、打开失败、两步删除/取消/已不存在/失败保留、与队列互不干扰）。
+  - 验收对应（手动，`.tmp/logs/t033-history.json`，`ok:true`）：真实 Host 通过 `annotation.history.save` 写入 2 条（HTTP 200，磁盘 2 文件）→ 面板列出 2 条 → 搜索“品牌色”只剩 1 条 → 重新打开后队列 1 条、composer 仍为空（未自动发送）→ 停 Host、写入坏文件 `ann-t033-broken.json` → 重启后列表仍 2 条并提示“已跳过 1 个无法读取的标注文件。”→ UI 两步确认删除 1 条：状态“标注已删除。”、该文件已删、另一条仍在、列表剩 1；面板无 pageerror（7 条 DSH 自身 mux/资源断线属停/重启噪声，单独记录）。清理只删本轮 3 个 id，空的 `.vibe/annotations`、`.vibe` 已移除，端口无 LISTEN 残留。
+  - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm test` 59 文件 / 507 用例；`pnpm build` host 199.8 KiB / client 202.1 KiB。日志 `.tmp/logs/t033-{unit,component,full,typecheck,build,history}.log`。
+  - 计划偏差/限制：客户端 store 命名为 `history-store.ts`（`history.ts` 与 `History.tsx` 仅大小写不同，会被 TS `forceConsistentCasingInFileNames` 拒绝）；列表按 `limit` 截断但搜索在 Host 端对全量过滤（当前目录规模可接受，未做索引/分页）；历史仅是本地记录，不进入聊天、不随发送删除；保存失败不影响队列；未接 region/截图来源的历史展示。
 
 ### - [ ] T034 G3 Inspect 评审 [GATE]
 
