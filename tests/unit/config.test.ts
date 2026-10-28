@@ -50,6 +50,8 @@ describe('host config', () => {
       config: expect.objectContaining({ logLevel: 'debug' }),
       transport: expect.anything(),
       settings: expect.anything(),
+      targets: expect.anything(),
+      preview: expect.anything(),
     })
   })
 })

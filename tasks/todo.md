@@ -20,6 +20,7 @@
 - 所有 host/client 通信走 `ctx.connection`；不裸用 `ctx.webServer`。
 - 所有页面/接口内容按不可信数据处理；密钥只走 `ctx.credentials`。
 - 完成一个任务：勾选 + 在任务下补一行“验证结果”（命令/截图/报告路径）。
+- 界面与产品方向以 `docs/2026-10-28-界面与项目方向.md` 为准；**U01 必须先于 T027**，新增界面不得违反该文档第 1 节六条原则。
 
 ---
 
@@ -157,88 +158,127 @@
 
 > 依赖：G1。T016 先做；T017/T018/T019 可在 T016 后并行；T020 依赖 T017/T019；T021 依赖 T020；T022 依赖 T021；T023/T024 依赖 T017；T025 依赖 T016–T024。
 
-### - [ ] T016 Target 模型、配置与 adapter 注册表
+### - [x] T016 Target 模型、配置与 adapter 注册表
 
 - **目标**：目标配置校验、能力声明、adapter 注册、假 adapter、错误码。
 - **验收**：非法配置/未知 adapter 有明确错误；假 adapter 生命周期单测通过。
 - **验证**：`pnpm test -- tests/unit/targets`。
 - **文件**：`src/host/targets/{types,registry,validate}.ts`、tests。
+- **验证结果（2026-10-27）**：`src/host/targets/types.ts` 定义 `TargetAdapter`（id/kind/capabilities/start/stop，可选 navigate/screenshot）与 `ValidatedTargetConfig`、`DEFAULT_VIEWPORT`、`assertCapability`；`validate.ts` 校验 id/name/kind/url/command/cwd/port/viewport，拒绝未知键、非 http(s)、凭证 URL、相对 cwd、越界端口/viewport，错误统一为 `invalid_config` + `details.field`，url 归一化、viewport 默认 1280×720@1；`registry.ts` 每 kind 一个 adapter，重复 kind/id、缺 capability 均 `invalid_config`，未知 kind 报 `unsupported: unknown target adapter "x"`，已知未注册 kind 报 `no target adapter registered`。`apply()` 向 `vibeStudio` 服务增加空 `targets` registry（T017+ 注册）。`tests/helpers/fake-adapter.ts` 改为实现真实契约（保留 status/sessions/logs 观测）。验证：`pnpm exec vitest run tests/unit/targets` 3 文件 / 21 用例通过；`pnpm typecheck` 0 error；全量 `pnpm test` 20 文件 / 135 用例通过；`pnpm build` host 34.6 KiB / client 36.8 KiB。同步更新 `tests/unit/config.test.ts` 的服务槽断言（新增 `targets`）。
 
-### - [ ] T017 Web target adapter（启动/导航/截图）
+### - [x] T017 Web target adapter（启动/导航/截图）
 
 - **目标**：Playwright 启动 Edge（`channel: 'msedge'`）；导航、viewport、截图、关闭；暂不做 screencast。
 - **验收**：fixture 页面可打开；截图正确；Edge 缺失时有明确提示；关闭无残留。
-- **验证**：`pnpm test -- tests/integration/web-adapter`。
+- **验证**：`pnpm exec vitest run tests/integration/web-adapter`。
 - **文件**：`src/host/targets/web/{adapter,launch}.ts`、tests。
+- **验证结果（2026-10-27）**：`src/host/targets/web/launch.ts` 懒加载 `playwright-core`（缺失 → `target_unavailable`），`launchEdge()` 仅用本机 `channel: 'msedge'`、默认 headless；`toStartError`（缺失 Edge → `target_unavailable`，消息不含本机路径；其他 → `preview_failed`）、`toNavigationError`（超时 → `timeout`，`net::ERR_CONNECTION_*` → `target_unavailable`，其他 → `preview_failed`）、`toScreenshotError`。`adapter.ts` 实现 `TargetAdapter` 生命周期（start 合并并发调用、stop 幂等、失败可重试）、viewport/deviceScaleFactor/colorScheme=light 上下文、`navigate`（成功后更新 session url）、`screenshot`（PNG、viewport 尺寸、动画禁用）、非 loopback 目标默认 `permission_denied`（`allowNonLocal` 显式放开）、`file:`/`chrome:` 等 scheme `unsupported`；能力声明只开 `screenshot`。`apply()` 注册 web adapter。验证：`pnpm exec vitest run tests/integration/web-adapter` 2 文件 / 13 用例通过；`pnpm typecheck` 0 error；全量 `pnpm test` 22 文件 / 148 用例通过；`pnpm build` host 43.4 KiB / client 36.8 KiB，产物中 `playwright-core` 仍为懒加载；`pnpm test:e2e` 3/3。真实 Edge + 临时端口 Vite fixture：800×600 PNG 解码校验（左上白底、>1000 深色文字像素）、导航 query 生效、关闭后 `browser.isConnected()===false` 且无 `playwright_chromiumdev_profile` msedge 进程、可再次启动为 `fixture-2`；不可达端口导航稳定返回 `target_unavailable` 且 session 保持 ready；用真实 Playwright「可执行文件不存在」错误与模拟缺失 channel 验证 Edge 缺失提示。附加测试助手 `tests/helpers/png.ts`（无第三方依赖的 8-bit PNG 解码）。
 
-### - [ ] T018 S8 进程生命周期 spike [P]
+### - [x] T018 S8 进程生命周期 spike [P]
 
 - **目标**：Vite 启动、端口探测、Windows 进程树清理、端口冲突。
 - **验收**：启动 < 10 s；停止无孤儿；端口冲突有可读错误；报告结论。
 - **验证**：`pnpm tsx spikes/s8/run.ts`；`spikes/s8/REPORT.md`。
 - **文件**：`spikes/s8/{run.ts,REPORT.md}`。
+- **验证结果（2026-10-27）**：`spikes/s8/run.ts` 用真实 Vite 8.3.5 + `fixtures/vite-basic`，逐场景测量启动、停止、孤儿与端口冲突；原始数据 `.tmp/logs/s8-results.json`。启动 9 次 spawn 的 HTTP 就绪 393–469 ms（中位 417 ms，预算 10 s），ready 日志 362–380 ms。停止：直接 `child.kill()` 14–15 ms、0 存活（Node 24 对非 detached 子进程使用 job object，`IsProcessInJob=true`，不依赖此行为）；`taskkill /T /F` 435–598 ms、3/3 无存活；`cmd.exe` 中转（`shell:true`）只杀 cmd 时 1 个 vite node 存活且仍占端口，按记录 PID 直接强杀后清零——证明必须记录 PID 并校验。端口冲突 exit 1、366–484 ms，stderr `Error: Port <port> is already in use`。结束时残留进程 0、监听端口 0。`pnpm exec tsc --noEmit` 0 error。报告给出 T019 的启动/就绪/停止/兜底/错误映射结论；`spikes/s8/` 仅 `run.ts` 与 `REPORT.md` 两个文件。
 
-### - [ ] T019 Dev server 进程监督
+### - [x] T019 Dev server 进程监督
 
 - **目标**：按 S8 结论实现 supervisor：spawn、日志 ring buffer、健康检查、停止、Windows tree kill。
 - **验收**：启动/停止/重启；日志可见；无孤儿；单测用假进程。
 - **验证**：`pnpm test -- tests/integration/supervisor` + 手动。
 - **文件**：`src/host/targets/process/{supervisor,logs}.ts`、tests。
+- **验证结果（2026-10-27）**：`src/host/targets/process/supervisor.ts` 实现可注入 spawn/HTTP 探测/进程列举/树杀/端口探测的 supervisor：严格校验 spec（绝对 command/cwd、端口范围、loopback 就绪 URL，非本地 `permission_denied`）、`shell:false` + `windowsHide:true` 启动、50–100 ms 轮询 HTTP 就绪（10 s 预算，超时 `timeout`）、端口冲突/提前退出映射 `preview_failed` + `reason:'port_in_use'|'exited'`、spawn 失败 `target_unavailable`、abort 可中断；启动结束清空上一轮日志，并发 start 合并，ready 幂等，失败可重试。停止记录后代 PID，Windows 用 `taskkill /PID /T /F`，等待退出后在 grace 后按 PID + 命令行精确匹配补杀，校验 survivors 与端口释放（5 s），端口仍占用记 `reason:'port_busy'`。启动失败且子进程已自行退出（如端口冲突）时跳过端口释放等待，避免误报与 5 s 延迟。`logs.ts` 提供 500 条 / 64 KiB / 单行 2000 字符的环形缓冲，按流拆分半行、去 ANSI、保留 seq 且支持 `after`/`limit` 增量读取。`tests/helpers/fake-dev-server.ts` 假进程 + `tests/integration/supervisor/{logs,supervisor}.test.ts` 覆盖生命周期、日志、超时/冲突/abort/spawn 失败、并发、重启、树杀、PID 复用保护、端口占用、非法配置与非本地 URL；全部用假进程，不启动真实长驻服务。验证：`pnpm exec vitest run tests/integration/supervisor` 2 文件 / 23 用例通过；全量 `pnpm exec vitest run` 24 文件 / 171 用例通过；`pnpm typecheck` 0 error；`pnpm build` host 67.4 KiB / client 36.8 KiB。手动（`.tmp/t019-manual.ts`，真实 Vite 8.3.5 + `fixtures/vite-basic`，结果 `.tmp/logs/t019-manual.json`，`pass: true`）：启动 ready 532 ms、日志含 `Local:`/`ready at`；重启 run=2、新 PID、旧日志已清；停止 `portReleased:true`、`survivors:[]`、端口关闭、无残留 node.exe；端口冲突约 1.6 s 返回 `preview_failed`/`port_in_use`。进程查询需限定 `Name -eq "node.exe"`，否则执行查询的 PowerShell 自身会误匹配。
 
-### - [ ] T020 Screencast + 帧路由 + canvas
+### - [x] T020 Screencast + 帧路由 + canvas
 
 - **目标**：CDP `Page.startScreencast`；最新帧 + seq；用精确 `/api/vibe/stream`（multipart JPEG）为主通道，`/api/vibe/frame?wait=1&after=<seq>` 为回退；client canvas 渲染；断流后切 pull，恢复后切回 stream。
 - **验收**：Web ≥ 10 fps；Desktop 手动通过；模拟断流可回退且无内存泄漏。
 - **验证**：`pnpm test -- tests/integration/frames` + 手动 Web/Desktop。
 - **文件**：`src/host/preview/{screencast,frame-buffer,route}.ts`、`src/client/preview/{Canvas.tsx,transport.ts}`、tests。
+- **验证结果（2026-10-27）**：host 侧 `frame-buffer` 只保留最新 JPEG、seq 单调递增，waiter/subscriber 取消即清理；`screencast` 收到帧后立即 ack、base64 解码、4 MiB 上限 + SOI 校验、latest-wins，按绝对 deadline（10 ms 轮询、30 fps、quality 70）限速，停止时清空缓冲；`route` 提供 multipart `/api/vibe/stream`（`multipart/x-mixed-replace; boundary=vibe-frame`，部件带 `Content-Length` 与 `X-Vibe-Seq/Ts/Width/Height`，停止时发结束边界）与 `/api/vibe/frame?wait=1&after=<seq>`（200 JPEG / 204 超时 / 400 非法 / 503 未运行）。client `transport` 以 stream 为主，失败或结束切 pull（2 s 退避）并每 5 s 探测 stream，seq 去重保证切换不重复/不回退；`Canvas` 用 `createImageBitmap` + 单绘制循环合并最新帧，绘制后 `bitmap.close()`，画布尺寸取自帧元数据。`pnpm exec vitest run tests/integration/frames` 4 文件 / 28 用例通过；全量 `pnpm exec vitest run` 28 文件 / 199 用例通过；`pnpm typecheck` 0 error；`pnpm build` host 88.2 KiB / client 58.1 KiB。手动 Web（`.tmp/t020-web.mjs`，DSH 4328 + 动态回环页，报告 `.tmp/logs/t020-web.json`，`ok:true`）：中止 `/api/vibe/stream` 后自动切轮询，25.3 fps、1280×720、12 色、首帧可见；解除后 5 s 内恢复流式，25.3 fps、13 色；25 s 浸泡 host RSS 最后 5 s 仅 +24 KB（25 s 稳态 +4.3 MB，浏览器堆 +190 KB），停止后目标 Edge PID 全部退出，真实 `desktop` profile SHA-256 前后一致。手动 Desktop（隔离 `DSH_HOME=.tmp/desktop-home` + 独立 userData，CDP 9223；`.tmp/t020-desktop.mjs`，`.tmp/logs/t020-desktop.json`，`ok:true`）：`dsh-app://app` 下 5 页签，流式 25.7 fps、25 s 共 1060 帧、画布 1280×720/13 色、渲染器堆 +49 KB、Electron 进程树 RSS 无增长，停止后 Edge 全退出、真实 profile 未改；console 仅预热 503 与预期中止。手测发现并修复 detached `window.fetch` 在 Chromium 抛 `Illegal invocation` 导致 Web 两条通道均无帧的问题（箭头函数保留全局接收者）。限制：Desktop 未单独模拟断流（回退由 Web 覆盖）；本轮未覆盖缩放/整页切换。
 
-### - [ ] T021 输入转发（点击/滚轮/键盘）
+### - [x] T021 输入转发（点击/滚轮/键盘）
 
 - **目标**：CDP `Input.*`；坐标映射；modifiers；点击/滚动/按键。
 - **验收**：fixture 表单可点击/输入/滚动；焦点正确；延迟 < 200 ms。
 - **验证**：`pnpm test -- tests/integration/input` + 手动。
 - **文件**：`src/host/preview/input.ts`、`src/client/preview/InputLayer.tsx`、tests。
+- **验证结果（2026-10-27）**：contracts 新增 `PreviewInputEvent` 与 `isPreviewInputEvent`（pointer/wheel/key；拒绝未知键、NaN/越界、非法 action/button、clickCount 1–3、|wheel|>2000、key 长度 0/32+、非法 code、text 1–32、非布尔 modifiers）。host `src/host/preview/input.ts` 懒建单一 CDP 会话、按实时 viewport 把 [0,1] 映射为 CSS px 并夹到 width−1/height−1、按钮集合与 `buttons` 位掩码（释放发 0）、modifiers 位掩码、命中键表（Enter/Tab/方向键/修饰键等）与 `text/unmodifiedText`、串行队列保证 press 先于 release；`stop()` 级联 detach 且幂等，错误统一 `target_unavailable`（`stopped`/`no_viewport`/`cdp_session`/`cdp_failed`）。输入复用 unary `preview.input`（`/api/vibe/request`），未新增路由；Web adapter 能力补 `input: true`；client `InputLayer` 为 canvas 上透明覆盖层，点击聚焦、best-effort pointer capture、非 passive wheel、IME 组合期按键忽略、move 30 ms 节流，`InputForwarder` 单飞行 + 合并 move + 队列上限 64，停止/卸载 `dispose`；`Canvas` 在 ready 时挂载并显示输入提示，en/zh-CN 文案补齐。`pnpm exec vitest run tests/integration/input tests/component/preview` 3 文件 / 23 用例通过；全量 `pnpm test` 31 文件 / 222 用例通过；`pnpm typecheck` 0 error；`pnpm build` host 99.1 KiB / client 66.0 KiB。手动 Host（`.tmp/t021-host.mjs`，真实 Edge + Vite fixture，`.tmp/logs/t021-host.json`，`ok:true`）：点击后焦点 `INPUT#item-name`、键入 `hello`、计数器 `Count: 1`、滚轮 scrollY 0→347；15 次派发最大 26.3 ms / 平均 4.7 ms；停止后目标 Edge PID `[]`。手动 Web（`.tmp/t021-web.mjs`，DSH 4331 + 回环表单 beacon 页，`.tmp/logs/t021-web.json`，`ok:true`）：覆盖层与 canvas 同为 615×345.9 @ (809,234.2)，点击后覆盖层持有焦点，目标收到 focus 与 h/he/hel/hell/hello，click 计数 1，scrollY 500；18 个 `preview.input` 请求全部 HTTP 200，端到端最大 39.3 ms / 平均 13.1 ms；目标 Edge 全退、真实 `desktop` profile SHA-256 未变、无意外 console error。手动 Desktop（隔离 `DSH_HOME` + 独立 userData，CDP 9223，`.tmp/t021-desktop.mjs`，`.tmp/logs/t021-desktop.json`，`ok:true`）：覆盖层与 canvas 同为 543.3×305.6，焦点/输入/点击/滚动均达目标，18 个请求全部 200，最大 14.3 ms / 平均 9.4 ms；目标 Edge 全退、真实 profile 未改。限制：Desktop 自动化按 25 ms/字符合成键入时目标只收到首字符，150 ms/字符（接近人类速度）全部到达；Web 25 ms 与 host 直连连续按键均正常，判断为 Desktop 载体下 Edge 对过密合成键事件的合并/节流，留 T022 真 IME 手测复核。
 
-### - [ ] T022 中文输入
+### - [x] T022 中文输入
 
 - **目标**：隐藏 textarea + `compositionstart/update/end` → `Input.insertText`；回退文案。
 - **验收**：fixture 输入“你好，世界”正确；失败时有明确限制提示。
 - **验证**：手动 fixture + `spikes/s3` 结论。
 - **文件**：`src/client/preview/ImeInput.tsx`、`src/host/preview/input.ts`。
+- **验证结果（2026-10-27）**：contracts 新增 `{kind:'text', text}` 与 `isInsertableText`（非空、≤1024 码点、拒绝孤立代理、只允许 kind/text 两键）；host 优先 `Input.insertText`，被拒时按码点 `dispatchKeyEvent` 回退（≤256 码点），两条路径都失败返回 `target_unavailable`/`insert_text_failed` 且错误不含原文。client 新增隐藏 textarea（1px、opacity 0、非 display:none、tabIndex −1），只在 `compositionend` 提交最终文本（emoji/代理对按码点计数），组合期间的按键与 `Process` 忽略；点击目标时把 textarea 移到点击点并聚焦；`Ctrl/Cmd+V` 不拦截以走 paste 回退；失活/停止/切换预览时清空值与组合状态；失败时显示 `role="status"` 限制提示（逐字输入或粘贴），不自动提交、不复述用户文本。`pnpm exec vitest run tests/integration/input tests/component/preview` 4 文件 / 39 用例通过；全量 `pnpm test` 32 文件 / 238 用例通过；`pnpm typecheck` 0 error；`pnpm build` host 100.5 KiB / client 72.2 KiB。手动 Host（真实 Edge + Vite fixture，`.tmp/t022-host.mjs`，`.tmp/logs/t022-host.json`，`ok:true`）：点击后 `INPUT#item-name` 获得焦点，一次 text 事件后 value = `你好，世界`，3 次派发最大 8.6 ms / 平均 6.9 ms，停止后 Edge 全部退出。手动 Web（DSH 4332 + 回环表单，CDP `Input.imeSetComposition`→`Input.insertText` 驱动真实 Chromium IME 管线，`.tmp/t022-web.mjs`，`.tmp/logs/t022-web.json`，`ok:true`）：点击后活动元素为隐藏 TEXTAREA；组合中间态（`nihao`/候选）未产生 text 请求、也未触达目标；提交后仅 1 个 `{kind:'text',text:'你好，世界'}`，目标收到完整值，textarea 清空，无部分/中间值；强制 `/api/vibe/request` 的 text 请求 500 后目标值不变且出现中文限制提示（`role=status`，无 alert），解除后重试恢复；粘贴事件被 textarea 接管并整段送达；请求状态含 200/500，最大 15.7 ms / 平均 8.1 ms；目标 Edge 全退、真实 `desktop` profile SHA-256 未变、无意外 console error。手动 Desktop（隔离 `DSH_HOME` + 独立 userData，CDP 9223，`.tmp/t022-desktop.mjs`，`.tmp/logs/t022-desktop.json`，`ok:true`）：同样流程通过（提交值、单次请求、失败提示、恢复、粘贴），200 请求最大 59.6 ms / 平均 16.7 ms，失败注入通过渲染进程 fetch 包装完成（`dsh-app://` 无法被 Playwright route 拦截），未改产品代码；目标 Edge 全退、真实 profile 未改。限制：自动化以 CDP 模拟 IME 组合，不能替代 Microsoft Pinyin 系统级真手测；仍建议在 `vibe-dev` Web 与隔离 Desktop 手测组合中途候选、上屏、emoji、超长输入与切换预览。
 
-### - [ ] T023 Console 采集与抽屉
+### - [x] T023 Console 采集与抽屉
 
 - **目标**：CDP `Runtime.consoleAPICalled`/`exceptionThrown`；ring buffer；UI 过滤/清空。
 - **验收**：错误/警告可见；上限生效；清空可用。
 - **验证**：integration + component test。
 - **文件**：`src/host/preview/console.ts`、`src/client/preview/ConsoleDrawer.tsx`、tests。
 
-### - [ ] T024 Network 采集与抽屉
+- **验证结果（2026-10-28）**：contracts 新增 `preview.console.list` / `preview.console.clear` 两个一元方法（`after`/`limit` 严格校验，`MAX_CONSOLE_ENTRIES=500`、单条文本 500 字节），不新增全局路由；host 新增 `src/host/preview/console.ts`：独立 CDP 会话在 `Runtime.enable` 前挂 `Runtime.consoleAPICalled` / `Runtime.exceptionThrown`，按 info/debug/warn/error 分级，异常合并 `description`，来源先 `redactUrl` 再截 512 字节且行号 +1；页面文本先去 ANSI/控制字符并归一 CRLF，再按 UTF-8 截断；ring buffer 500 条 / 64 KiB，超出淘汰最旧并累计 `dropped`，`seq` 跨 clear 单调；`stop()` 移除监听（`off` 可选）、detach 且清空缓冲；采集失败不阻断预览，只把快照能力降为 `console:false`。route 在 `release()` 中先停采集器再停输入/adapter；`consoleList` 未运行 `target_unavailable`、能力缺失 `unsupported`、非法 query `invalid_input`。client 新增 `ConsoleDrawer`：1 s 轮询 `after` 增量、按 id 去重、本地 500 上限、Host `lastSeq` 回退时全量重取、`clearEpoch` 防在途响应回填、all/error/warn/info 过滤、清空同时清 Host 与本地、失败 `role="status"`、来源按纯文本渲染；仅当快照 `capabilities.console` 为 true 时挂到 Canvas；en/zh-CN 文案补齐。`pnpm exec vitest run tests/integration/console tests/component/preview/console-drawer.test.tsx` 3 文件 / 22 用例通过；全量 `pnpm test` 35 文件 / 260 用例通过；`pnpm typecheck` 0 error；`pnpm build` host 116.1 KiB / client 83.4 KiB。手动 Host（真实 Edge + Vite fixture，`.tmp/t023-host.mjs`，`.tmp/logs/t023-host.json`，`ok:true`）：info/warn/error 与异步 throw 均入缓冲（异常文本含 `boom-exception`），Vite/React DevTools 既有日志也正常采集；510 条 `console.log` 后缓冲恰为 500 条、`lastSeq=517`、`dropped=17`、首条 `bulk-10`；clear 返回 `{cleared:500,lastSeq:517}`，快照为空且 seq 不变，随后 `console.error('after-clear')` 得到唯一 `console-518`；停止后目标 Edge 全退。限制：T023 只要求 integration + component，未做 Web/隔离 Desktop 载体手测；异常 `description` 可能自带堆栈，已受单条文本上限约束。
+### - [x] T024 Network 采集与抽屉
 
 - **目标**：CDP Network 事件；请求/响应摘要；body 按需；上限与脱敏；UI。
 - **验收**：method/url/status/time 可见；4xx/5xx 标记；敏感 header 脱敏。
 - **验证**：integration + component test。
 - **文件**：`src/host/preview/network.ts`、`src/client/preview/NetworkDrawer.tsx`、tests。
 
-### - [ ] T025 预览工具栏与生命周期
+- **验证结果（2026-10-28）**：contracts 新增 `preview.network.list` / `preview.network.clear` / `preview.network.body` 三个一元方法（`after`/`limit` 严格校验，`MAX_NETWORK_ENTRIES=300`、`MAX_NETWORK_BODY_BYTES=64 KiB`），不新增全局路由。host 新增 `src/host/preview/network.ts`：独立 CDP 会话先挂 `requestWillBeSent`/`responseReceived`/`loadingFinished`/`loadingFailed` 再 `Network.enable`（总缓冲 20 MiB、单资源 5 MiB）；请求/响应按 `requestId` 合并，4xx/5xx 记 `error`，`loadingFailed` 的 `canceled` 记 `aborted`；header 上限 64 条、单值 512 字节并先 `redactHeaders`，URL 先 `redactUrl` 再截 512 字节，非 http(s) 请求拒绝；ring buffer 300 条 / 256 KiB，淘汰最旧并累计 `dropped`；采用 revision 游标，pending 行更新后会再次下发，client 按 id 原位替换；`seq` 跨 clear 单调；body 仅按需 `Network.getResponseBody`，文本按 UTF-8 截断（下限 64 字节）、base64 解码后按字节截断，body 不脱敏只截断，失败映射 `not_found`；`stop()` 移除监听、detach 并清空缓冲。route 在 `release()` 中按 console → network → input → adapter 顺序清理；`networkList` 未运行 `target_unavailable`、能力缺失 `unsupported`、非法 query/params `invalid_input`。client 新增 `NetworkDrawer`：500 ms 轮询 revision 增量、按 id 合并、pending→completed 原位更新、`clearEpoch` 防在途响应回填、All/Failed 过滤、4xx/5xx 红色与 `data-error` 标记、清空同时清 Host 与本地、展开时按需取 body 并缓存、header/body 按纯文本渲染、失败 `role="status"`；仅当快照 `capabilities.network` 为 true 时挂到 Canvas；en/zh-CN 文案补齐。聚焦 `pnpm exec vitest run tests/integration/network tests/component/preview/network-drawer.test.tsx` 3 文件 / 27 用例通过；全量 `pnpm test` 38 文件 / 287 用例通过；`pnpm typecheck` 0 error；`pnpm build` host 134.2 KiB / client 102.1 KiB。限制：T024 只要求 integration + component，未做真实 Edge 手测，抽屉在真实载体的布局/轮询开销留 T025/G2；未采集 POST body/WebSocket/SSE 事件。
+
+### - [x] T025 预览工具栏与生命周期
 
 - **目标**：工具栏（目标/URL/刷新/视口/外部打开）；浏览器崩溃/断线提示；关 tab/停目标清理。
 - **验收**：操作可用；崩溃可重启；5 s 内进程退出；无孤儿。
 - **验证**：手动矩阵 + integration。
 - **文件**：`src/client/preview/Toolbar.tsx`、`src/host/preview/session.ts`、tests。
 
-### - [ ] T026 G2 Preview 评审 [GATE]
+- **验证结果（2026-10-28）**：contracts 新增 `preview.session.navigate` / `preview.session.reload` / `preview.session.viewport` / `preview.targets` 四个一元方法，`PreviewSessionSnapshot` 增加 `kind`，`PreviewStartParams` 支持可选 `kind`，并新增严格参数校验（URL 1..2048 去空白、viewport 有限数值、target 仅 `{id,kind}`）；不新增全局路由。host 把会话服务迁到 `src/host/preview/session.ts`（`route.ts` 仅保留 stream/frame 路由与 re-export）：`snapshot()`、stream 与 `start()` 都会调用 `checkHealth()`，adapter `isAlive()` 为 false 时置 `failed` + `target_unavailable`，只提示不自动重连；重启先 `release()` 旧句柄再取新句柄；reload 无 adapter 实现时回退 `navigate(url)`；`setViewport` 复用目标配置校验（占位 URL），保留 `deviceScaleFactor`，越界 `invalid_input`；`listTargets` 仅暴露 `{id,kind}`。Web adapter 增加 `reload`/`setViewport`/`isAlive`（`ready && browser.isConnected() && !page.isClosed()`），registry 的必选方法校验扩展。client 新增 `Toolbar`（目标下拉、URL 表单、刷新/前往、视口 64–7680 应用、外部打开仅 loopback、状态行、崩溃提示 + Restart/Stop）与 `local-url` 校验；Canvas 1 s 轮询状态、500 ms 帧统计、动作 busy/错误包装、重启复用 start；`lifecycle` 用模块级 active 标记区分内部 tab 切换与面板关闭，只有 shell 卸载才调用 stop（15 s 超时），失败不复活标记。聚焦 `pnpm exec vitest run tests/integration/preview/session-lifecycle.test.ts tests/component/preview/toolbar.test.tsx tests/unit/preview/lifecycle.test.ts` 3 文件 / 14 用例通过；全量 `pnpm test` 41 文件 / 301 用例通过；`pnpm typecheck` 0 error；`pnpm build` host 140.5 KiB / client 115.1 KiB。手动矩阵：Host 真 Edge（`.tmp/t025-host.mjs`，`.tmp/logs/t025-host.json` ok）navigate/reload/viewport 生效，崩溃 101 ms 检出且 1.5 s 后仍 `failed`、Edge 进程 0，重启为新会话，stop 调用 301 ms、进程 4471 ms 内退出、无孤儿；隔离 Desktop（`.tmp/t025-desktop.mjs`，`.tmp/logs/t025-desktop.json` ok，中文载体）工具栏刷新/视口 900×700/导航均生效，Console 与 Network 抽屉在真实载体有数据，杀 Edge 后出现断开提示且不自动重启，Restart 恢复，内部切到“检查”再回“预览”会话保留且无重载，停止后 3820 ms 内 Edge 全退、无孤儿，真实 desktop profile 哈希前后一致。限制：崩溃后不会自动恢复；改 DPR 需重启会话；Desktop 的 `window.open` 返回 null 属正常拦截路径；未在真实载体验证“关闭整个 DSH 面板”触发的 stop（由 lifecycle 单测覆盖）。
+
+### - [x] T026 G2 Preview 评审 [GATE]
 
 - **目标**：验证预览闭环与性能。
 - **验收**：10 fps；点击/输入/滚动；Console/Network；停止清理；SPEC 相关条目通过。
 - **验证**：手动 + `pnpm test`；记录到 `tasks/todo.md`。
 - **文件**：无。
 
+- **验证结果（2026-10-28）**：**G2 通过（GO）**，未改产品代码。基线 `pnpm typecheck` 0 error、`pnpm test` 41 文件 / 301 用例通过、`pnpm build` host 140.5 KiB / client 115.1 KiB。手动矩阵三端均先经工具栏设 1280×800（SPEC FR-PRE-04 口径）：**Host 真 Edge**（`.tmp/t026-host.mjs`，`.tmp/logs/t026-host.json`，`ok:true`）带全页 CSS 动画持续 10 s 得 258–259 帧 / 25.8–25.9 fps（p50 间隔 41–42 ms、p95 49–50 ms）；点击 `#item-name` 聚焦、键入 `hello`、计数器 0→1、滚轮 scrollY 0→267；点击到首帧 49–54 ms、输入 ack 1–2 ms；Console 采集到 log/warn/error/异步 throw（`g2-async-boom`），Network 采集 200 与连接失败（`outcome=error`），`network.body` 602 字节；停止调用 354–377 ms、Edge 1357 ms 内全退、无孤儿。**Web**（`.tmp/t026-web.mjs`，`.tmp/logs/t026-web.json`，`ok:true`）`vibe-dev` + headless Edge 面板，流式模式 10 s 244 帧 / 24.4 fps；聚焦/键入 `hello`/点击计数 1/滚轮 500 均生效；Console 16 条、Network 39 条；停止后 2940 ms Edge 全退、无孤儿。**隔离 Desktop**（`.tmp/t026-desktop.mjs`，`.tmp/logs/t026-desktop.json`，`ok:true`，CDP 9225）流式 10 s 250 帧 / 25.0 fps；聚焦/键入/点击/滚动均生效；Console 32 条、Network 71 条；停止后 4886 ms Edge 全退、无孤儿，真实 `desktop` profile 哈希前后一致。**SPEC 相关条目**：FR-PRE-01/03/06/07/10 由 T025 手动矩阵与 shell 用例覆盖（切 tab 会话保留、重启、视口、外部打开按钮可用、崩溃提示），FR-PRE-02/05/08 本次三端实测，FR-PRE-04 本次实测 ≥10 fps；FR-PRE-09（多目标独立会话）当前仅注册 web 目标，未验证，属 SHOULD，留到多目标任务。输入反馈 <200 ms：Host 点击到首帧 49–54 ms，Web/Desktop 沿用 T021/T022 的请求延迟（最大 39.3/59.6 ms）加 ~40 ms 帧间隔。限制：Desktop 预览 Edge 在后台被遮挡时 rAF 计时器会被 Chromium 节流，测量前脚本用 `SetForegroundWindow` 拉起预览窗口；停止清理 Desktop 4886 ms 接近 5 s 上限；未验证真实“关闭整个 DSH 面板”的 stop（仅 lifecycle 单测）。
+
+---
+
+## M2.5：UI Layout v2（T027 前置）
+
+> 依赖：G2。**阻塞 T027**：T027 的 overlay 需要基于定稿后的画布几何取坐标。范围只限预览页排版与引导文案，不新增功能。
+> 依据：`docs/2026-10-28-界面与项目方向.md` 第 2 节；用户《M1界面修改意见》。
+
+### - [x] U01 预览界面精简（Layout v2）
+
+- **目标**：画布优先。状态压成单行；视口等参数移入设置页或“更多”菜单；Console/Network 改为底部常驻 tab + 覆盖式抽屉；补空状态/失败态引导。
+- **验收**：
+  - 右栏宽 320/400/500px、窗口高 900px：无横向溢出，画布高度 ≥ 面板 60%。
+  - 常驻行 ≤ 3（状态条、地址行、底部 tab）；视口宽高输入不再常驻预览页。
+  - 抽屉开合不改变画布尺寸；点击/键入/滚动仍正常。
+  - 帧率约 25 fps 不下降；浏览器 console 0 error。
+  - 手动回归 P1–P5、V1–V6、I1–I8、C1–C5、N1–N6、L1–L7、S1–S7（编号见 `docs/2026-10-28-手动测试手册.md`）。
+- **验证**：`pnpm typecheck`、`pnpm test`、`pnpm build`；`vibe-dev` + headless Edge 在 320/400/500px 三档各截图 + 断言；组件测试更新。
+- **文件**：`src/client/preview/{Canvas,Toolbar,PreviewTabs,ConsoleDrawer,NetworkDrawer}.tsx`、`src/client/shell/StudioShell.tsx`、`src/client/shell/settings/{SettingsPage,PreviewSettings}.tsx`、`src/client/locales/*.json`、tests（实现无 CSS 文件，全部内联样式）。
+- **验证结果（2026-10-28）**：
+  - 静态检查：`pnpm typecheck` 0 error；`pnpm test` 43 文件 / 319 用例通过（新增 `preview-tabs.test.tsx`、`preview-settings.test.tsx`，重写 toolbar/console/network/studio-shell 用例）；`pnpm build` host 140.5 KiB / client 140.9 KiB。
+  - 真实载体（`.tmp/u01-verify.mjs` → `.tmp/logs/u01-verify.json`，`vibe-dev` + headless Edge 1440×900，右栏强制 320/400/500px，`ok:true`）：三档面板宽均无横向溢出（document/预览根/状态行/地址行 scrollWidth == clientWidth，预览根 scrollHeight == clientHeight）；舞台（画布区域）高 657.6px = 面板 768.6px 的 **85.6% ≥ 60%**，实际位图按 16:9 居中letterbox（320px 宽时位图 304×171 = 22.2%，受几何限制，非布局问题）；常驻行恰 3（工具条/舞台/tab），视口宽高输入 0；抽屉开/关（Console→Network→关）canvas 恒为 304×171；fps 264 帧 / 10.1 s = **26.2 fps**（状态条运行中 · 30 fps 为目标值），≥ 20；点击/键入 `hello`/滚轮 500px 均经 InputLayer 生效；Console 18 条、Network 46 条，tab 标签 `控制台 (17)` / `网络 (42)`；失败态（不可达 4399）显示 3 条检查项 + 重启按钮，重启到良好地址成功；停止后 3086 ms 内 9 个目标 Edge 进程全退、无孤儿、状态回空闲。
+  - console：正常流程 0 error；唯一一条 503 是**故意**启动不可达目标时 `preview.session.start` 的设计性错误响应（浏览器对任何 5xx 都会记录），非缺陷。首轮发现并已修复：`/api/vibe/request` 返回 501 `unsupported` 两次（Console/Network 抽屉在 Stop 过程中仍轮询已释放句柄的会话）——`Canvas` 现在在 `busy === 'stop'` 时立即停用抽屉并关闭已开抽屉，末轮 501 = 0。
+  - 截图：`.tmp/logs/u01-{320,400,500}.png`、`u01-failure.png`、`u01-stopped.png`。
+  - 限制：真实系统中文 IME、外部浏览器打开跳转、以及 P/V/I/C/N/L/S 全量手测矩阵未自动化（本轮覆盖 P1–P5/V1–V6/I1–I8/C1–C5/N1–N6 的脚本等价项，L/S 类（切 tab、关闭面板）沿用 T025 手测与 lifecycle 单测结论）；失败态测试必然产生 1 条 503 日志。
+
 ---
 
 ## M3：Inspect + Annotation
 
-> 依赖：G2；T027 可先在 S4 harness 上开发。T030 依赖 T009；T031 依赖 T010/T030；T032 依赖 T031；T033 依赖 T030。
+> 依赖：G2 + **U01**（画布几何定稿，T027 overlay 依赖它）。T028 可在 U01 后与 T027 并行。T030 依赖 T009；T031 依赖 T010/T030；T032 依赖 T031；T033 依赖 T030。
 
 ### - [ ] T027 拾取 overlay 与选择器
 
@@ -531,18 +571,19 @@
 | M0 Spike | 5 | T001–T005 |
 | M1 Foundation | 10 | T006–T015 |
 | M2 Preview | 11 | T016–T026 |
+| M2.5 UI Layout v2 | 1 | U01（2026-10-28 插入，阻塞 T027） |
 | M3 Inspect | 8 | T027–T034 |
 | M4 API | 12 | T035–T046 |
 | M5 Agent | 8 | T047–T054 |
 | M6 Hardening | 7 | T055–T061 |
-| **合计** | **61** | 不含 B/C backlog |
+| **合计** | **62** | 不含 B/C backlog |
 
 **关键路径：**
 
 ```
 T001–T004 → T005 → T006 → T007/T008/T009 → T010/T011/T012/T013/T014 → T015
 → T016/T017/T019/T020/T021/T022/T023/T024/T025 → T026
-→ T027/T028/T029/T030/T031/T032/T033 → T034
+→ U01 → T027/T028/T029/T030/T031/T032/T033 → T034
 → T047/T048/T049/T050/T051/T052/T053 → T054
 → T055/T056/T057/T058/T059/T060 → T061
 ```
@@ -551,7 +592,7 @@ T001–T004 → T005 → T006 → T007/T008/T009 → T010/T011/T012/T013/T014 �
 
 - T001–T004（四个 spike）。
 - G1 后：M2（Preview）与 M4（API）两条线并行。
-- T027–T029（拾取/源码）可在 S4 harness 上先行，不必等 M2 全部完成。
+- T028/T029（上下文/源码）可在 U01 期间用 S4 harness 先行；**T027 overlay 必须等 U01 定稿画布几何**。
 - T035–T037（HTTP/环境/存储）可并行；T041（OpenAPI spike）独立。
 - T047（工具 schema）可在 contracts 稳定后先写。
 
@@ -572,4 +613,5 @@ T001–T004 → T005 → T006 → T007/T008/T009 → T010/T011/T012/T013/T014 �
 ## 批准记录
 
 - 2026-10-25：用户回复“批准”，接受 61 个任务、依赖顺序与 G0–G6 评审门禁。
+- 2026-10-28：按用户界面反馈（本地 `M1阶段界面审查/M1界面修改意见.docx`，未入库）新增 **U01 预览界面精简（Layout v2）**，置于 T027 之前；依据与产品方向见 `docs/2026-10-28-界面与项目方向.md`。其余任务范围不变，总数 62。
 - 执行规则：按任务顺序推进；发现计划假设不成立时先更新 `plan.md`/SPEC，再继续。

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { resetShellStore } from '../../../src/client/shell/store'
 import { StudioShell } from '../../../src/client/shell/StudioShell'
 
@@ -12,27 +12,36 @@ afterEach(() => {
   cleanup()
 })
 
+/**
+ * The preview page has its own drawer tablist (U01), so shell assertions scope
+ * to the shell's tablist instead of every `role=tab` on the page.
+ */
+function shellTabs(): HTMLElement[] {
+  return within(screen.getByRole('tablist', { name: 'Vibe Studio' })).getAllByRole('tab')
+}
+
 function tabNames(): (string | null)[] {
-  return screen.getAllByRole('tab').map((tab) => tab.textContent)
+  return shellTabs().map((tab) => tab.textContent)
 }
 
 describe('StudioShell', () => {
-  it('renders the header and all internal tabs with Preview selected', () => {
+  it('renders all internal tabs with Preview selected and no repeated header', () => {
     render(<StudioShell locale="en" />)
 
-    expect(screen.getByRole('heading', { name: 'Vibe Studio' })).toBeTruthy()
+    // DSH labels the pane itself; an in-pane title/subtitle would repeat it.
+    expect(screen.queryByRole('heading')).toBeNull()
+    expect(screen.queryByText('Preview, inspect and annotate the running app')).toBeNull()
     expect(tabNames()).toEqual(['Preview', 'Inspect', 'Annotations', 'API', 'Settings'])
 
-    const selected = screen.getAllByRole('tab').filter(
+    const selected = shellTabs().filter(
       (tab) => tab.getAttribute('aria-selected') === 'true',
     )
     expect(selected).toHaveLength(1)
     expect(selected[0]?.textContent).toBe('Preview')
 
     expect(screen.getByRole('tabpanel').id).toBe('vibe-studio-panel-preview')
-    expect(
-      screen.getByText('No preview target yet. Start a local app and open it here.'),
-    ).toBeTruthy()
+    expect(screen.getByLabelText('Preview URL')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Start' })).toBeTruthy()
   })
 
   it('switches internal pages and updates the panel', () => {
@@ -65,8 +74,8 @@ describe('StudioShell', () => {
   it('renders translated labels for zh-CN', () => {
     render(<StudioShell locale="zh-CN" />)
 
-    expect(screen.getByRole('heading', { name: 'Vibe Studio' })).toBeTruthy()
+    expect(screen.queryByText('预览、检查并标注正在运行的应用')).toBeNull()
     expect(tabNames()).toEqual(['预览', '检查', '标注', 'API', '设置'])
-    expect(screen.getByText('暂无内容')).toBeTruthy()
+    expect(screen.getByLabelText('预览地址')).toBeTruthy()
   })
 })

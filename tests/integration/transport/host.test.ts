@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { studioError } from '../../../src/contracts/errors'
 import {
+  FRAME_PATH,
   HEALTH_PATH,
   MAX_UNARY_BODY_BYTES,
+  PREVIEW_START_METHOD,
+  PREVIEW_STATUS_METHOD,
+  PREVIEW_STOP_METHOD,
   REQUEST_PATH,
+  STREAM_PATH,
   TRANSPORT_VERSION,
   type UnaryResponse,
 } from '../../../src/contracts/transport'
@@ -47,18 +52,25 @@ afterEach(() => {
 })
 
 describe('host transport registration', () => {
-  it('registers only the two exact /api/vibe routes', () => {
+  it('registers only the exact /api/vibe routes', () => {
     const host = boot()
 
-    expect([...host.routes.keys()].sort()).toEqual([HEALTH_PATH, REQUEST_PATH].sort())
+    expect([...host.routes.keys()].sort()).toEqual(
+      [HEALTH_PATH, REQUEST_PATH, STREAM_PATH, FRAME_PATH].sort(),
+    )
     expect(route(host, HEALTH_PATH).methods).toEqual(['GET'])
     expect(route(host, HEALTH_PATH).requestBody).toBe('buffered')
     expect(route(host, REQUEST_PATH).methods).toEqual(['POST'])
     expect(route(host, REQUEST_PATH).requestBody).toBe('buffered')
+    expect(route(host, STREAM_PATH).methods).toEqual(['GET'])
+    expect(route(host, FRAME_PATH).methods).toEqual(['GET'])
     expect(host.effectLabels).toEqual([
       `vibe-studio: ${HEALTH_PATH}`,
       `vibe-studio: ${REQUEST_PATH}`,
       'vibe-studio: settings methods',
+      'vibe-studio: preview methods',
+      `vibe-studio: ${STREAM_PATH}`,
+      `vibe-studio: ${FRAME_PATH}`,
     ])
   })
 
@@ -70,7 +82,11 @@ describe('host transport registration', () => {
     expect(service.transport.has('studio.ping')).toBe(true)
     expect(service.transport.has('studio.settings.get')).toBe(true)
     expect(service.transport.has('studio.settings.update')).toBe(true)
+    expect(service.transport.has(PREVIEW_START_METHOD)).toBe(true)
+    expect(service.transport.has(PREVIEW_STOP_METHOD)).toBe(true)
+    expect(service.transport.has(PREVIEW_STATUS_METHOD)).toBe(true)
     expect(service.settings).toBeDefined()
+    expect(service.preview.status().status).toBe('idle')
 
     await host.dispose()
     expect(host.routes.size).toBe(0)

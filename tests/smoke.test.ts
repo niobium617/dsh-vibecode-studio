@@ -12,7 +12,7 @@ describe('package smoke', () => {
     expect(apply).toBeTypeOf('function')
     const host = createFakeHost()
     expect(() => apply(host.ctx)).not.toThrow()
-    expect(host.routes.size).toBe(2)
+    expect(host.routes.size).toBe(4)
   })
 
   it('exposes the client id', () => {

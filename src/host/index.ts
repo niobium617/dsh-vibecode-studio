@@ -7,10 +7,21 @@
  */
 import { Config, resolveConfig, type VibeStudioConfig } from './config'
 import {
+  registerPreviewMethods,
+  registerPreviewRoutes,
+  type PreviewService,
+} from './preview/route'
+import { createPreviewService } from './preview/session'
+import {
   createStudioSettingsService,
   registerSettingsMethods,
   type StudioSettingsService,
 } from './studio/settings'
+import {
+  createTargetAdapterRegistry,
+  type TargetAdapterRegistry,
+} from './targets/registry'
+import { createWebTargetAdapter } from './targets/web/adapter'
 import {
   registerTransport,
   type TransportHostContext,
@@ -31,6 +42,94 @@ export {
   UnaryRegistry,
 } from './transport'
 export type { UnaryCallContext, UnaryHandler } from './transport'
+export { createTargetAdapterRegistry } from './targets/registry'
+export type { TargetAdapterRegistry } from './targets/registry'
+export { validateTargetConfig } from './targets/validate'
+export { assertCapability, DEFAULT_VIEWPORT } from './targets/types'
+export type {
+  ScreencastPageLike,
+  ScreencastSessionLike,
+  TargetAdapter,
+  TargetStartOptions,
+  ValidatedTargetConfig,
+} from './targets/types'
+export { registerPreviewMethods, registerPreviewRoutes } from './preview/route'
+export { createPreviewService } from './preview/session'
+export type { PreviewService, PreviewServiceOptions } from './preview/session'
+export { createPreviewFrameBuffer, PreviewFrameBuffer } from './preview/frame-buffer'
+export type { FrameListener, PreviewFrame } from './preview/frame-buffer'
+export { createScreencastSource } from './preview/screencast'
+export type {
+  ScreencastOptions,
+  ScreencastSource,
+  ScreencastStats,
+} from './preview/screencast'
+export {
+  createPreviewInputDispatcher,
+  mapPoint,
+  modifierMask,
+} from './preview/input'
+export type {
+  PreviewInputDispatcher,
+  PreviewInputDispatcherOptions,
+} from './preview/input'
+export {
+  createPreviewConsoleCollector,
+  formatConsoleArgs,
+  formatRemoteObject,
+  mapConsoleEvent,
+  normalizeConsoleText,
+  normalizeConsoleTimestamp,
+  PreviewConsoleBuffer,
+} from './preview/console'
+export type {
+  ConsoleRecordInput,
+  PreviewConsoleCollector,
+  PreviewConsoleCollectorOptions,
+  PreviewConsoleStats,
+} from './preview/console'
+export { createWebTargetAdapter, WEB_TARGET_CAPABILITIES } from './targets/web/adapter'
+export type {
+  WebTargetAdapter,
+  WebTargetAdapterOptions,
+  WebTargetAdapterStatus,
+} from './targets/web/adapter'
+export {
+  EDGE_CHANNEL,
+  isEdgeMissingError,
+  launchEdge,
+  toNavigationError,
+  toScreenshotError,
+  toStartError,
+} from './targets/web/launch'
+export type { BrowserLauncher, LaunchEdgeOptions } from './targets/web/launch'
+export {
+  createDevServerSupervisor,
+  validateDevServerSpec,
+} from './targets/process/supervisor'
+export type {
+  DevServerChildProcess,
+  DevServerExit,
+  DevServerProcessInfo,
+  DevServerSpec,
+  DevServerSpawn,
+  DevServerSpawnOptions,
+  DevServerStartOptions,
+  DevServerState,
+  DevServerStatus,
+  DevServerStopResult,
+  DevServerSupervisor,
+  DevServerSupervisorOptions,
+  DevServerTreeKill,
+} from './targets/process/supervisor'
+export { createLogRingBuffer, stripAnsi } from './targets/process/logs'
+export type {
+  DevServerLogEntry,
+  DevServerLogStream,
+  LogRingBuffer,
+  LogRingBufferOptions,
+  LogRingBufferSnapshotOptions,
+} from './targets/process/logs'
 
 export const name = 'dsh-vibecode-studio'
 export const inject = ['connection']
@@ -42,6 +141,10 @@ export interface VibeStudioService {
   readonly transport: UnaryRegistry
   /** `.vibe/studio.json` settings, shared with the panel. */
   readonly settings: StudioSettingsService
+  /** Adapters that can serve each target kind (T016). */
+  readonly targets: TargetAdapterRegistry
+  /** Preview session + shared latest-frame buffer (T020). */
+  readonly preview: PreviewService
 }
 
 /** Minimal Cordis surface used at this stage. */
@@ -56,6 +159,10 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
   // M1 binds the project root to the Host process cwd; `apply` has no session
   // yet. Revisit once preview targets resolve a workspace directory (M2).
   const settings = createStudioSettingsService({ projectDir: process.cwd(), config: resolved })
+  // M2 adapters register here; T017 provides the web/Edge adapter. Desktop and
+  // API kinds stay unregistered and fail late lookups with `unsupported`.
+  const targets = createTargetAdapterRegistry()
+  targets.register(createWebTargetAdapter())
   const setupSettings = () => registerSettingsMethods(registry, settings)
   if (typeof ctx.effect === 'function') {
     ctx.effect(setupSettings, 'vibe-studio: settings methods')
@@ -63,9 +170,27 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
     setupSettings()
   }
 
+  // T020 preview: unary lifecycle methods plus the stream/pull frame routes.
+  const preview = createPreviewService({ targets })
+  const setupPreview = () => {
+    const disposeMethods = registerPreviewMethods(registry, preview)
+    return async () => {
+      disposeMethods()
+      await preview.dispose()
+    }
+  }
+  if (typeof ctx.effect === 'function') {
+    ctx.effect(setupPreview, 'vibe-studio: preview methods')
+  } else {
+    void setupPreview()
+  }
+  registerPreviewRoutes(ctx, preview)
+
   ctx.provide('vibeStudio', {
     config: resolved,
     transport: registry,
     settings,
+    targets,
+    preview,
   } satisfies VibeStudioService)
 }

@@ -1,10 +1,12 @@
 /**
- * Studio shell: header, internal page tabs and the page placeholder. The DSH
- * sidebar supplies docking, fullscreen and start-here guide; this component
- * only fills the pane body.
+ * Studio shell: internal page tabs and the page placeholder. The DSH sidebar
+ * supplies docking, fullscreen, the pane title and the start-here guide; this
+ * component only fills the pane body, so it no longer repeats the title.
  */
 import * as React from 'react'
 import { browserLocale, createTranslator, type Locale } from '../i18n'
+import { PreviewPage } from '../preview/Canvas'
+import { stopPreviewSession } from '../preview/lifecycle'
 import { SettingsPage } from './settings/SettingsPage'
 import { EmptyState, ShellErrorBoundary } from './StateViews'
 import { useShellState, setActiveTab } from './store'
@@ -12,34 +14,19 @@ import { DEFAULT_TAB, STUDIO_TAB_DEFINITIONS } from './tabs'
 
 const rootStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateRows: 'auto auto minmax(0, 1fr)',
+  // Two rows: the page tabs and the page body. The old title/subtitle header
+  // was redundant — DSH already labels the pane with the tab name.
+  gridTemplateRows: 'auto minmax(0, 1fr)',
   height: '100%',
   minHeight: 0,
   font: '13px/1.5 system-ui, sans-serif',
   color: 'var(--dsw-text-primary, inherit)',
 }
 
-const headerStyle: React.CSSProperties = {
-  display: 'grid',
-  gap: 2,
-  padding: '12px 12px 8px',
-}
-
-const titleStyle: React.CSSProperties = {
-  margin: 0,
-  font: '600 14px/1.4 system-ui, sans-serif',
-}
-
-const subtitleStyle: React.CSSProperties = {
-  margin: 0,
-  font: '12px/1.5 system-ui, sans-serif',
-  opacity: 0.7,
-}
-
 const tabListStyle: React.CSSProperties = {
   display: 'flex',
   gap: 2,
-  padding: '0 8px',
+  padding: '6px 8px 0',
   borderBottom: '1px solid var(--dsw-border-color, rgba(127, 127, 127, 0.3))',
 }
 
@@ -62,6 +49,15 @@ const panelStyle: React.CSSProperties = {
   overflow: 'auto',
 }
 
+/**
+ * The preview page is its own fixed-height layout (canvas plus drawers), so the
+ * panel must not scroll it; scrolling would resize the canvas over and over.
+ */
+const previewPanelStyle: React.CSSProperties = {
+  minHeight: 0,
+  overflow: 'hidden',
+}
+
 export interface StudioShellProps {
   /** Override the detected locale (tests); the client passes nothing. */
   readonly locale?: Locale
@@ -76,13 +72,17 @@ export function StudioShell({ locale }: StudioShellProps): React.ReactElement {
     STUDIO_TAB_DEFINITIONS.find((tab) => tab.id === DEFAULT_TAB)!
   const panelId = `vibe-studio-panel-${current.id}`
 
+  // Closing the DSH panel unmounts the shell; an internal tab switch only
+  // unmounts PreviewPage and keeps the live target. The lifecycle flag makes
+  // that distinction, so a plain shell teardown never calls the Host.
+  React.useEffect(() => {
+    return () => {
+      void stopPreviewSession()
+    }
+  }, [])
+
   return (
     <div data-vibe-shell="1" style={rootStyle}>
-      <header style={headerStyle}>
-        <h2 style={titleStyle}>{t('shell.title')}</h2>
-        <p style={subtitleStyle}>{t('shell.subtitle')}</p>
-      </header>
-
       <div role="tablist" aria-label={t('shell.title')} style={tabListStyle}>
         {STUDIO_TAB_DEFINITIONS.map((tab) => {
           const selected = tab.id === activeTab
@@ -107,11 +107,13 @@ export function StudioShell({ locale }: StudioShellProps): React.ReactElement {
         role="tabpanel"
         id={panelId}
         aria-labelledby={`vibe-studio-tab-${current.id}`}
-        style={panelStyle}
+        style={current.id === 'preview' ? previewPanelStyle : panelStyle}
       >
         <ShellErrorBoundary key={current.id} locale={activeLocale}>
           {current.id === 'settings' ? (
             <SettingsPage locale={activeLocale} />
+          ) : current.id === 'preview' ? (
+            <PreviewPage locale={activeLocale} />
           ) : (
             <EmptyState title={t('state.empty.title')} body={t(current.emptyKey)} />
           )}
