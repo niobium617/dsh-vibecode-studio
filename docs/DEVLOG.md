@@ -9,7 +9,7 @@
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，M1 已完成，M2 已完成）**。
 - 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）、T023 Console 采集与抽屉、T024 Network 采集与抽屉、T025 预览工具栏与生命周期、T026 G2 Preview 评审（通过）、T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 三框架源码适配、T030 标注模型与存储、T031 标注气泡与队列。
-- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），**T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 源码适配（React/Vue/Svelte）、T030 标注模型与存储、T031 标注气泡与队列、T032 Composer handoff、T033 标注历史 已完成**，下一项 **T034 G3 Inspect 评审**。
+- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），**T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 源码适配（React/Vue/Svelte）、T030 标注模型与存储、T031 标注气泡与队列、T032 Composer handoff、T033 标注历史 已完成**；**T034 G3 评审完成（GO）**：初评“≤3 步”实测 4–5 个动作，经用户批准在保存通知加“发送到对话”后为 3 个动作（点元素 → 保存 → 发送），复测四项验收全过（源码 100%、标注 4,095 B ≤ 4 KB、不自动发送），M3 完成。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
 - T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T026 已提交并推送到 `origin/task/m2-target-model`（`ebee1e5`，文档至 `92ecc32`），尚未合并入 `main`；其后 `9c19501..88a4070`（方向/手册文档、U01 实现、去重复标题）已推送到 `origin/task/m2-target-model`（`92ecc32..88a4070`，2026-10-28）；`f64e928`（清理残留 locale key 与过期布局引用）推送后，以 `--no-ff` 合并入 `main`（合并提交 `768e129`，`main` 树与分支一致），功能分支保留。手动复测入口见 `docs/2026-10-28-手动测试手册.md`；界面/产品方向见 `docs/2026-10-28-界面与项目方向.md`。S3/S4/T010/T014/T015/T020/T021/T022/T025 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
@@ -550,6 +550,21 @@
 - 验证：`pnpm typecheck` 0 error；`pnpm test` 59 文件 / **507 用例全通过**；`pnpm build` host 199.8 KiB / client 202.1 KiB。手动（`.tmp/t033-history.mjs` → `.tmp/logs/t033-history.json`，`ok:true`）：真实 Host 经 `annotation.history.save` 写入 2 条（HTTP 200，磁盘 2 文件）→ 面板列出 2 条 → 搜索“品牌色”仅 1 条 → 重新打开后队列 1 条、composer 仍为空（未自动发送）→ 停 Host 并写入坏文件 → 重启后列表仍 2 条并提示“已跳过 1 个无法读取的标注文件。”→ 两步确认删除 1 条（“标注已删除。”、该文件已删、另一条仍在、列表剩 1）；7 条 DSH 自身 mux/资源断线属停/重启噪声，Studio 面板 0 异常；清理只删本轮 3 个 id，空的 `.vibe/annotations`、`.vibe` 已移除，4337 无 LISTEN 残留。日志 `.tmp/logs/t033-{unit,component,full,test-all,typecheck,build,history}.log`。
 - 计划偏差/限制：客户端 store 命名 `history-store.ts`（`history.ts` 与 `History.tsx` 仅大小写不同会被 TS `forceConsistentCasingInFileNames` 拒绝）；搜索在 Host 端全量过滤后才截断，未做索引/分页；历史只是本地记录，不随发送删除、不进聊天；保存失败不影响队列；未接 region/截图来源的历史展示。
 
+### T034 — G3 Inspect 评审与返工（GO，2026-10-29）
+
+- 背景：M3 的 T027–T033 已完成，G3 需验证圈选/标注/发送闭环与预算：50 元素源码 ≥ 80%、标注 ≤ 4 KB、从拾取到 composer ≤ 3 步、不自动发送。初评按“不改产品代码”执行；初评未达标后经用户批准返工并复测。
+- 基线：`pnpm typecheck` 0 error、`pnpm test` 59 文件 / 507 用例、`pnpm test:e2e` 9/9。
+- 初评结果：
+  - ① 源码命中：`50/50 = 100%`（React 17 / Vue 17 / Svelte 16，门槛 80%），0 miss、0 console/pageerror；用真实 `buildPickerScript` + `normalizePickedElement` 在 Vite dev server + headless Edge 上逐元素拾取（`.tmp/g3/source-sample.ts` → `.tmp/logs/g3-source.json`）。`pnpm test:e2e` 的 90 元素（三框架各 30/30，行号 ±2）为交叉证据。
+  - ② 标注预算：最坏输入下 `renderAnnotationText` 输出 4,094–4,096 B，均 ≤ 4,096，且无断代理对（2,000 字中文、2,000 ASCII、1,000 emoji 三组，`.tmp/logs/g3-budget.json`）。真实载体把 2,000 字中文意见送进 composer 后实测 **4,095 B**。
+  - ③ 3 步进 composer：**未达标**。真实 Web 闭环记录的用户动作为：开启“拾取”→ 点击画布元素 → 输入意见 + `Ctrl+Enter` 保存 → 点击“查看队列”→ 点击“发送”（从点元素算 4 个动作）。预览与标注页签互斥，预览页签内没有发送入口，所以“查看队列”是必要点击；只有按语义阶段（圈选 / 写意见保存 / 发送）才算 3 步。
+  - ④ 不自动发送：通过。保存气泡后 composer 为空、页面外 marker 0；点发送后状态“已插入对话草稿，尚未发送。”，4 s 后 composer 文本逐字节不变（4,095 B）、面板外 marker 0、无用户消息；`handoff.ts` 只调用 `captureInsertion`/`insertText`/可选 `setDraft`，没有 `submit`/`send` 路径（`.tmp/logs/g3-live.json`，`ok:true`）。
+- 缺口：保存通知只有“查看队列”。建议在通知里加“发送到对话”（或气泡保存后直接提供发送），把动作压到 3 次点击。附带发现：2,000 字中文意见会在 composer 被截到约 1,617 字且气泡无截断提示；`fixtures/vite-basic` 拾取 `source: null` 属 T029 已知限制（真实项目需 dev 构建插件）。
+- 返工（用户选择“通知里加‘发送到对话’”）：新增 `src/client/inspect/AnnotationSaveNotice.tsx`（保存通知：文案 + “发送到对话” + “查看队列”；本地 `idle/pending/done`，成功后隐藏发送按钮，失败保留重试）；`AnnotationQueue.tsx` 抽出并导出 `sendQueuedAnnotation`（成功才出队、失败保留草稿、无消息回退 `annotation.item.sent`）与 `clipboardSender`，队列与通知共用同一规则；`Canvas.tsx` 的 `queueNotice` 改为 `{kind, annotation}` 并渲染通知（`key` 用标注 id 重置发送状态，历史落盘失败仍只降级文案）；`StudioShell.tsx` 把 composer handoff 同时注入 `PreviewPage`（新增可选 `send` prop，缺省走剪贴板）。两语无新增 key（复用 `annotation.item.send/sending/sent/sendFailed`）。
+- 返工验证：`pnpm typecheck` 0 error；`pnpm test` 60 文件 / **514 用例**（新增 `tests/component/annotation/annotation-save-notice.test.tsx` 7 用例：不自动发送、成功清队列并隐藏按钮、无消息回退剪贴板文案、失败保留队列可重试、发送中禁用、历史失败仍可发送、中文）；`pnpm test:e2e` 9/9；`pnpm build` host 199.8 / client 204.1 KiB。真实 Web 复测（`.tmp/g3/live.mjs` → `.tmp/logs/g3-live.json`，`ok:true`）：动作 `pick-element → save-bubble → send-now`（从点元素算 **3 个**，含开启拾取 4 个），composer 4,095 B ≤ 4,096，保存后 composer 空、发送后 4 s 逐字节不变、面板外 marker 0、发送后队列 0 条、console 0。
+- 环境：评审与复测写入的 `.vibe/annotations/*.json` 与空 `.vibe/` 已删除；4320/4338 无监听残留、无 Playwright Edge 残留（在跑的 msedge 为用户 21:40 自启的默认 profile）；真实 `desktop` profile 未触碰。脚本 `.tmp/g3/{source-sample.ts,budget.ts,live.mjs}` 非产品代码。
+- 结论：**4 项验收全部通过，G3 GO**；第 3 项按用户确认口径“点元素 → 保存 → 发送 = 3 次点击”达标，开启拾取仍为额外 1 次点击。遗留：composer 截断无提示、`fixtures/vite-basic` `source: null`、通知与队列发送互不感知进行中状态。未开始 M4。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -666,6 +681,7 @@
 3. **发送失败必须保留草稿**：只有 `await send()` 成功后才从队列删除；失败显示 `role=alert` 并保留条目，避免用户意见因一次剪贴板/传输失败而丢失。
 4. **空态不能提前 return**：队列清空的同一渲染里还要显示“发送成功”反馈；若在 `queue.length === 0` 时直接返回 `EmptyState`，反馈会被丢掉。改成始终渲染容器、只条件渲染列表与底部提示。
 5. **`pnpm test -- <path>` 在本仓库不过滤**：`--` 之后的路径会被当成重复参数，vitest 仍跑全量。只跑目录用 `pnpm exec vitest run <path>`（HANDOFF §9 已记录，T031 再次踩到）。
+6. **闭环入口要放在用户动作的落点**：预览页签与标注页签互斥，保存通知是唯一“刚发生且可见”的位置；把“发送到对话”放在通知里，动作从 4–5 个压到 3 个（点元素 → 保存 → 发送）。G3 初评的“≤3 步”失败正是因为入口藏在另一个页签。发送规则（成功才出队、失败保留草稿、无消息回退剪贴板文案）抽成 `sendQueuedAnnotation` 供队列与通知共用，避免两处行为漂移；通知用 `key={annotation.id}` 重置本地发送状态，防止上一条的结果串到下一条。
 
 ## 4. 已改变的计划假设
 

@@ -136,7 +136,43 @@ export async function copyAnnotationToClipboard(
   await clipboard.writeText(text)
 }
 
-const defaultSender: AnnotationSender = (annotation) => copyAnnotationToClipboard(annotation)
+/** The fallback when no composer handoff is attached (T032 S2 behaviour). */
+export const clipboardSender: AnnotationSender = (annotation) =>
+  copyAnnotationToClipboard(annotation)
+
+export interface AnnotationSendMessages {
+  /** Shown when the sender resolves without a message of its own. */
+  readonly sent: string
+  /** Shown when the sender throws; the draft stays queued. */
+  readonly failed: string
+}
+
+export interface AnnotationSendResult {
+  readonly ok: boolean
+  readonly message: string
+}
+
+/**
+ * Sends one queued annotation and drops it only after the handoff resolves, so
+ * a failed send never loses the comment. Shared by the queue list and the
+ * preview save notice (T034) so both follow the same rule.
+ */
+export async function sendQueuedAnnotation(
+  annotation: Annotation,
+  send: AnnotationSender,
+  messages: AnnotationSendMessages,
+): Promise<AnnotationSendResult> {
+  try {
+    const message = await send(annotation, renderAnnotationText(annotation))
+    removeQueuedAnnotation(annotation.id)
+    return {
+      ok: true,
+      message: typeof message === 'string' && message.length > 0 ? message : messages.sent,
+    }
+  } catch {
+    return { ok: false, message: messages.failed }
+  }
+}
 
 const listStyle: React.CSSProperties = {
   display: 'grid',
@@ -282,7 +318,7 @@ export interface AnnotationQueueProps {
  */
 export function AnnotationQueue({
   locale,
-  send = defaultSender,
+  send = clipboardSender,
   persist,
 }: AnnotationQueueProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
@@ -323,14 +359,11 @@ export function AnnotationQueue({
     setPendingId(annotation.id)
     setFeedback(null)
     try {
-      const message = await send(annotation, renderAnnotationText(annotation))
-      removeQueuedAnnotation(annotation.id)
-      setFeedback({
-        kind: 'success',
-        message: typeof message === 'string' && message.length > 0 ? message : t('annotation.item.sent'),
+      const result = await sendQueuedAnnotation(annotation, send, {
+        sent: t('annotation.item.sent'),
+        failed: t('annotation.item.sendFailed'),
       })
-    } catch {
-      setFeedback({ kind: 'error', message: t('annotation.item.sendFailed') })
+      setFeedback({ kind: result.ok ? 'success' : 'error', message: result.message })
     } finally {
       setPendingId(null)
     }

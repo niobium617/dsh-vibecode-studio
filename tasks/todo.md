@@ -385,12 +385,21 @@
   - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm test` 59 文件 / 507 用例；`pnpm build` host 199.8 KiB / client 202.1 KiB。日志 `.tmp/logs/t033-{unit,component,full,typecheck,build,history}.log`。
   - 计划偏差/限制：客户端 store 命名为 `history-store.ts`（`history.ts` 与 `History.tsx` 仅大小写不同，会被 TS `forceConsistentCasingInFileNames` 拒绝）；列表按 `limit` 截断但搜索在 Host 端对全量过滤（当前目录规模可接受，未做索引/分页）；历史仅是本地记录，不进入聊天、不随发送删除；保存失败不影响队列；未接 region/截图来源的历史展示。
 
-### - [ ] T034 G3 Inspect 评审 [GATE]
+### - [x] T034 G3 Inspect 评审 [GATE]
 
 - **目标**：验证圈选/标注/发送闭环与预算。
 - **验收**：50 元素源码 ≥ 80%；标注 ≤ 4 KB；3 步内进 composer；不自动发送。
 - **验证**：手动 + `pnpm test`；记录结果。
 - **文件**：无。
+- **评审结果（2026-10-29，不改产品代码）**：
+  - 基线：`pnpm typecheck` 0 error；`pnpm test` 59 文件 / 507 用例；`pnpm test:e2e` 9/9（含三框架 dev 各 30/30、生产各 30/30 `source: null`）。日志 `.tmp/logs/g3-{typecheck,test,e2e}.log`。
+  - ① 50 元素源码命中：**通过**。评审脚本 `.tmp/g3/source-sample.ts`（真实 `buildPickerScript` + `normalizePickedElement`，Vite dev server + headless Edge）在 React 17 / Vue 17 / Svelte 16 共 50 个元素上命中 50（100%，门槛 80%），0 miss、0 console/pageerror，结果 `.tmp/logs/g3-source.json`。与 `pnpm test:e2e` 的 90 元素（30×3，全部命中）互相印证。
+  - ② 标注 ≤ 4 KB：**通过**。`.tmp/g3/budget.ts` 走真实 `renderAnnotationText`：常规中文 1,235 B；2,000 字中文 + >2 KB HTML 4,094 B；2,000 ASCII 4,096 B；1,000 emoji 4,096 B，均 ≤ 4,096 且无断开的代理对（`.tmp/logs/g3-budget.json`）。真实载体 `.tmp/g3/live.mjs`：2,000 字中文意见送入 composer 后实测 **4,095 B**。
+  - ③ 3 步内进 composer：**初评未达标 → 用户批准返工后通过**。初评实测（不改产品代码）动作为：开启“拾取”(1) → 点击画布元素(2) → 输入意见 + `Ctrl+Enter` 保存(3) → 点击“查看队列”(4) → 点击“发送”(5)；从点击元素算起 4 个动作，根因是预览页签没有发送入口。返工：保存通知新增“发送到对话”（`src/client/inspect/AnnotationSaveNotice.tsx`，由 `StudioShell` 注入 composer handoff 发送器），复测动作为 点击元素(1) → 输入 + 保存(2) → 发送(3)，**3 个动作直达 composer**；计入“开启拾取”为 4 个（原先 5 个）。证据 `.tmp/logs/g3-live.json`（`ok:true`，动作序列 `pick-element → save-bubble → send-now`）。
+  - ④ 不自动发送：**通过**。保存气泡后 composer 仍为空、页面外 marker 0；点击发送后状态“已插入对话草稿，尚未发送。”，4 s 后 composer 文本逐字节不变（4,095 B），面板外 marker 0，无用户消息出现，console 0；`handoff.ts` 只用 `captureInsertion`/`insertText`/可选 `setDraft`，无 `submit`/`send` 路径。
+  - 附带发现（非本次验收阻断项）：2,000 字中文意见在 composer 里被截到约 1,617 字（4,095 B 预算），气泡没有“已截断”提示；`fixtures/vite-basic` 预览拾取 `source: null`（真实项目需装 dev 构建插件，属 T029 已知限制）；保存时面板不在标注页签，`[data-vibe-annotation-item]` 计数为 0 属测量时序，非缺陷；评审写入的 `.vibe/annotations/a-mvsaxlbb-1.json` 已删除，端口与 Edge 无残留。
+  - 返工验证（经用户批准，仅动保存通知与发送路径，不碰拾取/上下文/预算）：`pnpm typecheck` 0 error；`pnpm test` 60 文件 / 514 用例（新增 `tests/component/annotation/annotation-save-notice.test.tsx` 7 用例：不自动发送、成功清队列、无消息回退剪贴板文案、失败保留队列并可重试、发送中禁用、历史失败仍可发送、中文文案）；`pnpm test:e2e` 9/9；`pnpm build` host 199.8 / client 204.1 KiB；真实 Web 复测 `.tmp/logs/g3-live.json` `ok:true`（composer 4,095 B ≤ 4,096、保存后 composer 空、发送后 4 s 逐字节不变、面板外 marker 0、发送后队列 0 条、console 0）。
+  - 结论：**返工后 4 项验收全部通过，G3 GO**。第 3 项按用户确认的口径“点元素 → 保存 → 发送 = 3 次点击”达标（另需先开启拾取，如实记录为额外 1 次点击）；附带问题（2,000 字中文意见在 composer 截断到约 1,617 字且无提示、`fixtures/vite-basic` `source: null` 属 T029 已知限制）不阻断验收，已记入 HANDOFF 遗留。
 
 ---
 

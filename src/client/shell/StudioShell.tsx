@@ -139,7 +139,7 @@ export function StudioShell({ locale }: StudioShellProps): React.ReactElement {
           {current.id === 'settings' ? (
             <SettingsPage locale={activeLocale} />
           ) : current.id === 'preview' ? (
-            <PreviewPage locale={activeLocale} />
+            <PreviewPage locale={activeLocale} send={handoff} />
           ) : current.id === 'annotations' ? (
             <>
               <AnnotationQueue locale={activeLocale} send={handoff} persist={persistAnnotation} />

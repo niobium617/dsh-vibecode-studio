@@ -17,6 +17,7 @@
  * what the display can actually paint, however fast CDP delivers frames.
  */
 import * as React from 'react'
+import type { Annotation } from '../../contracts/annotation'
 import type { TargetKind, TargetViewport } from '../../contracts/target'
 import {
   PREVIEW_NAVIGATE_METHOD,
@@ -31,7 +32,12 @@ import {
 } from '../../contracts/transport'
 import { createTranslator, type Locale } from '../i18n'
 import { AnnotationBubble, placeBubble } from '../inspect/AnnotationBubble'
-import { addAnnotationToQueue, createElementAnnotation } from '../inspect/AnnotationQueue'
+import {
+  addAnnotationToQueue,
+  createElementAnnotation,
+  type AnnotationSender,
+} from '../inspect/AnnotationQueue'
+import { AnnotationSaveNotice } from '../inspect/AnnotationSaveNotice'
 import { persistAnnotation } from '../inspect/history-store'
 import { PickCard, usePicker } from '../inspect/Picker'
 import { setActiveTab } from '../shell/store'
@@ -191,32 +197,6 @@ const pickHintStyle: React.CSSProperties = {
   pointerEvents: 'none',
 }
 
-const noticeStyle: React.CSSProperties = {
-  position: 'absolute',
-  right: 8,
-  bottom: 8,
-  zIndex: 5,
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  margin: 0,
-  padding: '3px 6px 3px 8px',
-  borderRadius: 4,
-  background: 'rgba(0, 0, 0, 0.72)',
-  color: '#e6e6e6',
-  font: '11px/1.4 system-ui, sans-serif',
-}
-
-const noticeButtonStyle: React.CSSProperties = {
-  font: 'inherit',
-  padding: '1px 6px',
-  borderRadius: 3,
-  border: '1px solid rgba(255, 255, 255, 0.4)',
-  background: 'transparent',
-  color: 'inherit',
-  cursor: 'pointer',
-}
-
 function drawerLayerStyle(open: boolean): React.CSSProperties {
   return {
     display: open ? 'grid' : 'none',
@@ -255,9 +235,16 @@ export function fitContain(
 
 export interface PreviewPageProps {
   readonly locale?: Locale
+  /** Composer handoff for the save notice; defaults to the clipboard. */
+  readonly send?: AnnotationSender
 }
 
-export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
+interface QueueNotice {
+  readonly kind: 'saved' | 'unsaved'
+  readonly annotation: Annotation
+}
+
+export function PreviewPage({ locale, send }: PreviewPageProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
   const [url, setUrl] = React.useState(DEFAULT_PREVIEW_URL)
   const [kind, setKind] = React.useState<TargetKind>('web')
@@ -269,7 +256,7 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
   const [stageSize, setStageSize] = React.useState<StageSize | null>(null)
   const [drawer, setDrawer] = React.useState<PreviewDrawerKind | null>(null)
   // `unsaved` means the note is in the queue but the history file was not written.
-  const [queueNotice, setQueueNotice] = React.useState<'saved' | 'unsaved' | null>(null)
+  const [queueNotice, setQueueNotice] = React.useState<QueueNotice | null>(null)
   const [consoleCounts, setConsoleCounts] = React.useState<ConsoleCounts>({
     total: 0,
     errors: 0,
@@ -709,12 +696,17 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
                 element: pickedElement,
               })
               if (addAnnotationToQueue(annotation)) {
-                setQueueNotice('saved')
+                setQueueNotice({ kind: 'saved', annotation })
                 picker.dismiss()
                 // History is a local record only; a failure never blocks the
                 // queue, it just downgrades the notice.
                 void persistAnnotation(annotation).then((saved) => {
-                  if (!saved) setQueueNotice('unsaved')
+                  if (saved) return
+                  setQueueNotice((current) =>
+                    current?.annotation.id === annotation.id
+                      ? { ...current, kind: 'unsaved' }
+                      : current,
+                  )
                 })
               }
             }}
@@ -722,23 +714,16 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
           />
         ) : null}
 
-        {queueNotice !== null ? (
-          <div data-vibe-annotation-notice="1" role="status" style={noticeStyle}>
-            <span>
-              {queueNotice === 'unsaved'
-                ? t('annotation.history.saveFailed')
-                : t('annotation.bubble.saved')}
-            </span>
-            <button
-              type="button"
-              data-vibe-annotation-view="1"
-              style={noticeButtonStyle}
-              onClick={() => setActiveTab('annotations')}
-            >
-              {t('annotation.queue.view')}
-            </button>
-          </div>
-        ) : null}
+        {queueNotice === null ? null : (
+          <AnnotationSaveNotice
+            key={queueNotice.annotation.id}
+            locale={locale}
+            annotation={queueNotice.annotation}
+            persisted={queueNotice.kind === 'saved'}
+            onViewQueue={() => setActiveTab('annotations')}
+            send={send}
+          />
+        )}
 
         {error === null ? null : (
           <p role="alert" style={errorBannerStyle}>
