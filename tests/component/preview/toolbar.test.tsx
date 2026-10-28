@@ -3,7 +3,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { TargetCapabilities } from '../../../src/contracts/target'
 import type { PreviewSessionSnapshot } from '../../../src/contracts/transport'
-import { Toolbar, type ToolbarProps } from '../../../src/client/preview/Toolbar'
+import {
+  Toolbar,
+  VIEWPORT_PRESETS,
+  type ToolbarProps,
+} from '../../../src/client/preview/Toolbar'
 
 const CAPABILITIES: TargetCapabilities = {
   screencast: true,
@@ -55,38 +59,57 @@ function renderToolbar(overrides: Partial<ToolbarProps> = {}) {
   return { ...view, handlers }
 }
 
+function openMenu(): void {
+  fireEvent.click(screen.getByRole('button', { name: /More/ }))
+}
+
 afterEach(() => {
   cleanup()
 })
 
-describe('preview toolbar (T025)', () => {
-  it('starts from an idle session and disables live-only actions', () => {
-    const { handlers } = renderToolbar({ snapshot: null })
+describe('preview toolbar (U01 layout v2)', () => {
+  it('shows a single status line and the address row while idle', () => {
+    renderToolbar({ snapshot: null })
 
+    const status = document.querySelector('[data-vibe-status]')
+    expect(status?.getAttribute('data-state')).toBe('idle')
+    expect(status?.textContent).toContain('Idle')
     expect(screen.getByLabelText('Preview URL')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Start' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Reload' })).toHaveProperty('disabled', true)
-    expect(screen.getByRole('button', { name: 'Open in browser' })).toHaveProperty(
+
+    // The viewport inputs no longer live on the preview page.
+    expect(screen.queryByLabelText('Viewport width')).toBeNull()
+    expect(screen.queryByLabelText('Viewport height')).toBeNull()
+    // Reload only exists while live.
+    expect(screen.queryByRole('button', { name: 'Reload' })).toBeNull()
+  })
+
+  it('keeps live-only actions disabled inside the More menu while idle', () => {
+    const { handlers } = renderToolbar({ snapshot: null })
+    openMenu()
+
+    expect(screen.getByRole('menuitem', { name: '1280 × 800' })).toHaveProperty(
       'disabled',
       true,
     )
-    expect(screen.getByRole('button', { name: 'Stop' })).toHaveProperty('disabled', true)
-    expect(screen.getByLabelText('Viewport width')).toHaveProperty('disabled', true)
+    expect(screen.getByRole('menuitem', { name: 'Open in browser' })).toHaveProperty(
+      'disabled',
+      true,
+    )
+    expect(screen.getByRole('menuitem', { name: 'Stop' })).toHaveProperty('disabled', true)
+    expect(screen.queryByRole('menuitem', { name: 'Restart' })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))
     expect(handlers.onSubmit).toHaveBeenCalledTimes(1)
+    expect(handlers.onStop).not.toHaveBeenCalled()
   })
 
-  it('submits the URL for navigation while live and offers live actions', () => {
+  it('navigates from the address row and exposes live actions in the menu', () => {
     const { handlers } = renderToolbar()
 
-    expect(screen.getByRole('button', { name: 'Go' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Reload' })).toHaveProperty('disabled', false)
-    expect(screen.getByRole('button', { name: 'Open in browser' })).toHaveProperty(
-      'disabled',
-      false,
-    )
-    expect(screen.getByRole('button', { name: 'Stop' })).toHaveProperty('disabled', false)
+    const status = document.querySelector('[data-vibe-status]')
+    expect(status?.getAttribute('data-state')).toBe('ready')
+    expect(status?.textContent).toContain('Live · 15 fps')
 
     fireEvent.change(screen.getByLabelText('Preview URL'), {
       target: { value: 'http://localhost:5173/' },
@@ -99,47 +122,116 @@ describe('preview toolbar (T025)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reload' }))
     expect(handlers.onReload).toHaveBeenCalledTimes(1)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
-    expect(handlers.onStop).toHaveBeenCalledTimes(1)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open in browser' }))
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open in browser' }))
     expect(handlers.onOpenExternal).toHaveBeenCalledTimes(1)
+
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Stop' }))
+    expect(handlers.onStop).toHaveBeenCalledTimes(1)
   })
 
-  it('applies a valid viewport and refuses out-of-range sizes', () => {
+  it('moves viewport presets into the menu and reports the chosen size', () => {
     const { handlers } = renderToolbar()
-    const width = screen.getByLabelText('Viewport width') as HTMLInputElement
-    const height = screen.getByLabelText('Viewport height') as HTMLInputElement
+    openMenu()
 
-    expect(width.value).toBe('800')
-    expect(height.value).toBe('600')
+    for (const preset of VIEWPORT_PRESETS) {
+      expect(
+        screen.getByRole('menuitem', { name: `${preset.width} × ${preset.height}` }),
+      ).toHaveProperty('disabled', false)
+    }
 
-    fireEvent.change(width, { target: { value: '900' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
-    expect(handlers.onViewportChange).toHaveBeenCalledWith({ width: 900, height: 600 })
+    fireEvent.click(screen.getByRole('menuitem', { name: '1440 × 900' }))
+    expect(handlers.onViewportChange).toHaveBeenCalledWith({ width: 1440, height: 900 })
+    // Choosing a preset closes the menu.
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
 
-    fireEvent.change(height, { target: { value: '10' } })
-    expect(screen.getByRole('button', { name: 'Apply' })).toHaveProperty('disabled', true)
-    expect(screen.getByText('Width and height must be 64–7680.')).toBeTruthy()
+  it('uses the measured stage for the fit-panel preset and clamps it', () => {
+    const { handlers } = renderToolbar({
+      stageSize: { width: 8000.6, height: 900.2 },
+    })
+    openMenu()
+
+    const adaptive = screen.getByRole('menuitem', { name: 'Fit panel' })
+    expect(adaptive).toHaveProperty('disabled', false)
+    fireEvent.click(adaptive)
+    expect(handlers.onViewportChange).toHaveBeenCalledWith({ width: 7680, height: 900 })
+  })
+
+  it('disables the fit-panel preset without a usable stage size', () => {
+    renderToolbar({ stageSize: null })
+    openMenu()
+    expect(screen.getByRole('menuitem', { name: 'Fit panel' })).toHaveProperty(
+      'disabled',
+      true,
+    )
+
+    cleanup()
+    // Too small to be a viewport; the Host would reject it.
+    renderToolbar({ stageSize: { width: 520, height: 20 } })
+    openMenu()
+    expect(screen.getByRole('menuitem', { name: 'Fit panel' })).toHaveProperty(
+      'disabled',
+      true,
+    )
+  })
+
+  it('expands the status line into details without a second toolbar row', () => {
+    renderToolbar({
+      snapshot: snapshot({
+        lastError: { code: 'target_unavailable', message: 'page closed' },
+      }),
+      stats: {
+        mode: 'stream',
+        frames: 42,
+        lastSeq: 7,
+        streamConnects: 1,
+        pullRequests: 0,
+        failures: 0,
+        lastError: null,
+      },
+    })
+
+    fireEvent.click(document.querySelector('[data-vibe-status]') as HTMLElement)
+    const details = document.querySelector('[data-vibe-status-details]')
+    expect(details).not.toBeNull()
+    expect(details?.textContent).toContain('Stream')
+    expect(details?.textContent).toContain('42')
+    expect(details?.textContent).toContain('#7')
+    expect(details?.textContent).toContain('page closed')
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(document.querySelector('[data-vibe-status-details]')).toBeNull()
   })
 
   it('only offers external open for loopback http(s) URLs', () => {
     renderToolbar({ snapshot: snapshot({ url: 'https://example.com/' }) })
-    expect(screen.getByRole('button', { name: 'Open in browser' })).toHaveProperty(
+    openMenu()
+    expect(screen.getByRole('menuitem', { name: 'Open in browser' })).toHaveProperty(
       'disabled',
       true,
     )
 
     cleanup()
     renderToolbar({ snapshot: snapshot({ url: 'file:///C:/secret.html' }) })
-    expect(screen.getByRole('button', { name: 'Open in browser' })).toHaveProperty(
+    openMenu()
+    expect(screen.getByRole('menuitem', { name: 'Open in browser' })).toHaveProperty(
       'disabled',
       true,
     )
+
+    cleanup()
+    renderToolbar({ snapshot: snapshot({ url: 'http://127.0.0.1:4320/' }) })
+    openMenu()
+    expect(screen.getByRole('menuitem', { name: 'Open in browser' })).toHaveProperty(
+      'disabled',
+      false,
+    )
   })
 
-  it('shows a failed session with actions disabled until restart completes', () => {
-    renderToolbar({
+  it('shows a failed session with a restart action and the last error', () => {
+    const { handlers } = renderToolbar({
       snapshot: snapshot({
         status: 'failed',
         lastError: {
@@ -149,8 +241,31 @@ describe('preview toolbar (T025)', () => {
       }),
     })
 
-    expect(screen.getByText(/State:\s*Failed/)).toBeTruthy()
+    const status = document.querySelector('[data-vibe-status]')
+    expect(status?.getAttribute('data-state')).toBe('failed')
+    expect(status?.textContent).toContain('Failed')
+    expect(screen.queryByRole('button', { name: 'Reload' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Start' })).toHaveProperty('disabled', false)
-    expect(screen.getByRole('button', { name: 'Reload' })).toHaveProperty('disabled', true)
+
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Restart' }))
+    expect(handlers.onSubmit).toHaveBeenCalledTimes(1)
+  })
+
+  it('only lists target selectors when the Host advertises several', () => {
+    renderToolbar()
+    openMenu()
+    expect(screen.queryByLabelText('Target')).toBeNull()
+
+    cleanup()
+    renderToolbar({
+      snapshot: null,
+      targets: [
+        { id: 'web', kind: 'web' },
+        { id: 'desktop', kind: 'desktop' },
+      ],
+    })
+    openMenu()
+    expect(screen.getByLabelText('Target')).toBeTruthy()
   })
 })

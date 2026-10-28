@@ -256,7 +256,7 @@
 > 依赖：G2。**阻塞 T027**：T027 的 overlay 需要基于定稿后的画布几何取坐标。范围只限预览页排版与引导文案，不新增功能。
 > 依据：`docs/2026-10-28-界面与项目方向.md` 第 2 节；用户《M1界面修改意见》。
 
-### - [ ] U01 预览界面精简（Layout v2）
+### - [x] U01 预览界面精简（Layout v2）
 
 - **目标**：画布优先。状态压成单行；视口等参数移入设置页或“更多”菜单；Console/Network 改为底部常驻 tab + 覆盖式抽屉；补空状态/失败态引导。
 - **验收**：
@@ -267,6 +267,12 @@
   - 手动回归 P1–P5、V1–V6、I1–I8、C1–C5、N1–N6、L1–L7、S1–S7（编号见 `docs/2026-10-28-手动测试手册.md`）。
 - **验证**：`pnpm typecheck`、`pnpm test`、`pnpm build`；`vibe-dev` + headless Edge 在 320/400/500px 三档各截图 + 断言；组件测试更新。
 - **文件**：`src/client/preview/{Canvas,PreviewPage,Toolbar}.tsx`、`src/client/shell/settings/*`、`src/client/locales/*.json`、`src/client/preview/*.css`、tests。
+- **验证结果（2026-10-28）**：
+  - 静态检查：`pnpm typecheck` 0 error；`pnpm test` 43 文件 / 319 用例通过（新增 `preview-tabs.test.tsx`、`preview-settings.test.tsx`，重写 toolbar/console/network/studio-shell 用例）；`pnpm build` host 140.5 KiB / client 140.9 KiB。
+  - 真实载体（`.tmp/u01-verify.mjs` → `.tmp/logs/u01-verify.json`，`vibe-dev` + headless Edge 1440×900，右栏强制 320/400/500px，`ok:true`）：三档面板宽均无横向溢出（document/预览根/状态行/地址行 scrollWidth == clientWidth，预览根 scrollHeight == clientHeight）；舞台（画布区域）高 657.6px = 面板 768.6px 的 **85.6% ≥ 60%**，实际位图按 16:9 居中letterbox（320px 宽时位图 304×171 = 22.2%，受几何限制，非布局问题）；常驻行恰 3（工具条/舞台/tab），视口宽高输入 0；抽屉开/关（Console→Network→关）canvas 恒为 304×171；fps 264 帧 / 10.1 s = **26.2 fps**（状态条运行中 · 30 fps 为目标值），≥ 20；点击/键入 `hello`/滚轮 500px 均经 InputLayer 生效；Console 18 条、Network 46 条，tab 标签 `控制台 (17)` / `网络 (42)`；失败态（不可达 4399）显示 3 条检查项 + 重启按钮，重启到良好地址成功；停止后 3086 ms 内 9 个目标 Edge 进程全退、无孤儿、状态回空闲。
+  - console：正常流程 0 error；唯一一条 503 是**故意**启动不可达目标时 `preview.session.start` 的设计性错误响应（浏览器对任何 5xx 都会记录），非缺陷。首轮发现并已修复：`/api/vibe/request` 返回 501 `unsupported` 两次（Console/Network 抽屉在 Stop 过程中仍轮询已释放句柄的会话）——`Canvas` 现在在 `busy === 'stop'` 时立即停用抽屉并关闭已开抽屉，末轮 501 = 0。
+  - 截图：`.tmp/logs/u01-{320,400,500}.png`、`u01-failure.png`、`u01-stopped.png`。
+  - 限制：真实系统中文 IME、外部浏览器打开跳转、以及 P/V/I/C/N/L/S 全量手测矩阵未自动化（本轮覆盖 P1–P5/V1–V6/I1–I8/C1–C5/N1–N6 的脚本等价项，L/S 类（切 tab、关闭面板）沿用 T025 手测与 lifecycle 单测结论）；失败态测试必然产生 1 条 503 日志。
 
 ---
 

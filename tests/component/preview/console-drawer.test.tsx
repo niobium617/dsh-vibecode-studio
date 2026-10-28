@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
-import { ConsoleDrawer, type ConsoleSource } from '../../../src/client/preview/ConsoleDrawer'
+import {
+  ConsoleDrawer,
+  type ConsoleCounts,
+  type ConsoleSource,
+} from '../../../src/client/preview/ConsoleDrawer'
 import type { ConsoleEntry } from '../../../src/contracts/telemetry'
 import type {
   PreviewConsoleClearResult,
@@ -30,8 +34,10 @@ function snapshot(
 
 interface SetupOptions {
   readonly active?: boolean
+  readonly visible?: boolean
   readonly list?: (query: PreviewConsoleQuery) => Promise<PreviewConsoleSnapshot>
   readonly clear?: () => Promise<PreviewConsoleClearResult>
+  readonly onCountsChange?: (counts: ConsoleCounts) => void
 }
 
 function setup(initial: PreviewConsoleSnapshot, options: SetupOptions = {}) {
@@ -48,7 +54,13 @@ function setup(initial: PreviewConsoleSnapshot, options: SetupOptions = {}) {
   )
   const source: ConsoleSource = { list, clear }
   const view = render(
-    <ConsoleDrawer active={options.active ?? true} source={source} pollMs={POLL_MS} />,
+    <ConsoleDrawer
+      active={options.active ?? true}
+      source={source}
+      pollMs={POLL_MS}
+      visible={options.visible ?? true}
+      onCountsChange={options.onCountsChange}
+    />,
   )
   return {
     view,
@@ -78,10 +90,6 @@ function entryElements(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>('[data-vibe-console-entry="1"]'))
 }
 
-function openDrawer(view: ReturnType<typeof render>): void {
-  fireEvent.click(view.getByRole('button', { name: /^Console/ }))
-}
-
 beforeEach(() => {
   vi.useFakeTimers()
 })
@@ -100,11 +108,7 @@ describe('ConsoleDrawer', () => {
     await settle()
 
     expect(calls).toEqual([{}])
-    expect(
-      view.getByRole('button', { name: 'Console · 1 errors · 1 warnings' }),
-    ).toBeTruthy()
-
-    openDrawer(view)
+    expect(view.getByText('Console · 1 errors · 1 warnings')).toBeTruthy()
     expect(entryElements(view.container)).toHaveLength(3)
     expect(view.getByText('boom')).toBeTruthy()
     expect(view.getByText('careful')).toBeTruthy()
@@ -119,7 +123,6 @@ describe('ConsoleDrawer', () => {
   it('merges only new entries and drops duplicate ids', async () => {
     const { view, setSnapshot } = setup(snapshot([entry(1, 'info', 'first')], 1))
     await settle()
-    openDrawer(view)
 
     // A retried response may repeat the last entry; the drawer keeps one copy.
     setSnapshot(snapshot([entry(1, 'info', 'first'), entry(2, 'error', 'second')], 2))
@@ -144,7 +147,6 @@ describe('ConsoleDrawer', () => {
       ),
     )
     await settle()
-    openDrawer(view)
 
     fireEvent.click(view.getByRole('button', { name: 'Errors (1)' }))
     expect(entryElements(view.container).map((row) => row.dataset.level)).toEqual(['error'])
@@ -167,15 +169,16 @@ describe('ConsoleDrawer', () => {
       snapshot([entry(1, 'error', 'boom'), entry(2, 'warn', 'careful')], 2),
     )
     await settle()
-    openDrawer(view)
 
     fireEvent.click(view.getByRole('button', { name: 'Clear' }))
     await settle()
 
     expect(clear).toHaveBeenCalledTimes(1)
     expect(entryElements(view.container)).toHaveLength(0)
-    expect(view.getByRole('button', { name: 'Console · 0 errors · 0 warnings' })).toBeTruthy()
-    expect(view.getByText('No console messages yet.')).toBeTruthy()
+    expect(view.getByText('Console · 0 errors · 0 warnings')).toBeTruthy()
+    expect(
+      view.getByText('No messages yet. Interact with the preview and entries appear automatically.'),
+    ).toBeTruthy()
 
     // The next poll resumes from the sequence the Host reported.
     setSnapshot(snapshot([], 2))
@@ -197,7 +200,6 @@ describe('ConsoleDrawer', () => {
       clear: async () => ({ cleared: 1, lastSeq: 6 }),
     })
     await settle()
-    openDrawer(view)
 
     pending = true
     await advance(POLL_MS)
@@ -220,7 +222,7 @@ describe('ConsoleDrawer', () => {
     await advance(POLL_MS * 3)
 
     expect(list).not.toHaveBeenCalled()
-    expect(view.getByRole('button', { name: 'Console · 0 errors · 0 warnings' })).toBeTruthy()
+    expect(view.getByText('Console · 0 errors · 0 warnings')).toBeTruthy()
   })
 
   it('reports Host failures without dropping already drawn entries', async () => {
@@ -233,7 +235,6 @@ describe('ConsoleDrawer', () => {
           : Promise.resolve(initial),
     })
     await settle()
-    openDrawer(view)
     expect(entryElements(view.container)).toHaveLength(1)
 
     failing = true
@@ -256,8 +257,26 @@ describe('ConsoleDrawer', () => {
       ),
     )
     await settle()
-    openDrawer(view)
 
     expect(view.getByText('http://127.0.0.1:4320/a.js?token=REDACTED:3:9')).toBeTruthy()
+  })
+
+  it('stays hidden but keeps counting while another tab is selected', async () => {
+    const counts: ConsoleCounts[] = []
+    const { view } = setup(
+      snapshot([entry(1, 'error', 'boom'), entry(2, 'info', 'hi')], 2),
+      { visible: false, onCountsChange: (value) => counts.push(value) },
+    )
+    await settle()
+
+    const root = view.container.querySelector<HTMLElement>('#vibe-console-drawer')
+    expect(root?.style.display).toBe('none')
+    expect(counts.at(-1)).toEqual({ total: 2, errors: 1, warnings: 0, info: 1 })
+  })
+
+  it('hides its own close affordance only when no handler is given', async () => {
+    const { view } = setup(snapshot([], 0))
+    await settle()
+    expect(view.queryByRole('button', { name: 'Close drawer' })).toBeNull()
   })
 })

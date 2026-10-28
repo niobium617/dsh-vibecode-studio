@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
-import { NetworkDrawer, type NetworkSource } from '../../../src/client/preview/NetworkDrawer'
+import {
+  NetworkDrawer,
+  type NetworkCounts,
+  type NetworkSource,
+} from '../../../src/client/preview/NetworkDrawer'
 import type { NetworkEntry } from '../../../src/contracts/telemetry'
 import type {
   PreviewNetworkBody,
@@ -65,6 +69,8 @@ const BODY: PreviewNetworkBody = {
 
 interface SetupOptions {
   readonly active?: boolean
+  readonly visible?: boolean
+  readonly onCountsChange?: (counts: NetworkCounts) => void
   readonly list?: (query: PreviewNetworkQuery) => Promise<PreviewNetworkSnapshot>
   readonly clear?: () => Promise<PreviewNetworkClearResult>
   readonly body?: (id: string) => Promise<PreviewNetworkBody>
@@ -89,7 +95,13 @@ function setup(initial: PreviewNetworkSnapshot, options: SetupOptions = {}) {
   })
   const source: NetworkSource = { list, clear, body }
   const view = render(
-    <NetworkDrawer active={options.active ?? true} source={source} pollMs={POLL_MS} />,
+    <NetworkDrawer
+      active={options.active ?? true}
+      source={source}
+      pollMs={POLL_MS}
+      visible={options.visible ?? true}
+      onCountsChange={options.onCountsChange}
+    />,
   )
   return {
     view,
@@ -121,10 +133,6 @@ function rowElements(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>('[data-vibe-network-entry="1"]'))
 }
 
-function openDrawer(view: ReturnType<typeof render>): void {
-  fireEvent.click(view.getByRole('button', { name: /^Network/ }))
-}
-
 beforeEach(() => {
   vi.useFakeTimers()
 })
@@ -141,10 +149,7 @@ describe('NetworkDrawer', () => {
     await settle()
 
     expect(calls).toEqual([{}])
-    expect(
-      view.getByRole('button', { name: 'Network · 3 requests · 1 failed' }),
-    ).toBeTruthy()
-    openDrawer(view)
+    expect(view.getByText('Network · 3 requests · 1 failed')).toBeTruthy()
 
     const rows = rowElements(view.container)
     expect(rows).toHaveLength(3)
@@ -166,13 +171,10 @@ describe('NetworkDrawer', () => {
   it('filters to failed requests without changing the summary', async () => {
     const { view } = setup(snapshot([OK_ENTRY, BAD_ENTRY, PENDING_ENTRY], 3))
     await settle()
-    openDrawer(view)
 
     fireEvent.click(view.getByRole('button', { name: 'Failed (1)' }))
     expect(rowElements(view.container).map((row) => row.dataset.status)).toEqual(['500'])
-    expect(
-      view.getByRole('button', { name: 'Network · 3 requests · 1 failed' }),
-    ).toBeTruthy()
+    expect(view.getByText('Network · 3 requests · 1 failed')).toBeTruthy()
 
     fireEvent.click(view.getByRole('button', { name: 'All (3)' }))
     expect(rowElements(view.container)).toHaveLength(3)
@@ -181,7 +183,6 @@ describe('NetworkDrawer', () => {
   it('updates a pending row in place when its response arrives', async () => {
     const { view, calls, setSnapshot } = setup(snapshot([OK_ENTRY, PENDING_ENTRY], 2))
     await settle()
-    openDrawer(view)
     expect(rowElements(view.container)).toHaveLength(2)
     expect(rowElements(view.container)[1]?.textContent).toContain('pending')
 
@@ -211,7 +212,6 @@ describe('NetworkDrawer', () => {
   it('loads a response body on demand and caches it per row', async () => {
     const { view, bodyCalls } = setup(snapshot([OK_ENTRY, BAD_ENTRY], 2))
     await settle()
-    openDrawer(view)
 
     fireEvent.click(view.getByRole('button', { name: /\/api\/echo/ }))
     await settle()
@@ -232,7 +232,6 @@ describe('NetworkDrawer', () => {
   it('shows request and response headers as plain text with sensitive values redacted', async () => {
     const { view, bodyCalls } = setup(snapshot([BAD_ENTRY], 1))
     await settle()
-    openDrawer(view)
 
     fireEvent.click(view.getByRole('button', { name: /\/api\/boom/ }))
     await settle()
@@ -255,7 +254,6 @@ describe('NetworkDrawer', () => {
   it('does not request a body for a pending request', async () => {
     const { view, bodyCalls } = setup(snapshot([PENDING_ENTRY], 1))
     await settle()
-    openDrawer(view)
 
     fireEvent.click(view.getByRole('button', { name: /\/api\/slow/ }))
     await settle()
@@ -275,7 +273,6 @@ describe('NetworkDrawer', () => {
       }),
     })
     await settle()
-    openDrawer(view)
     fireEvent.click(view.getByRole('button', { name: /\/api\/echo/ }))
     await settle()
 
@@ -286,17 +283,18 @@ describe('NetworkDrawer', () => {
   it('clears both the Host buffer and the local rows', async () => {
     const { view, calls, clear, setSnapshot } = setup(snapshot([OK_ENTRY, BAD_ENTRY], 2))
     await settle()
-    openDrawer(view)
 
     fireEvent.click(view.getByRole('button', { name: 'Clear' }))
     await settle()
 
     expect(clear).toHaveBeenCalledTimes(1)
     expect(rowElements(view.container)).toHaveLength(0)
+    expect(view.getByText('Network · 0 requests · 0 failed')).toBeTruthy()
     expect(
-      view.getByRole('button', { name: 'Network · 0 requests · 0 failed' }),
+      view.getByText(
+        'No requests yet. Interact with the preview and requests appear automatically.',
+      ),
     ).toBeTruthy()
-    expect(view.getByText('No network requests yet.')).toBeTruthy()
 
     setSnapshot(snapshot([], 2))
     await advance(POLL_MS)
@@ -309,9 +307,7 @@ describe('NetworkDrawer', () => {
     await advance(POLL_MS * 3)
 
     expect(list).not.toHaveBeenCalled()
-    expect(
-      view.getByRole('button', { name: 'Network · 0 requests · 0 failed' }),
-    ).toBeTruthy()
+    expect(view.getByText('Network · 0 requests · 0 failed')).toBeTruthy()
   })
 
   it('reports Host failures without dropping already drawn rows', async () => {
@@ -322,7 +318,6 @@ describe('NetworkDrawer', () => {
         failing ? Promise.reject(new Error('preview is not running')) : Promise.resolve(initial),
     })
     await settle()
-    openDrawer(view)
     expect(rowElements(view.container)).toHaveLength(1)
 
     failing = true
@@ -330,5 +325,24 @@ describe('NetworkDrawer', () => {
 
     expect(rowElements(view.container)).toHaveLength(1)
     expect(view.getByRole('status').textContent).toContain('preview is not running')
+  })
+
+  it('stays hidden but keeps counting while another tab is selected', async () => {
+    const counts: NetworkCounts[] = []
+    const { view } = setup(snapshot([OK_ENTRY, BAD_ENTRY], 2), {
+      visible: false,
+      onCountsChange: (value) => counts.push(value),
+    })
+    await settle()
+
+    const root = view.container.querySelector<HTMLElement>('#vibe-network-drawer')
+    expect(root?.style.display).toBe('none')
+    expect(counts.at(-1)).toEqual({ total: 2, failed: 1 })
+  })
+
+  it('hides its own close affordance only when no handler is given', async () => {
+    const { view } = setup(snapshot([], 0))
+    await settle()
+    expect(view.queryByRole('button', { name: 'Close drawer' })).toBeNull()
   })
 })

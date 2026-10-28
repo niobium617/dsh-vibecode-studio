@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { resetShellStore } from '../../../src/client/shell/store'
 import { StudioShell } from '../../../src/client/shell/StudioShell'
 
@@ -12,8 +12,16 @@ afterEach(() => {
   cleanup()
 })
 
+/**
+ * The preview page has its own drawer tablist (U01), so shell assertions scope
+ * to the shell's tablist instead of every `role=tab` on the page.
+ */
+function shellTabs(): HTMLElement[] {
+  return within(screen.getByRole('tablist', { name: 'Vibe Studio' })).getAllByRole('tab')
+}
+
 function tabNames(): (string | null)[] {
-  return screen.getAllByRole('tab').map((tab) => tab.textContent)
+  return shellTabs().map((tab) => tab.textContent)
 }
 
 describe('StudioShell', () => {
@@ -23,7 +31,7 @@ describe('StudioShell', () => {
     expect(screen.getByRole('heading', { name: 'Vibe Studio' })).toBeTruthy()
     expect(tabNames()).toEqual(['Preview', 'Inspect', 'Annotations', 'API', 'Settings'])
 
-    const selected = screen.getAllByRole('tab').filter(
+    const selected = shellTabs().filter(
       (tab) => tab.getAttribute('aria-selected') === 'true',
     )
     expect(selected).toHaveLength(1)

@@ -20,6 +20,7 @@ import {
 import { browserLocale, createTranslator, type Locale } from '../../i18n'
 import { ErrorState, LoadingState } from '../StateViews'
 import { transportSettingsApi, type SettingsApi } from './api'
+import { PreviewSettings, type PreviewSettingsApi } from './PreviewSettings'
 import {
   groupSettingsIssues,
   issuesFromError,
@@ -161,9 +162,15 @@ export interface SettingsPageProps {
   readonly locale?: Locale
   /** Injection point for tests; production uses the unary transport. */
   readonly api?: SettingsApi
+  /** Injection point for the preview group (U01); production uses the transport. */
+  readonly previewApi?: PreviewSettingsApi
 }
 
-export function SettingsPage({ locale, api }: SettingsPageProps): React.ReactElement {
+export function SettingsPage({
+  locale,
+  api,
+  previewApi,
+}: SettingsPageProps): React.ReactElement {
   const activeLocale = locale ?? browserLocale()
   const t = React.useMemo(() => createTranslator(activeLocale), [activeLocale])
   const client = api ?? transportSettingsApi
@@ -381,6 +388,8 @@ export function SettingsPage({ locale, api }: SettingsPageProps): React.ReactEle
         <p style={hintStyle}>{t('settings.logLevel.hint')}</p>
         <FieldIssues field="logLevel" messages={issues.logLevel} />
       </div>
+
+      <PreviewSettings locale={activeLocale} api={previewApi} />
 
       {generalIssues.length > 0 ? (
         <ul role="alert" data-settings-general="1" style={issueStyle}>

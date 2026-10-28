@@ -421,6 +421,30 @@
 - 验证：仅文档/任务清单，未改产品代码、未跑测试。
 - 待确认：右栏最小宽度 320/360px、抽屉是否可拖拽、“在浏览器打开”位置、P2 一键部署是否单独立项。
 
+### U01 实施 — 预览界面精简（Layout v2）（已完成，2026-10-28）
+
+- 背景：方向定稿后按 `docs/2026-10-28-界面与项目方向.md` 第 2 节落地。基线（T026）：工具栏 5 组控件常驻、视口输入常驻、抽屉挤压画布、失败态无引导。
+- 结果：
+  - `src/client/preview/Canvas.tsx`：页面根改为 3 行网格（工具条 / 舞台 / 底部 tab），`fitContain()` 舞台内 letterbox 使 canvas 盒与位图严格等比（InputLayer 坐标映射不变），ResizeObserver 量舞台；状态 1 s 轮询、帧统计 500 ms；空状态提示与失败卡片（错误信息 + 3 条检查项 + 重启）；抽屉层 `position:absolute` 覆盖舞台、高 40%，Console/Network 常驻挂载以维持 tab 计数。
+  - `src/client/preview/Toolbar.tsx`：单行状态（`● 运行中 · N fps` + `⋯ 更多`）与单行地址（`[URL] [启动/前往] [↻]`）；视口预设 + Fit panel、在浏览器打开、停止、重启、目标选择收进“更多”；状态点击弹出帧数/序号详情；视口钳制 64–7680；Esc 与外部 pointerdown 关闭浮层。
+  - `src/client/preview/PreviewTabs.tsx`（新增）：底部常驻 tab，带实时计数，未就绪/无能力时禁用。
+  - `src/client/preview/{ConsoleDrawer,NetworkDrawer}.tsx`：`active`（轮询）与 `visible`（显示）拆分，隐藏时用 `display:none` 且继续计数；新增关闭按钮、初学者空态文案、`onCountsChange` 上报。
+  - `src/client/shell/settings/PreviewSettings.tsx`（新增）+ `SettingsPage.tsx`：设置页“预览”分组（懒加载 `<details>`），只用既有 `preview.session.status` / `preview.session.viewport` 一元方法，无契约变更；可注入 API 便于测试。
+  - `src/client/shell/StudioShell.tsx`：预览面板 `minHeight:0; overflow:hidden`，保证网格行高可收缩。
+  - `src/client/locales/{en,zh-CN}.json`：新增 30 个 key（状态详情、更多、空/失败态、抽屉空态、设置预览分组），两语 141/141 对齐。
+  - 测试：新增 `tests/component/preview/preview-tabs.test.tsx`、`tests/component/shell/preview-settings.test.tsx`；重写 toolbar / console-drawer / network-drawer 用例与 studio-shell 的 tab 查询（限定 shell tablist，避免与抽屉 tab 冲突）。
+- 真机发现并修复的两个缺陷（jsdom 测不出）：
+  1. 页面根写了 4 个 `gridTemplateRows` 值却只有 3 个子节点，舞台被排成 `auto`（171 px）、底部 tab 反而吃掉 `1fr`（509 px）。改为 `'auto minmax(0, 1fr) auto'` 后舞台占面板 85.6%。
+  2. 停止预览时 host 先释放 Console/Network 采集器、状态仍为 `ready`，抽屉 500 ms 轮询打到半拆会话，`/api/vibe/request` 返回 501 `unsupported`（浏览器 console 记两条 5xx，且抽屉里闪现错误）。现在 `busy === 'stop'` 时立即停用两个抽屉并关闭已开抽屉。
+- 验证：
+  - `pnpm typecheck` 0 error；`pnpm test` 43 文件 / 319 用例通过；`pnpm build` host 140.5 KiB / client 140.9 KiB。
+  - 真机（`.tmp/u01-verify.mjs`，`vibe-dev` + headless Edge 1440×900，右栏强制 320/400/500px，`.tmp/logs/u01-verify.json`，`ok:true`）：三档均无横向溢出，舞台高 657.6 / 面板 768.6 = **85.6%**；常驻行 3，视口输入 0；抽屉开合 canvas 恒 304×171；264 帧 / 10.1 s = **26.2 fps**；点击、键入 `hello`、滚轮 500 均经 InputLayer 生效；Console 18 条 / Network 46 条，tab 计数正确；失败态 3 条检查项 + 重启成功；停止 3086 ms 内 9 个 Edge 进程全退、无孤儿。正常流程 console 0 error；唯一 503 是故意启动不可达目标的设计性错误响应，修复后无 501。
+  - 截图：`.tmp/logs/u01-{320,400,500}.png`、`u01-failure.png`、`u01-stopped.png`。
+- 计划偏差/限制：
+  - 验收写“画布高度 ≥ 面板 60%”，按**舞台（画布区域）**理解并达标；16:9 位图在 320px 宽、768px 高面板中最多只能到 22.2%（304×171），几何上不可能达 60%，位图比例单独记录。
+  - 真实系统中文 IME、外部浏览器跳转、P/V/I/C/N/L/S 全量手测矩阵未自动化；L/S 类（切 tab、关面板）沿用 T025 手测与 lifecycle 单测结论。
+  - 设置页“预览”分组只改目标页视口，不改 DSH 窗口尺寸；不新增 host 契约。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体

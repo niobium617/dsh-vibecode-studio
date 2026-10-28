@@ -28,6 +28,11 @@ export interface NetworkSource {
   body(id: string): Promise<PreviewNetworkBody>
 }
 
+export interface NetworkCounts {
+  readonly total: number
+  readonly failed: number
+}
+
 export interface NetworkDrawerProps {
   /** Only poll while a preview session is live. */
   readonly active: boolean
@@ -36,6 +41,11 @@ export interface NetworkDrawerProps {
   readonly source?: NetworkSource
   /** Poll cadence in milliseconds (tests use a short interval). */
   readonly pollMs?: number
+  /** Shown when this drawer is the selected bottom tab. */
+  readonly visible?: boolean
+  onClose?(): void
+  /** Keeps the bottom tab count in sync while the drawer is closed. */
+  onCountsChange?(counts: NetworkCounts): void
 }
 
 type NetworkFilter = 'all' | 'error'
@@ -54,31 +64,40 @@ const DEFAULT_SOURCE: NetworkSource = {
   body: (id) => callUnary<PreviewNetworkBody>(PREVIEW_NETWORK_BODY_METHOD, { id }),
 }
 
-const rootStyle: React.CSSProperties = {
+function rootStyle(visible: boolean): React.CSSProperties {
+  return {
+    display: visible ? 'grid' : 'none',
+    gridTemplateRows: 'auto minmax(0, 1fr)',
+    gap: 6,
+    height: '100%',
+    minHeight: 0,
+    padding: '6px 8px 8px',
+    boxSizing: 'border-box',
+    font: '12px/1.5 system-ui, sans-serif',
+  }
+}
+
+const drawerBodyStyle: React.CSSProperties = {
   display: 'grid',
+  gridTemplateRows: 'auto auto minmax(0, 1fr)',
   gap: 6,
-  borderTop: '1px solid var(--dsw-border-color, rgba(127, 127, 127, 0.3))',
-  paddingTop: 8,
-  font: '12px/1.5 system-ui, sans-serif',
+  minHeight: 0,
 }
 
 const headerStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 8,
+  minWidth: 0,
 }
 
-const toggleStyle: React.CSSProperties = {
+const titleStyle: React.CSSProperties = {
   flex: 1,
   minWidth: 0,
-  textAlign: 'left',
-  font: 'inherit',
-  padding: '4px 6px',
-  border: '1px solid var(--dsw-border-color, rgba(127, 127, 127, 0.4))',
-  borderRadius: 4,
-  background: 'transparent',
-  color: 'inherit',
-  cursor: 'pointer',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  font: '600 12px/1.4 system-ui, sans-serif',
 }
 
 const buttonStyle: React.CSSProperties = {
@@ -116,9 +135,10 @@ const listStyle: React.CSSProperties = {
   margin: 0,
   padding: 0,
   listStyle: 'none',
-  maxHeight: 240,
+  minHeight: 0,
   overflow: 'auto',
   display: 'grid',
+  alignContent: 'start',
   gap: 2,
   font: '11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace',
 }
@@ -254,9 +274,11 @@ export function NetworkDrawer({
   locale,
   source = DEFAULT_SOURCE,
   pollMs = DEFAULT_POLL_MS,
+  visible = true,
+  onClose,
+  onCountsChange,
 }: NetworkDrawerProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
-  const [open, setOpen] = React.useState(false)
   const [entries, setEntries] = React.useState<readonly NetworkEntry[]>([])
   const [filter, setFilter] = React.useState<NetworkFilter>('all')
   const [status, setStatus] = React.useState<string | null>(null)
@@ -333,17 +355,26 @@ export function NetworkDrawer({
   }, [active, source, pollMs])
 
   React.useEffect(() => {
-    if (!open) return
+    if (!visible) return
     const list = listRef.current
     if (list !== null) list.scrollTop = list.scrollHeight
-  }, [entries.length, open])
+  }, [entries.length, visible])
 
   const failedCount = React.useMemo(
     () => entries.filter((entry) => isFailure(entry)).length,
     [entries],
   )
 
-  const visible = React.useMemo(
+  const counts = React.useMemo(
+    () => ({ total: entries.length, failed: failedCount }),
+    [entries.length, failedCount],
+  )
+
+  React.useEffect(() => {
+    onCountsChange?.(counts)
+  }, [counts, onCountsChange])
+
+  const visibleEntries = React.useMemo(
     () => (filter === 'all' ? entries : entries.filter((entry) => isFailure(entry))),
     [entries, filter],
   )
@@ -399,22 +430,20 @@ export function NetworkDrawer({
   }
 
   return (
-    <section data-vibe-network="1" aria-label={t('preview.network.title')} style={rootStyle}>
+    <section
+      id="vibe-network-drawer"
+      data-vibe-network="1"
+      aria-label={t('preview.network.title')}
+      style={rootStyle(visible)}
+    >
       <div style={headerStyle}>
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls="vibe-network-log"
-          data-vibe-network-toggle="1"
-          style={toggleStyle}
-          onClick={() => setOpen((value) => !value)}
-        >
+        <strong style={titleStyle}>
           {t('preview.network.title')} ·{' '}
           {t('preview.network.summary', {
             requests: entries.length,
             failed: failedCount,
           })}
-        </button>
+        </strong>
         <button
           type="button"
           style={buttonStyle}
@@ -423,45 +452,54 @@ export function NetworkDrawer({
         >
           {clearing ? t('preview.network.clearing') : t('preview.network.clear')}
         </button>
+        {onClose ? (
+          <button
+            type="button"
+            aria-label={t('preview.drawer.close')}
+            style={buttonStyle}
+            onClick={onClose}
+          >
+            ✕
+          </button>
+        ) : null}
       </div>
 
-      {status === null ? null : (
+      <div style={drawerBodyStyle}>
         <p role="status" style={noteStyle}>
-          {t('preview.network.unavailable', { message: status })}
+          {status === null
+            ? ''
+            : t('preview.network.unavailable', { message: status })}
         </p>
-      )}
 
-      {open ? (
-        <>
-          <div role="group" aria-label={t('preview.network.filters')} style={filterRowStyle}>
-            {FILTERS.map((name) => (
-              <button
-                key={name}
-                type="button"
-                aria-pressed={filter === name}
-                style={filterStyle(filter === name)}
-                onClick={() => setFilter(name)}
-              >
-                {t(`preview.network.filter.${name}`)} ({name === 'all' ? entries.length : failedCount})
-              </button>
-            ))}
-          </div>
-          <ol
-            id="vibe-network-log"
-            role="log"
-            aria-label={t('preview.network.log')}
-            aria-live="off"
-            ref={listRef}
-            style={listStyle}
-          >
-            {visible.length === 0 ? (
-              <li style={emptyStyle}>
-                {entries.length === 0
-                  ? t('preview.network.empty')
-                  : t('preview.network.emptyFilter')}
-              </li>
-            ) : (
-              visible.map((entry) => {
+        <div role="group" aria-label={t('preview.network.filters')} style={filterRowStyle}>
+          {FILTERS.map((name) => (
+            <button
+              key={name}
+              type="button"
+              aria-pressed={filter === name}
+              style={filterStyle(filter === name)}
+              onClick={() => setFilter(name)}
+            >
+              {t(`preview.network.filter.${name}`)} ({name === 'all' ? entries.length : failedCount})
+            </button>
+          ))}
+        </div>
+        <ol
+          id="vibe-network-log"
+          role="log"
+          aria-label={t('preview.network.log')}
+          aria-live="off"
+          ref={listRef}
+          style={listStyle}
+        >
+          {visibleEntries.length === 0 ? (
+            <li style={emptyStyle}>
+              {entries.length === 0
+                ? t('preview.network.empty')
+                : t('preview.network.emptyFilter')}
+            </li>
+          ) : (
+            visibleEntries.map((entry) => {
                 const isOpen = expanded === entry.id
                 const body = bodies[entry.id]
                 const requestHeaders = headersOf(entry.requestHeaders)
@@ -560,8 +598,7 @@ export function NetworkDrawer({
               })
             )}
           </ol>
-        </>
-      ) : null}
+      </div>
     </section>
   )
 }

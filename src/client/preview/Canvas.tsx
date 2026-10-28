@@ -1,12 +1,16 @@
 /**
- * Preview page (T020, toolbar and lifecycle T025).
+ * Preview page (T020, toolbar and lifecycle T025, Layout v2 U01).
  *
- * The page owns the frame canvas and the transport feed; the toolbar above it
- * drives the Host session. A one-second status poll turns a crashed browser or
- * closed tab into a visible, restartable `failed` snapshot — there is no
- * automatic reconnect. Unmounting this page (an internal tab switch) only
- * detaches the frame feed; the shell calls `stopPreviewSession` when the whole
- * DSH panel closes.
+ * The page owns the frame canvas and the transport feed; the toolbar drives the
+ * Host session. Layout v2 keeps the canvas as the main surface: one status line,
+ * one address row, a permanent bottom tab bar, and drawers that overlay the
+ * stage without changing its size. Viewport sizes moved to Settings → Preview,
+ * with a few presets behind the "More" menu.
+ *
+ * A one-second status poll turns a crashed browser or closed tab into a
+ * visible, restartable `failed` snapshot — there is no automatic reconnect.
+ * Unmounting this page (an internal tab switch) only detaches the frame feed;
+ * the shell calls `stopPreviewSession` when the whole DSH panel closes.
  *
  * Frames are coalesced: only the newest undrawn frame is kept, and the canvas
  * loop awaits one `createImageBitmap` at a time. That bounds decoding work at
@@ -27,12 +31,17 @@ import {
 } from '../../contracts/transport'
 import { createTranslator, type Locale } from '../i18n'
 import { callUnary } from '../transport/client'
-import { ConsoleDrawer } from './ConsoleDrawer'
+import { ConsoleDrawer, type ConsoleCounts } from './ConsoleDrawer'
 import { InputLayer } from './InputLayer'
 import { markPreviewActive } from './lifecycle'
 import { isLocalPreviewUrl } from './local-url'
-import { NetworkDrawer } from './NetworkDrawer'
-import { Toolbar, type ToolbarBusy } from './Toolbar'
+import { NetworkDrawer, type NetworkCounts } from './NetworkDrawer'
+import {
+  PreviewTabs,
+  type PreviewDrawerKind,
+  type TabCount,
+} from './PreviewTabs'
+import { Toolbar, type StageSize, type ToolbarBusy } from './Toolbar'
 import {
   PreviewTransport,
   type PreviewFrame,
@@ -44,18 +53,29 @@ const DEFAULT_PREVIEW_URL = 'http://127.0.0.1:4320'
 const START_TIMEOUT_MS = 30_000
 const STOP_TIMEOUT_MS = 15_000
 const STATUS_INTERVAL_MS = 1_000
+const DRAWER_HEIGHT = '40%'
 
 const pageStyle: React.CSSProperties = {
   display: 'grid',
-  gap: 12,
-  padding: 16,
-  alignContent: 'start',
+  // Exactly three children: toolbar, stage, drawer tabs.
+  gridTemplateRows: 'auto minmax(0, 1fr) auto',
+  gap: 6,
+  height: '100%',
+  minHeight: 0,
+  boxSizing: 'border-box',
+  padding: '8px 8px 0',
   font: '12px/1.5 system-ui, sans-serif',
 }
 
-const rowStyle: React.CSSProperties = {
+const stageStyle: React.CSSProperties = {
+  position: 'relative',
   display: 'flex',
-  gap: 6,
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: 0,
+  overflow: 'hidden',
+  borderRadius: 4,
+  background: '#111',
 }
 
 const buttonStyle: React.CSSProperties = {
@@ -68,40 +88,123 @@ const buttonStyle: React.CSSProperties = {
   cursor: 'pointer',
 }
 
-const noteStyle: React.CSSProperties = {
-  margin: 0,
-  opacity: 0.75,
+const canvasStyle: React.CSSProperties = {
+  display: 'block',
+  width: '100%',
+  height: '100%',
+  background: '#111',
 }
 
-const errorStyle: React.CSSProperties = {
+const emptyHintStyle: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  display: 'grid',
+  placeItems: 'center',
+  padding: 16,
   margin: 0,
-  color: 'var(--dsw-danger-color, #d14343)',
+  textAlign: 'center',
+  color: '#cfcfcf',
+  font: '12px/1.6 system-ui, sans-serif',
+  pointerEvents: 'none',
 }
 
-const crashStyle: React.CSSProperties = {
+const errorBannerStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: 8,
+  left: 8,
+  right: 8,
+  zIndex: 6,
+  margin: 0,
+  padding: '6px 8px',
+  borderRadius: 4,
+  background: 'rgba(120, 24, 24, 0.92)',
+  color: '#fff',
+  font: '11px/1.5 system-ui, sans-serif',
+}
+
+const failureOverlayStyle: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  zIndex: 3,
+  display: 'grid',
+  placeItems: 'center',
+  padding: 16,
+  background: 'rgba(0, 0, 0, 0.6)',
+}
+
+const failureCardStyle: React.CSSProperties = {
   display: 'grid',
   gap: 6,
-  padding: '8px 10px',
-  border: '1px solid var(--dsw-danger-color, #d14343)',
-  borderRadius: 4,
-}
-
-const stageStyle: React.CSSProperties = {
-  position: 'relative',
-  display: 'block',
-  lineHeight: 0,
-}
-
-const canvasStyle: React.CSSProperties = {
   width: '100%',
-  height: 'auto',
-  display: 'block',
-  background: '#111',
+  maxWidth: 340,
+  padding: 12,
+  border: '1px solid var(--dsw-danger-color, #d14343)',
+  borderRadius: 6,
+  background: '#1c1c1e',
+  color: '#f2f2f2',
+  font: '12px/1.5 system-ui, sans-serif',
+}
+
+const failureListStyle: React.CSSProperties = {
+  margin: 0,
+  paddingLeft: 18,
+  opacity: 0.85,
+}
+
+const failureNoteStyle: React.CSSProperties = {
+  margin: 0,
+  opacity: 0.85,
+  wordBreak: 'break-word',
+}
+
+const inputHintStyle: React.CSSProperties = {
+  position: 'absolute',
+  left: 8,
+  bottom: 8,
+  zIndex: 2,
+  margin: 0,
+  padding: '2px 6px',
   borderRadius: 4,
+  background: 'rgba(0, 0, 0, 0.55)',
+  color: '#e6e6e6',
+  font: '11px/1.4 system-ui, sans-serif',
+  pointerEvents: 'none',
+}
+
+function drawerLayerStyle(open: boolean): React.CSSProperties {
+  return {
+    display: open ? 'grid' : 'none',
+    gridTemplateRows: 'minmax(0, 1fr)',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: DRAWER_HEIGHT,
+    zIndex: 4,
+    borderTop: '1px solid var(--dsw-border-color, rgba(127, 127, 127, 0.4))',
+    background: 'var(--dsw-surface-color, Canvas)',
+    color: 'var(--dsw-text-primary, CanvasText)',
+  }
 }
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * Picks the largest box with `aspect` (width / height) that fits the stage.
+ * The canvas keeps the target page's ratio; the leftover stage area is a
+ * letterbox, never a stretch.
+ */
+export function fitContain(
+  stage: StageSize | null,
+  aspect: number,
+): StageSize | null {
+  if (stage === null) return null
+  if (!(stage.width > 0) || !(stage.height > 0)) return null
+  if (!(aspect > 0) || !Number.isFinite(aspect)) return null
+  const width = Math.min(stage.width, stage.height * aspect)
+  return { width: Math.floor(width), height: Math.floor(width / aspect) }
 }
 
 export interface PreviewPageProps {
@@ -117,7 +220,20 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
   const [busy, setBusy] = React.useState<ToolbarBusy>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [stats, setStats] = React.useState<PreviewTransportStats | null>(null)
+  const [stageSize, setStageSize] = React.useState<StageSize | null>(null)
+  const [drawer, setDrawer] = React.useState<PreviewDrawerKind | null>(null)
+  const [consoleCounts, setConsoleCounts] = React.useState<ConsoleCounts>({
+    total: 0,
+    errors: 0,
+    warnings: 0,
+    info: 0,
+  })
+  const [networkCounts, setNetworkCounts] = React.useState<NetworkCounts>({
+    total: 0,
+    failed: 0,
+  })
 
+  const stageRef = React.useRef<HTMLDivElement | null>(null)
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null)
   const transportRef = React.useRef<PreviewTransport | null>(null)
   const latestRef = React.useRef<PreviewFrame | null>(null)
@@ -252,6 +368,28 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
     }
   }, [refreshStatus, syncSnapshot])
 
+  // The stage is measured so the canvas can keep the target ratio inside the
+  // available pane; the drawer overlays it and must not trigger a resize.
+  React.useEffect(() => {
+    const stage = stageRef.current
+    if (stage === null) return
+    const measure = (): void => {
+      const rect = stage.getBoundingClientRect()
+      setStageSize((previous) =>
+        previous !== null &&
+        Math.abs(previous.width - rect.width) < 1 &&
+        Math.abs(previous.height - rect.height) < 1
+          ? previous
+          : { width: rect.width, height: rect.height },
+      )
+    }
+    measure()
+    if (typeof ResizeObserver !== 'function') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(stage)
+    return () => observer.disconnect()
+  }, [])
+
   const runAction = async (
     label: Exclude<ToolbarBusy, null>,
     action: () => Promise<void>,
@@ -354,9 +492,39 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
 
   const state = snapshot?.status ?? 'idle'
   const ready = state === 'ready'
+  // Stop releases the host collectors before the session reports idle. Keep the
+  // drawers from polling that half-torn-down session (it answers `unsupported`)
+  // and close any open drawer as soon as the user asks to stop.
+  const stopping = busy === 'stop'
+  const canConsole = ready && !stopping && snapshot?.capabilities?.console === true
+  const canNetwork = ready && !stopping && snapshot?.capabilities?.network === true
+
+  React.useEffect(() => {
+    if (!ready || stopping) setDrawer(null)
+  }, [ready, stopping])
+
+  const toggleDrawer = (next: PreviewDrawerKind): void => {
+    setDrawer((current) => (current === next ? null : next))
+  }
+
+  // The bitmap keeps the target page ratio; the residual stage area is a
+  // letterbox so pointer mapping stays exact (the input layer matches the
+  // canvas box, not the stage).
+  const aspect =
+    snapshot?.viewport && snapshot.viewport.height > 0
+      ? snapshot.viewport.width / snapshot.viewport.height
+      : 16 / 9
+  const box = fitContain(stageSize, aspect)
+  const boxStyle: React.CSSProperties =
+    box === null
+      ? { position: 'relative', width: '100%', maxWidth: '100%', aspectRatio: String(aspect) }
+      : { position: 'relative', width: box.width, height: box.height }
+
+  const consoleTab: TabCount = { available: canConsole, count: consoleCounts.total }
+  const networkTab: TabCount = { available: canNetwork, count: networkCounts.total }
 
   return (
-    <div data-vibe-preview="1" style={pageStyle}>
+    <div data-vibe-preview="1" data-layout="v2" style={pageStyle}>
       <Toolbar
         locale={locale}
         snapshot={snapshot}
@@ -365,6 +533,7 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
         url={url}
         busy={busy}
         stats={stats}
+        stageSize={stageSize}
         onKindChange={setKind}
         onUrlChange={setUrl}
         onSubmit={() => void (ready ? handleNavigate() : handleStart())}
@@ -374,65 +543,97 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
         onOpenExternal={handleOpenExternal}
       />
 
-      {error === null ? null : (
-        <p role="alert" style={errorStyle}>
-          {error}
-        </p>
-      )}
-
-      {state === 'failed' ? (
-        <div role="alert" style={crashStyle}>
-          <strong>{t('preview.crash.title')}</strong>
-          {snapshot?.lastError ? (
-            <p style={noteStyle}>{snapshot.lastError.message}</p>
-          ) : null}
-          <p style={noteStyle}>{t('preview.crash.hint')}</p>
-          <div style={rowStyle}>
-            <button
-              type="button"
-              style={buttonStyle}
-              disabled={busy !== null}
-              onClick={() => void handleStart()}
-            >
-              {busy === 'start' ? t('preview.restart.busy') : t('preview.restart')}
-            </button>
-            <button
-              type="button"
-              style={buttonStyle}
-              disabled={busy !== null}
-              onClick={() => void handleStop()}
-            >
-              {busy === 'stop' ? t('preview.stop.busy') : t('preview.stop')}
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      <div style={stageStyle}>
-        <canvas
-          ref={canvasRef}
-          width={1280}
-          height={720}
-          aria-label={t('preview.canvas.label')}
-          style={canvasStyle}
-        />
-        {ready ? (
-          <InputLayer
-            canvasRef={canvasRef}
-            locale={locale}
-            onError={(failure) => {
-              if (mountedRef.current) setError(errorMessage(failure))
-            }}
+      <div ref={stageRef} data-vibe-stage="1" style={stageStyle}>
+        <div style={boxStyle}>
+          <canvas
+            ref={canvasRef}
+            width={1280}
+            height={720}
+            aria-label={t('preview.canvas.label')}
+            style={canvasStyle}
           />
+          {ready ? (
+            <InputLayer
+              canvasRef={canvasRef}
+              locale={locale}
+              onError={(failure) => {
+                if (mountedRef.current) setError(errorMessage(failure))
+              }}
+            />
+          ) : null}
+        </div>
+
+        {state === 'idle' ? (
+          <p data-vibe-empty="1" style={emptyHintStyle}>
+            {t('preview.empty.hint')}
+          </p>
         ) : null}
+
+        {state === 'failed' ? (
+          <div data-vibe-failure="1" style={failureOverlayStyle}>
+            <div role="alert" style={failureCardStyle}>
+              <strong>{t('preview.failure.title')}</strong>
+              {snapshot?.lastError ? (
+                <p style={failureNoteStyle}>{snapshot.lastError.message}</p>
+              ) : null}
+              <p style={failureNoteStyle}>{t('preview.failure.checks')}</p>
+              <ul style={failureListStyle}>
+                <li>{t('preview.failure.check.fixture')}</li>
+                <li>{t('preview.failure.check.port')}</li>
+                <li>{t('preview.failure.check.edge')}</li>
+              </ul>
+              <div>
+                <button
+                  type="button"
+                  style={{ ...buttonStyle, background: '#f2f2f2', color: '#111' }}
+                  disabled={busy !== null}
+                  onClick={() => void handleStart()}
+                >
+                  {busy === 'start' ? t('preview.restart.busy') : t('preview.restart')}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {ready ? (
+          <p data-vibe-input-hint="1" style={inputHintStyle}>
+            {t('preview.input.hint')}
+          </p>
+        ) : null}
+
+        {error === null ? null : (
+          <p role="alert" style={errorBannerStyle}>
+            {error}
+          </p>
+        )}
+
+        <div data-vibe-drawer-layer="1" style={drawerLayerStyle(drawer !== null)}>
+          <ConsoleDrawer
+            active={canConsole}
+            locale={locale}
+            visible={drawer === 'console'}
+            onClose={() => setDrawer(null)}
+            onCountsChange={setConsoleCounts}
+          />
+          <NetworkDrawer
+            active={canNetwork}
+            locale={locale}
+            visible={drawer === 'network'}
+            onClose={() => setDrawer(null)}
+            onCountsChange={setNetworkCounts}
+          />
+        </div>
       </div>
-      {ready ? <p style={noteStyle}>{t('preview.input.hint')}</p> : null}
-      {ready && snapshot?.capabilities?.console === true ? (
-        <ConsoleDrawer active locale={locale} />
-      ) : null}
-      {ready && snapshot?.capabilities?.network === true ? (
-        <NetworkDrawer active locale={locale} />
-      ) : null}
+
+      <PreviewTabs
+        locale={locale}
+        ready={ready}
+        console={consoleTab}
+        network={networkTab}
+        open={drawer}
+        onToggle={toggleDrawer}
+      />
     </div>
   )
 }

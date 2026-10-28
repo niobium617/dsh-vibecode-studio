@@ -64,6 +64,15 @@ const panelStyle: React.CSSProperties = {
   overflow: 'auto',
 }
 
+/**
+ * The preview page is its own fixed-height layout (canvas plus drawers), so the
+ * panel must not scroll it; scrolling would resize the canvas over and over.
+ */
+const previewPanelStyle: React.CSSProperties = {
+  minHeight: 0,
+  overflow: 'hidden',
+}
+
 export interface StudioShellProps {
   /** Override the detected locale (tests); the client passes nothing. */
   readonly locale?: Locale
@@ -118,7 +127,7 @@ export function StudioShell({ locale }: StudioShellProps): React.ReactElement {
         role="tabpanel"
         id={panelId}
         aria-labelledby={`vibe-studio-tab-${current.id}`}
-        style={panelStyle}
+        style={current.id === 'preview' ? previewPanelStyle : panelStyle}
       >
         <ShellErrorBoundary key={current.id} locale={activeLocale}>
           {current.id === 'settings' ? (
