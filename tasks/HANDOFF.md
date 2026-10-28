@@ -95,6 +95,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 - 验证：`pnpm typecheck` 0 error、`pnpm test` 53 文件 / 414 用例（新增 `tests/unit/annotation/annotation-store.test.ts` 10 用例）、`pnpm build` host 192.8 / client 150.0 KiB。日志 `.tmp/logs/t030-*.log`。
 - 关键约束（后续任务沿用）：`.vibe` 属于用户项目目录，写入前必须 realpath 校验仍在项目内；读路径一律“坏数据 → `null`/跳过”，不要因单条历史损坏让整个列表失败；`lstat` 的 symlink 先于 `isFile` 判断（symlink 的 `isFile()` 为 false，顺序反了会让分支不可达）。
 - 遗留：存储层未接入 host 服务/工具（T031 用模型、T033 做历史列表/搜索/重开）；未生成 `.vibe/annotations` 的 gitignore（属目标项目脚手架，T033/G3 处理）；并发保存同一 id 以最后写入为准，无锁。
+- 提交：`e78fb99 feat(annotation): T030 annotation store in .vibe/annotations`（`task/m3-inspect`，未 push）。
 
 ### T026 遗留
 
