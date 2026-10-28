@@ -4,7 +4,17 @@
  * rendered text ≤ 4 KB, untrusted wrapping after a disk round-trip, and bad
  * data falling back to "missing" instead of failing the whole history.
  */
-import { access, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
@@ -62,6 +72,65 @@ describe('AnnotationStore', () => {
 
     expect(await readdir(store.dirPath)).toEqual(['ann-1.json'])
     await expect(store.read('ann-1')).resolves.toMatchObject({ comment: 'Second pass.' })
+  })
+
+  it('retries a transient EPERM when replacing an existing file', async () => {
+    await store.save(annotationFixture())
+    let attempts = 0
+    const renameFile = async (from: string, to: string): Promise<void> => {
+      attempts += 1
+      if (attempts <= 2) {
+        const error = new Error('EPERM: operation not permitted, rename') as NodeJS.ErrnoException
+        error.code = 'EPERM'
+        throw error
+      }
+      await rename(from, to)
+    }
+    const retrying = createAnnotationStore(projectDir, { renameFile })
+
+    await retrying.save(annotationFixture({ comment: 'After a lock.' }))
+
+    expect(attempts).toBe(3)
+    await expect(retrying.read('ann-1')).resolves.toMatchObject({ comment: 'After a lock.' })
+    expect(await readdir(store.dirPath)).toEqual(['ann-1.json'])
+  })
+
+  it('gives up after bounded rename retries and leaves the old file intact', async () => {
+    await store.save(annotationFixture())
+    let attempts = 0
+    const renameFile = async (): Promise<void> => {
+      attempts += 1
+      const error = new Error('EBUSY: resource busy or locked, rename') as NodeJS.ErrnoException
+      error.code = 'EBUSY'
+      throw error
+    }
+    const failing = createAnnotationStore(projectDir, { renameFile })
+
+    await expect(failing.save(annotationFixture({ comment: 'Never lands.' }))).rejects.toMatchObject({
+      code: 'io',
+    })
+
+    expect(attempts).toBe(5)
+    await expect(store.read('ann-1')).resolves.toMatchObject({
+      comment: 'Tighten the spacing to 16px.',
+    })
+    // The temp file is cleaned up even when the rename never succeeds.
+    expect(await readdir(store.dirPath)).toEqual(['ann-1.json'])
+  })
+
+  it('does not retry non-lock errors such as ENOENT', async () => {
+    let attempts = 0
+    const renameFile = async (): Promise<void> => {
+      attempts += 1
+      const error = new Error('ENOENT: no such file or directory, rename') as NodeJS.ErrnoException
+      error.code = 'ENOENT'
+      throw error
+    }
+    const failing = createAnnotationStore(projectDir, { renameFile })
+
+    await expect(failing.save(annotationFixture())).rejects.toMatchObject({ code: 'io' })
+
+    expect(attempts).toBe(1)
   })
 
   it('renders what it reads back within 4 KB and keeps the untrusted boundary', async () => {

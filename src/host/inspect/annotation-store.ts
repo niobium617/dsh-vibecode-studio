@@ -27,6 +27,22 @@ export const ANNOTATION_DIR_NAME = 'annotations'
 export const ANNOTATION_FILE_EXT = '.json'
 export const MAX_ANNOTATION_FILE_BYTES = 64 * 1024
 
+/**
+ * Windows can briefly hold a file that a virus scanner or another process is
+ * touching, so replacing an existing annotation occasionally fails with
+ * EPERM/EBUSY/EACCES even though nothing is wrong. Retry a few times with a
+ * short backoff before reporting `io`; a genuine permissions problem still
+ * fails, just ~370 ms later.
+ */
+const RENAME_RETRY_DELAYS_MS = [20, 50, 100, 200] as const
+
+export type RenameFile = (from: string, to: string) => Promise<void>
+
+export interface AnnotationStoreOptions {
+  /** Overridable in tests; production always uses `fs.rename`. */
+  readonly renameFile?: RenameFile
+}
+
 export interface AnnotationListResult {
   readonly annotations: Annotation[]
   /** `.json` files with a valid id stem that read as invalid or missing. */
@@ -60,6 +76,14 @@ function isErrno(error: unknown, code: string): error is NodeJS.ErrnoException {
   return error instanceof Error && (error as NodeJS.ErrnoException).code === code
 }
 
+function isRetryableRenameError(error: unknown): boolean {
+  return isErrno(error, 'EPERM') || isErrno(error, 'EBUSY') || isErrno(error, 'EACCES')
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
@@ -83,8 +107,9 @@ export class AnnotationStore {
   readonly projectDir: string
   readonly vibeDir: string
   readonly dirPath: string
+  private readonly renameFile: RenameFile
 
-  constructor(projectDir: string) {
+  constructor(projectDir: string, options: AnnotationStoreOptions = {}) {
     if (typeof projectDir !== 'string' || projectDir.trim() === '') {
       throw new AnnotationStoreError(
         'invalid_project_path',
@@ -94,6 +119,7 @@ export class AnnotationStore {
     this.projectDir = resolve(projectDir)
     this.vibeDir = join(this.projectDir, '.vibe')
     this.dirPath = join(this.vibeDir, ANNOTATION_DIR_NAME)
+    this.renameFile = options.renameFile ?? rename
     if (!isInside(this.projectDir, this.dirPath)) {
       throw new AnnotationStoreError(
         'invalid_project_path',
@@ -135,7 +161,7 @@ export class AnnotationStore {
       const tempPath = join(dir, `.${annotation.id}.${process.pid}.${randomUUID()}.tmp`)
       try {
         await writeFile(tempPath, payload, { encoding: 'utf8', flag: 'wx' })
-        await rename(tempPath, file)
+        await this.replaceFile(tempPath, file)
       } catch (error) {
         await rm(tempPath, { force: true }).catch(() => undefined)
         throw error
@@ -147,6 +173,20 @@ export class AnnotationStore {
         `vibe-studio: cannot write annotation ${annotation.id}: ${errorMessage(error)}`,
         { cause: error },
       )
+    }
+  }
+
+  /** Replaces `file` with `tempPath`, retrying transient Windows lock errors. */
+  private async replaceFile(tempPath: string, file: string): Promise<void> {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        await this.renameFile(tempPath, file)
+        return
+      } catch (error) {
+        const wait = RENAME_RETRY_DELAYS_MS[attempt]
+        if (wait === undefined || !isRetryableRenameError(error)) throw error
+        await delay(wait)
+      }
     }
   }
 
@@ -318,6 +358,9 @@ export class AnnotationStore {
   }
 }
 
-export function createAnnotationStore(projectDir: string): AnnotationStore {
-  return new AnnotationStore(projectDir)
+export function createAnnotationStore(
+  projectDir: string,
+  options?: AnnotationStoreOptions,
+): AnnotationStore {
+  return new AnnotationStore(projectDir, options)
 }
