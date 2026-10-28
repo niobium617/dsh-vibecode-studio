@@ -96,6 +96,15 @@ export {
   PICK_OVERLAY_ID,
 } from './inspect/inject'
 export type { PreviewPicker, PreviewPickerOptions } from './inspect/inject'
+export {
+  ANNOTATION_DIR_NAME,
+  ANNOTATION_FILE_EXT,
+  AnnotationStore,
+  AnnotationStoreError,
+  createAnnotationStore,
+  MAX_ANNOTATION_FILE_BYTES,
+} from './inspect/annotation-store'
+export type { AnnotationStoreErrorCode } from './inspect/annotation-store'
 export { buildSelector } from './inspect/selector'
 export type { SelectorResult } from './inspect/selector'
 export { createWebTargetAdapter, WEB_TARGET_CAPABILITIES } from './targets/web/adapter'

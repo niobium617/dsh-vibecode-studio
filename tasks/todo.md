@@ -325,12 +325,18 @@
   - 注入复用与依赖：仍由 `buildPickerScript()` 用 `toString()` 组合 `reactSource/vueSource/svelteSource` 并作为第 5 个参数传给 `installVibePicker`，未改 T027/T028 结构；未新增依赖（`@react-dev-inspector/babel-plugin`、`vite-plugin-vue-inspector`、`@sveltejs/vite-plugin-svelte` 均已在 devDependencies）。
   - 限制：React 19 需在目标项目 dev 构建里启用 inspector babel 插件才有一级路径；Vue `__file` 回退只有文件没有行号（不计命中）；Svelte 4 的 `add_location` 与生产态均无行号；`spikes/s4/REPORT.md` 的结论仍适用于手写 fixture，真实项目插件的版本差异需在 G3 复核。
 
-### - [ ] T030 标注模型、存储与文本渲染
+### - [x] T030 标注模型、存储与文本渲染
 
 - **目标**：`Annotation` schema、序列化、文本渲染、预算、`.vibe/annotations` 存储。
 - **验收**：round-trip；≤ 4 KB；不可信包裹；坏数据回退。
 - **验证**：`pnpm test -- tests/unit/annotation`。
 - **文件**：`src/contracts/annotation/*`、`src/host/inspect/annotation-store.ts`、tests。
+- **验证结果（2026-10-28）**：
+  - 模型与渲染：`src/contracts/annotation.ts`（T009 已建）提供 `Annotation`/`isAnnotation`/`serializeAnnotation`/`deserializeAnnotation`/`renderAnnotationText`；本次新增并导出 `isAnnotationId`（id 直接用作 `.vibe/annotations/<id>.json` 文件名，正则禁止路径分隔符与前导点），`isAnnotation` 复用它。
+  - 存储：新增 `src/host/inspect/annotation-store.ts`。`save()` 先 `isAnnotation` 校验、序列化后按 UTF-8 字节限 64 KiB，再在 `.vibe/annotations` 同目录写 `wx` 临时文件并 `rename` 原子替换；`read()` 对缺失、损坏 JSON、形状不合法、超过 64 KiB、symlink 或解析到目录外的文件一律返回 `null`；`list()` 只认 `<合法 id>.json`、跳过坏文件、按 `createdAt` 倒序（同时间按 id）；`remove()` 返回是否真的删除；`.vibe` 或 `.vibe/annotations` 为越界 junction/symlink 时抛 `path_outside_project`。`src/host/index.ts` 导出 store 与常量。
+  - 验收对应：`tests/unit/annotation/annotation-store.test.ts`（10 用例）覆盖 save→read→render 往返、渲染结果 ≤ `ANNOTATION_BUDGET_BYTES`（4 KB）且 `<untrusted-page-content>` 边界在磁盘往返后仍只出现一次、损坏/形状非法/超大文件回退为 `null` 且 `list` 跳过、非法与超限存储被拒且不落盘、非法 id 不触达文件系统、删除与空历史、`.vibe` junction 越界拒绝；原有 `tests/unit/contracts/annotation.test.ts` 9 用例继续通过。
+  - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm test` 53 文件 / 414 用例；`pnpm build` host 192.8 KiB / client 150.0 KiB。日志 `.tmp/logs/t030-{typecheck,test,build}.log`。
+  - 限制：store 尚未接入 host 服务/agent 工具（T031 用模型、T033 做历史列表与搜索）；未替目标项目写 `.vibe/annotations` 的 gitignore；同一 id 并发保存以最后完成的 `rename` 为准，无文件锁；未做跨进程历史大小/保留期清理（`retentionDays` 属 T033/G3）。
 
 ### - [ ] T031 标注气泡与队列
 

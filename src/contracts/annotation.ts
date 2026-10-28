@@ -26,6 +26,14 @@ export interface Annotation {
 
 const ANNOTATION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/
 
+/**
+ * Ids double as file names in `.vibe/annotations/<id>.json`, so the pattern is
+ * deliberately narrow: no separators, no leading dot, never an empty stem.
+ */
+export function isAnnotationId(value: unknown): value is string {
+  return typeof value === 'string' && ANNOTATION_ID_PATTERN.test(value)
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
@@ -33,8 +41,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function isAnnotation(value: unknown): value is Annotation {
   if (!isRecord(value)) return false
   return (
-    typeof value.id === 'string' &&
-    ANNOTATION_ID_PATTERN.test(value.id) &&
+    isAnnotationId(value.id) &&
     isTargetId(value.targetId) &&
     (value.sessionId === undefined || isSessionId(value.sessionId)) &&
     typeof value.createdAt === 'string' &&
