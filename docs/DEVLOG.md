@@ -9,7 +9,7 @@
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，M1 已完成，M2 已完成）**。
 - 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）、T023 Console 采集与抽屉、T024 Network 采集与抽屉、T025 预览工具栏与生命周期、T026 G2 Preview 评审（通过）、T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 三框架源码适配、T030 标注模型与存储、T031 标注气泡与队列。
-- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），**T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 源码适配（React/Vue/Svelte）、T030 标注模型与存储、T031 标注气泡与队列、T032 Composer handoff、T033 标注历史 已完成**；**T034 G3 评审完成（GO）**：初评“≤3 步”实测 4–5 个动作，经用户批准在保存通知加“发送到对话”后为 3 个动作（点元素 → 保存 → 发送），复测四项验收全过（源码 100%、标注 4,095 B ≤ 4 KB、不自动发送），M3 完成。
+- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），**T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 源码适配（React/Vue/Svelte）、T030 标注模型与存储、T031 标注气泡与队列、T032 Composer handoff、T033 标注历史 已完成**；**T034 G3 评审完成（GO）**：初评“≤3 步”实测 4–5 个动作，经用户批准在保存通知加“发送到对话”后为 3 个动作（点元素 → 保存 → 发送），复测四项验收全过（源码 100%、标注 4,095 B ≤ 4 KB、不自动发送），M3 完成；手动复测入口见 `docs/2026-10-29-M3手动测试手册.md`（M2 见 `docs/2026-10-28-手动测试手册.md`）。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
 - T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T026 已提交并推送到 `origin/task/m2-target-model`（`ebee1e5`，文档至 `92ecc32`），尚未合并入 `main`；其后 `9c19501..88a4070`（方向/手册文档、U01 实现、去重复标题）已推送到 `origin/task/m2-target-model`（`92ecc32..88a4070`，2026-10-28）；`f64e928`（清理残留 locale key 与过期布局引用）推送后，以 `--no-ff` 合并入 `main`（合并提交 `768e129`，`main` 树与分支一致），功能分支保留。手动复测入口见 `docs/2026-10-28-手动测试手册.md`；界面/产品方向见 `docs/2026-10-28-界面与项目方向.md`。S3/S4/T010/T014/T015/T020/T021/T022/T025 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
@@ -587,6 +587,14 @@
   - 信息：composer 中的标注文本为英文结构化格式，属 SPEC“注释用英文；UI 文案 zh/en 分离”的设计，不是本地化缺陷。
 - 返工（用户批准，2026-10-29，仅加固 EPERM 重试）：`src/host/inspect/annotation-store.ts` 把 `rename` 抽成可注入的 `RenameFile`（`AnnotationStoreOptions.renameFile`，生产默认 `fs.rename`），新增 `replaceFile()`：对 `EPERM`/`EBUSY`/`EACCES` 最多重试 4 次（20/50/100/200 ms，共 5 次尝试），其余错误立即抛出；临时文件清理与 `io` 错误映射不变。`createAnnotationStore(projectDir, options?)` 透传可选参数。新增 3 个单测：连续 2 次 EPERM 后成功（`attempts=3`）、EBUSY 持续失败有界退避后报 `io` 且旧文件与目录保持不变（`attempts=5`）、`ENOENT` 不重试（`attempts=1`）。验证：`pnpm typecheck` 0 error；单文件 5 连跑 13/13；`pnpm test` 3 连跑 **60 文件 / 517 用例全过**；`pnpm build` host 200.6 / client 204.1 KiB；`pnpm test:e2e` 9/9。未动其余低风险项。
 - 清理：冒烟写入的 `.vibe/annotations/*.json` 与空 `.vibe/` 已删除；4320/4338 无监听残留、无 Playwright Edge 残留；真实 `desktop`/`web` profile 未触碰。脚本与日志在 `.tmp/audit/`，不入库。
+
+### 文档 — M3 手动测试手册（2026-10-29，仅文档）
+
+- 背景：M2 已有 `docs/2026-10-28-手动测试手册.md`，M3（T027–T034）只在 `tasks/todo.md` 与 DEVLOG 里留有验收记录，用户按同一结构补一份可自测的手册。
+- 产出：新增 `docs/2026-10-29-M3手动测试手册.md`（约 35–45 分钟，单次完整复测）：一次性准备（`pnpm install`/`build`、profile 链接核对与 `link:` 兜底）、启动（4320 fixture、可选 4321/4322/4323 三框架源码 fixture、`vibe-dev` 4317）、分组流程（拾取开关与 Alt+Click、拾取/卡片/气泡、意见输入与保存通知、通知“发送到对话”、队列、历史含坏文件注入、源码适配、4 KB 预算测量、清理）、测试表 K/X/S/A/N/Q/H/B/L（共 50 项）、G3 四项验收映射与 T027–T034 覆盖表、易误判的正常行为、排障、结果记录模板（`.tmp/logs/manual-2026-10-29-m3.md`）。
+- 口径：所有步骤对照当前实现（组件文案、`data-vibe-*` 钩子、Host 侧规则）编写；明确“拾取模式保存后仍保持”“通知切页签后消失但队列/历史保留”“队列仅内存、F5 清空而历史落盘”“3 动作不含开启拾取”“`fixtures/vite-basic` 无源码属设计”“2,000 字中文意见在 composer 被截到约 1,617 字且无提示”等易误判点。
+- 验证：仅文档改动，未改 `src/`、测试、依赖或 profile，故不重跑 typecheck/单测/build/e2e；手册内命令按当前 `package.json` 脚本与 `tests/e2e/source-adapters.spec.ts` 的真实启动方式核对。
+- 同步：`README.md` 状态句、导航链接、M3 完成条目与“下一步 T035”均已更新并链到新手册。
 
 ## 3. 踩坑与已验证经验
 

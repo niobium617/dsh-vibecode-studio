@@ -2,9 +2,9 @@
 
 > A visual feedback loop for **DeepSeek Harness**: preview your local web app inside DSH, point at what is wrong, and hand structured notes to the coding agent — no screenshot ping-pong.
 
-**Status: pre-alpha.** The M0 spike gate is complete. Transport, composer handoff, screencast/input/Chinese IME, and element/source mapping are verified; the G0 review selected stream-first frames with a pull fallback, one-shot CDP input, clipboard-only screenshots, and per-framework source adapters. The M1 foundation (package scaffold, contracts, client shell, connection transport, test harness, `.vibe` config store) is in `src/`, `tests/` and `fixtures/`; nothing is published yet. See the [G0 review](spikes/G0.md) for the go/no-go and fallback decisions.
+**Status: pre-alpha.** The M0 spike gate is complete. Transport, composer handoff, screencast/input/Chinese IME, and element/source mapping are verified; the G0 review selected stream-first frames with a pull fallback, one-shot CDP input, clipboard-only screenshots, and per-framework source adapters. M1–M3 (foundation, preview, and inspect/annotation) are in `src/`, `tests/` and `fixtures/`; nothing is published yet. See the [G0 review](spikes/G0.md) for the go/no-go and fallback decisions.
 
-[中文简介](#中文简介) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md) · [Dev log](docs/DEVLOG.md) · [手动测试手册](docs/2026-10-28-手动测试手册.md) · [界面与项目方向](docs/2026-10-28-界面与项目方向.md)
+[中文简介](#中文简介) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md) · [Dev log](docs/DEVLOG.md) · [M2 手册](docs/2026-10-28-手动测试手册.md) · [M3 手册](docs/2026-10-29-M3手动测试手册.md) · [界面与项目方向](docs/2026-10-28-界面与项目方向.md)
 
 ## 中文简介
 
@@ -24,7 +24,8 @@ Vibe coding 的关键是让 Agent “看见”结果。截图会丢失元素身�
 - **M0 / G0 已通过**：S1 传输、S2 composer 交接、S3 screencast/输入/中文、S4 拾取/源码四个 spike 均完成，结论与回退方案见 [spikes/G0.md](spikes/G0.md)。
 - **M2 完成并通过 G2**：预览闭环（screencast/帧路由/输入/工具栏/生命周期）、Console/Network 采集与抽屉、`.vibe` 设置已在 Host、Web 与隔离 Desktop 载体验证；G2 三端实测 24.4–25.9 fps。手动复测步骤见 [手动测试手册](docs/2026-10-28-手动测试手册.md)。
 - **M2.5 / U01 已完成（Layout v2）**：预览页改为画布优先——常驻仅状态行、地址行、底部 tab，视口参数移入设置与“更多”菜单，Console/Network 改为覆盖式抽屉；三档面板（320/400/500px）无横向溢出，舞台占面板 85.6%，实测 26.2 fps。方向与验收见 [界面与项目方向](docs/2026-10-28-界面与项目方向.md)。
-- **下一步 T027**：拾取 overlay 与选择器（基于 U01 定稿的画布几何）。
+- **M3 完成并通过 G3**：元素拾取与选择器、元素上下文、React/Vue/Svelte 源码适配、标注气泡与队列、保存通知、composer 草稿交接、标注历史均已完成；G3 四项验收通过（50/50 源码命中、标注 ≤ 4 KB、3 动作进 composer、不自动发送）。手动复测步骤见 [M3 手动测试手册](docs/2026-10-29-M3手动测试手册.md)。
+- **下一步 T035（M4）**：需用户明确批准后开工。
 - **尚未发布**：根包可在开发 profile 中加载，但尚未打包发布；`spikes/` 保留为 spike 证据。
 
 ### 计划中的 MVP
@@ -55,7 +56,7 @@ pnpm spike:s3 --seconds 10    # screencast / 输入 / 中文
 pnpm spike:s4                 # React / Vue / Svelte 拾取与源码命中
 ```
 
-完整设计见 [SPEC](docs/SPEC-vibecoding-studio.md)，任务顺序见 [todo.md](tasks/todo.md)，开发记录见 [DEVLOG](docs/DEVLOG.md)，自己复测功能见 [手动测试手册](docs/2026-10-28-手动测试手册.md)，界面与产品方向见 [方向文档](docs/2026-10-28-界面与项目方向.md)。
+完整设计见 [SPEC](docs/SPEC-vibecoding-studio.md)，任务顺序见 [todo.md](tasks/todo.md)，开发记录见 [DEVLOG](docs/DEVLOG.md)，自己复测功能见 [M2 手动测试手册](docs/2026-10-28-手动测试手册.md) 与 [M3 手动测试手册](docs/2026-10-29-M3手动测试手册.md)，界面与产品方向见 [方向文档](docs/2026-10-28-界面与项目方向.md)。
 
 ## Why
 
