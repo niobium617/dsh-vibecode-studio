@@ -34,6 +34,17 @@ const PICK: ElementContext = {
 
 const OTHER: ElementContext = { ...PICK, selector: '#other', unique: false, classes: [] }
 
+const SOURCED: ElementContext = {
+  ...PICK,
+  source: {
+    framework: 'vue',
+    via: '__v_inspector',
+    file: 'src/components/App.vue',
+    line: 14,
+    column: 6,
+  },
+}
+
 function idle(): PickSnapshot {
   return { active: false, seq: 0, pick: null, ts: null }
 }
@@ -172,6 +183,24 @@ describe('PickCard', () => {
   it('marks a non-unique selector instead of hiding that detail', () => {
     render(<PickCard locale="en" pick={OTHER} onClose={() => {}} />)
     expect(document.querySelector('[data-vibe-pick-unique="0"]')?.textContent).toBe('not unique')
+  })
+
+  it('shows the source file leaf with its line and the adapter that found it', () => {
+    render(<PickCard locale="en" pick={SOURCED} onClose={() => {}} />)
+
+    const line = document.querySelector('[data-vibe-pick-source="1"]') as HTMLElement
+    expect(line.textContent).toContain('Source: App.vue:14')
+    expect(line.getAttribute('data-vibe-pick-source-via')).toBe('__v_inspector')
+    // The full path stays available on hover; the row only shows the leaf.
+    expect(line.getAttribute('title')).toBe('src/components/App.vue')
+  })
+
+  it('keeps the source row and says it is unavailable when nothing was found', () => {
+    render(<PickCard locale="en" pick={PICK} onClose={() => {}} />)
+
+    const line = document.querySelector('[data-vibe-pick-source="0"]') as HTMLElement
+    expect(line.textContent).toContain('Source: source unavailable')
+    expect(line.getAttribute('data-vibe-pick-source-via')).toBeNull()
   })
 })
 

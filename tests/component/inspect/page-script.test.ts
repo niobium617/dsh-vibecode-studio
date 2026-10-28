@@ -124,6 +124,32 @@ describe('installVibePicker', () => {
       visible: true,
       role: 'button',
       name: 'Save',
+      source: null,
+    })
+  })
+
+  it('extracts framework source through the composed adapters', () => {
+    // The adapters are serialized into the same script; React's dev-server
+    // attributes are the primary path and must reach the payload.
+    document.body.innerHTML =
+      '<div data-inspector-relative-path="src/App.jsx" data-inspector-line="9" data-inspector-column="2">' +
+      '<button data-testid="save">Save</button></div>'
+    evaluate()
+    pickWindow.__vibePicker!.start()
+    document
+      .querySelector('button')!
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+
+    expect(sent).toHaveLength(1)
+    expect(sent[0]).toMatchObject({
+      kind: 'pick',
+      source: {
+        framework: 'react',
+        via: 'data-inspector',
+        file: 'src/App.jsx',
+        line: 9,
+        column: 2,
+      },
     })
   })
 

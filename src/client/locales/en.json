@@ -41,6 +41,8 @@
   "preview.pick.notUnique": "not unique",
   "preview.pick.close": "Hide picked element",
   "preview.pick.box": "Box",
+  "preview.pick.source": "Source",
+  "preview.pick.sourceUnavailable": "source unavailable",
   "preview.openExternal": "Open in browser",
   "preview.openExternal.localOnly": "Only loopback http(s) previews can open in the system browser.",
   "preview.target.web": "Web",

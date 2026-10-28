@@ -41,6 +41,8 @@
   "preview.pick.notUnique": "非唯一",
   "preview.pick.close": "收起拾取结果",
   "preview.pick.box": "位置",
+  "preview.pick.source": "源码",
+  "preview.pick.sourceUnavailable": "无源码信息",
   "preview.openExternal": "在浏览器打开",
   "preview.openExternal.localOnly": "只有本机 http(s) 预览可以在系统浏览器中打开。",
   "preview.target.web": "网页",

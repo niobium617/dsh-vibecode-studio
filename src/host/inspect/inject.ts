@@ -13,7 +13,7 @@
  * helper leaked into the source, because that would throw inside the page.
  */
 import { studioError } from '../../contracts/errors'
-import type { ElementBox, ElementContext } from '../../contracts/inspect'
+import type { ElementBox, ElementContext, SourceContext } from '../../contracts/inspect'
 import type { PickSnapshot } from '../../contracts/transport'
 import type { ScreencastPageLike, ScreencastSessionLike } from '../targets/types'
 import { ARIA_ROLES, describeAccessibility, normalizeAccessibility } from './accessibility'
@@ -24,6 +24,10 @@ import {
   normalizeVisibility,
 } from './dom'
 import { buildSelector } from './selector'
+import { normalizeSourceContext } from './source'
+import { reactSource } from './source/react'
+import { svelteSource } from './source/svelte'
+import { vueSource } from './source/vue'
 
 export const PICK_BINDING_NAME = '__vibePick'
 export const PICK_OVERLAY_ID = '__vibe-picker-host'
@@ -44,17 +48,19 @@ export interface PickerPageConfig {
 type PageSelect = (element: Element) => { selector: string; unique: boolean }
 type PageDom = (element: Element) => { html: string; text: string; visible: boolean }
 type PageAccess = (element: Element) => { role: string | null; name: string }
+type PageSource = (element: Element) => SourceContext | null
 
 /**
  * Runs inside the target page. Must stay self-contained: it is serialized and
- * evaluated there, and it only sees `config` plus the three extractors the
- * Host passes in (selector, DOM context, accessibility).
+ * evaluated there, and it only sees `config` plus the extractors the Host
+ * passes in (selector, DOM context, accessibility, source).
  */
 export function installVibePicker(
   config: PickerPageConfig,
   select: PageSelect,
   domOf: PageDom,
   accessOf: PageAccess,
+  sourceOf: PageSource,
 ): boolean {
   // Only the main frame drives the overlay. Without this guard the script
   // (installed in every frame by addScriptToEvaluateOnNewDocument) would also
@@ -241,6 +247,15 @@ export function installVibePicker(
     } catch {
       // Keep the empty defaults.
     }
+    // Source adapters inspect framework internals (React fiber, Vue vnodes,
+    // Svelte metadata); none of them may break a pick when one throws.
+    let source: SourceContext | null = null
+    try {
+      const found = sourceOf(target)
+      if (found && typeof found === 'object') source = found
+    } catch {
+      // Keep `null`.
+    }
     report({
       kind: 'pick',
       alt: event.altKey === true,
@@ -255,6 +270,7 @@ export function installVibePicker(
       visible,
       role: typeof role === 'string' ? role : null,
       name: typeof name === 'string' ? name : '',
+      source,
     })
   }
 
@@ -310,16 +326,27 @@ export function installVibePicker(
 }
 
 /**
- * The exact expression evaluated in the page. Both functions are composed by
- * source so the selector logic has one implementation for unit tests and the
- * page.
+ * The exact expression evaluated in the page. Every page-side function is
+ * composed by source so the logic has one implementation for unit tests and
+ * the page.
  */
 export function buildPickerScript(config: PickerPageConfig): string {
   const selectSource = buildSelector.toString()
   const domSource = extractDomContext.toString()
   const accessSource = describeAccessibility.toString()
+  const reactSourceText = reactSource.toString()
+  const vueSourceText = vueSource.toString()
+  const svelteSourceText = svelteSource.toString()
   const installSource = installVibePicker.toString()
-  const combined = `${selectSource}\n${domSource}\n${accessSource}\n${installSource}`
+  const combined = [
+    selectSource,
+    domSource,
+    accessSource,
+    reactSourceText,
+    vueSourceText,
+    svelteSourceText,
+    installSource,
+  ].join('\n')
   // esbuild's keepNames helper is not defined in the page; fail loudly here
   // instead of throwing inside the target.
   if (/(?:^|[^.\w$])__name\s*\(/.test(combined)) {
@@ -330,10 +357,16 @@ export function buildPickerScript(config: PickerPageConfig): string {
     `var __vibeSelect = ${selectSource};`,
     `var __vibeDom = ${domSource};`,
     `var __vibeAccess = ${accessSource};`,
+    `var __vibeReactSource = ${reactSourceText};`,
+    `var __vibeVueSource = ${vueSourceText};`,
+    `var __vibeSvelteSource = ${svelteSourceText};`,
     `var __vibeRoles = ${JSON.stringify(ARIA_ROLES)};`,
     'var __vibeAccessFor = function (element) { return __vibeAccess(element, __vibeRoles); };',
+    'var __vibeSourceFor = function (element) {',
+    '  return __vibeReactSource(element) || __vibeVueSource(element) || __vibeSvelteSource(element);',
+    '};',
     `var __vibeInstall = ${installSource};`,
-    `return __vibeInstall(${JSON.stringify(config)}, __vibeSelect, __vibeDom, __vibeAccessFor);`,
+    `return __vibeInstall(${JSON.stringify(config)}, __vibeSelect, __vibeDom, __vibeAccessFor, __vibeSourceFor);`,
     '})()',
   ].join('\n')
 }
@@ -391,8 +424,9 @@ function shortString(value: unknown, max: number): string | null {
 
 /**
  * The page is untrusted: even our own binding can be called by page script, so
- * every field is re-validated and bounded here. `source` is a placeholder until
- * T029 fills it.
+ * every field is re-validated and bounded here. `source` comes from the page's
+ * framework adapters, so `normalizeSourceContext` drops unknown keys and caps
+ * the file/via text.
  */
 export function normalizePickedElement(value: Record<string, unknown>): ElementContext | null {
   const selector = shortString(value.selector, MAX_SELECTOR_CHARS)
@@ -427,7 +461,7 @@ export function normalizePickedElement(value: Record<string, unknown>): ElementC
     html: normalizeDomSnippet(value.html),
     visible: normalizeVisibility(value.visible),
     box,
-    source: null,
+    source: normalizeSourceContext(value.source),
   }
 }
 

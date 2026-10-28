@@ -9,7 +9,7 @@
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，M1 已完成，M2 已完成）**。
 - 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）、T023 Console 采集与抽屉、T024 Network 采集与抽屉、T025 预览工具栏与生命周期、T026 G2 Preview 评审（通过）。
-- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），**T027 拾取 overlay 与选择器、T028 元素上下文提取已完成**，下一项 **T029 源码适配（React/Vue/Svelte）**。
+- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），**T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 源码适配（React/Vue/Svelte）已完成**，下一项 **T030 标注模型、存储与文本渲染**。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
 - T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T026 已提交并推送到 `origin/task/m2-target-model`（`ebee1e5`，文档至 `92ecc32`），尚未合并入 `main`；其后 `9c19501..88a4070`（方向/手册文档、U01 实现、去重复标题）已推送到 `origin/task/m2-target-model`（`92ecc32..88a4070`，2026-10-28）；`f64e928`（清理残留 locale key 与过期布局引用）推送后，以 `--no-ff` 合并入 `main`（合并提交 `768e129`，`main` 树与分支一致），功能分支保留。手动复测入口见 `docs/2026-10-28-手动测试手册.md`；界面/产品方向见 `docs/2026-10-28-界面与项目方向.md`。S3/S4/T010/T014/T015/T020/T021/T022/T025 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
@@ -499,6 +499,21 @@
 - 验证：`pnpm typecheck` 0 error；`pnpm test` 51 文件 / **384 用例全通过**；`pnpm build` host 172.8 KiB / client 149.1 KiB；真实 Edge 10/10 上下文正确。日志 `.tmp/logs/t028-*.log`。
 - 计划偏差/限制：名称是近似实现（无完整 accessibility tree、未覆盖 `aria-owns`/嵌套 landmark 特例）；拾取卡片暂不展示 text/role，留 T029/T030。
 
+### T029 — 源码适配（React/Vue/Svelte）（已完成，2026-10-28）
+
+- 背景：S4 spike 证明三框架能取到元素源码行，但 React 19 没有 `_debugSource`、Vue 的 `data-v-inspector` 运行时被移入 vnode、生产构建没有任何元数据。本任务把 S4 的取法产品化，并补上“取不到”的明确回退。
+- 结果：
+  - `src/host/inspect/source/react.ts`（新增）：`reactSource()` 先读 `@react-dev-inspector/babel-plugin` 在 dev 构建期写入的 `data-inspector-relative-path/-line/-column`（经 `closest` 兼容包装元素），再沿 `__reactFiber$*` 的 `return` 链 ≤ 64 层找 React 18 dev 的 `_debugSource`，否则 `null`。
+  - `src/host/inspect/source/vue.ts`（新增）：`vueSource()` 沿 `__vnode` 父链 ≤ 64 层，优先用 `__vue_inspector_store__.vnodeToPos`（`vite-plugin-vue-inspector` v7 的全局表），其次读 vnode 不可枚举 prop `__v_inspector`（`file:line:column`），再退回遗留的 `data-v-inspector` 属性，最后用 `__vueParentComponent.type.__file` / `__vnode.ctx.type.__file` 只给文件（无行号），否则 `null`。
+  - `src/host/inspect/source/svelte.ts`（新增）：`svelteSource()` 从元素向上 ≤ 64 层读 `__svelte_meta.loc`（Svelte 5 dev 运行时；生产构建没有），否则 `null`。
+  - `src/host/inspect/source/index.ts`（新增）：`SOURCE_VIAS` 与 Host 侧 `normalizeSourceContext()`——框架白名单、文件去控制字符/折叠空白/截 512 码点、`via` 限适配器 token、行列为 0–1,000,000 整数，未知字段丢弃，越界置 `null`。
+  - `src/host/inspect/inject.ts`：`installVibePicker()` 接收第 5 个页面提取器 `sourceOf`，点击时 `try/catch` 取 source 并随 payload 上报；`buildPickerScript()` 用 `toString()` 组合三个适配器，`return __vibeReactSource(el) || __vibeVueSource(el) || __vibeSvelteSource(el)`；`normalizePickedElement()` 经 `normalizeSourceContext` 填充 `ElementContext.source`。
+  - `src/client/inspect/Picker.tsx`：`PickCard` 新增源码行——显示文件末段 + 行号（`App.vue:14`）、完整路径放 `title`、`data-vibe-pick-source-via` 暴露取法；无源码时显示“无源码信息”，不隐藏该行。两语新增 `preview.pick.source` / `preview.pick.sourceUnavailable`。
+  - `fixtures/source/{react,vue,svelte}`（新增）：三套最小 Vite 应用，各 30 个带 `id` 的元素、每元素单独一行，分别启用 inspector Babel 插件、`vite-plugin-vue-inspector`、Svelte 5 dev 编译。
+  - 测试：新增 `tests/unit/inspect-context/source.test.ts`（17 用例：三适配器主路径/回退/异常，`normalizeSourceContext` 边界）、`tests/e2e/source-adapters.spec.ts`（每框架 dev 30/30 命中与真实鼠标复核 + 生产 30/30 `source: null`）；`component/inspect/page-script.test.ts` payload 补 `source` 并新增页面内 React 属性断言；`component/inspect/picker-ui.test.tsx` 新增源码行 2 例；`unit/preview/picker.test.ts` 补脚本组合断言。
+- 验证：`pnpm typecheck` 0 error；`pnpm test` 52 文件 / **404 用例全通过**；`pnpm build` host 181.0 KiB / client 150.0 KiB；`pnpm test:e2e` **9 用例全通过**（dev 三框架 30/30 命中、生产三框架 30/30 回退为 null、0 控制台/页面错误）。日志 `.tmp/logs/t029-*.log`。
+- 计划偏差/限制：React 19 的一级路径依赖目标项目启用 inspector babel 插件；Vue `__file` 回退只有文件、不计命中；Svelte 4 的 `add_location` 未单独适配；三 fixture 均为手写最小应用，真实项目插件版本差异留 G3 复核；e2e 紧接 `pnpm test` 时 Playwright 的 Edge 进程可能尚未退完，会误触发 `picker-edge` 的清理断言（单独重跑即通过）。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -586,6 +601,13 @@
 30. **Vue inspector 的 DOM 属性运行时不存在**：`data-v-inspector` 被 `vite-plugin-vue-inspector` 移入 vnode 不可枚举 prop `__v_inspector` 并删除属性；读 DOM 属性会全部失败，应读 `el.__vnode` / `__vue_inspector_store__.vnodeToPos`。
 31. **Svelte 源码只在 dev**：`__svelte_meta` 由 dev 运行时 `assign_location` 设置，生产构建没有；产品里必须能显示“源码不可用”。
 
+### 源码适配 / Vite 测试
+
+1. **Vite JS API 不会重置 `NODE_ENV`**：同一 Node 进程里先 `createServer()` 会把 `process.env.NODE_ENV` 固定为 `development`（只在未设置时才给默认值），随后 `build()` 解析出的 `config.isProduction` 仍是 false，`@vitejs/plugin-vue` 继续注入 `__file`、Svelte 插件继续编译 dev 的 `__svelte_meta`——“生产产物带源码”。测试里在 `createServer`/`build`/`preview` 前后显式设置并恢复 `NODE_ENV`；单独跑生产用例时不会暴露（首次 build 自己设成 production）。
+2. **序列化适配器同样禁止模块常量**：`reactSource/vueSource/svelteSource` 和 T027/T028 的页面函数一样用 `toString()` 进页面，`MAX_*` 与 `cleanFile`/`position` 等辅助函数必须写在函数体内；页面里找不到就是 ReferenceError。
+3. **`Object.keys` 只列 enumerable 自有属性**：React 的 `__reactFiber$*`、Vue 的 `__vnode` 运行时是普通赋值（enumerable），jsdom 测试用 `Object.defineProperty` 伪造时必须传 `enumerable: true`，否则适配器看不到。
+4. **`preview()` 的 `PreviewOptions` 没有 `outDir`**：传 `preview.outDir` 会 TS2345；把 `build.outDir` 以内联 config 同时传给 `build()` 和 `preview()`，二者都按 `build.outDir` 找静态文件。
+
 ### 预览 / 浏览器
 
 32. **进程检查会匹配到自己**：用 `CommandLine -like '*playwright_chromiumdev_profile*'` 查残留时，执行检查的 shell/PowerShell 自身也含该字符串，会误报。必须同时限定 `name='msedge.exe'`（或进程名）并匹配 `--user-data-dir=*playwright_chromiumdev_profile*`。
@@ -618,6 +640,7 @@
 - **T024 已完成**：Network 事件采集（4xx/5xx 标记、header/URL 脱敏、300 条 / 256 KiB 上限、body 按需 64 KiB 截断）、revision 游标增量轮询与网络抽屉（原位更新、Failed 过滤、body 懒加载）均通过集成与组件测试；T025 已在隔离 Desktop 确认抽屉有数据。
 - **T025 已完成**：工具栏 navigate/reload/viewport/外部打开、崩溃提示与显式重启、内部切 tab 保会话、停止后 5 s 内进程全退且无孤儿，Host 真 Edge 与隔离 Desktop 均 `ok:true`；证据 `.tmp/logs/t025-{host,desktop}.json`。限制：崩溃不自动重连、改 DPR 需重启。
 - **T026（M2）**：G2 Preview 评审，复核闭环/性能（10 fps、输入、Console/Network、停止清理）与 SPEC 条目。T020/T021 已接好预览会话与输入覆盖层；T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 将随截图与上下文任务逐步消费；T009 的 contracts 由后续页面逐步引用。
+- **T027–T029 已完成**：拾取 overlay/选择器、元素上下文（text/html/role/name/visible）、三框架源码适配（React `data-inspector` → fiber、Vue `__v_inspector` → `data-v-inspector` → `__file`、Svelte `__svelte_meta`），页面数据全部在 Host 侧重新校验。`fixtures/source/*` e2e 在三框架 dev 各 30/30 命中，生产构建 30/30 回退为 `source: null` 且无错误。限制：源码行依赖目标项目 dev 构建的插件，生产态只显示“无源码信息”。
 - **S2 遗留**：如果上游未来公开附件创建/释放 API，再评估直接截图附件；先复测切会话保留和失败清理。
 - **Desktop 遗留**：S2 跨会话未测到，后续需要能稳定创建第二个命名会话的测试环境。
 - **成本**：避免无必要的全仓读取和重复验收；每个任务完成即提交、记录、清理进程。
@@ -653,6 +676,7 @@ pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 - S8 进程生命周期：[REPORT](../spikes/s8/REPORT.md)、[run.ts](../spikes/s8/run.ts)；原始数据 `.tmp/logs/s8-results.json`。
 - 任务与验收：[todo.md](../tasks/todo.md)。
 - 测试 harness：`vitest.config.ts`、`playwright.config.ts`、`fixtures/vite-basic/`、`tests/e2e/fixture.spec.ts`。
+- 源码适配：`src/host/inspect/source/`、`fixtures/source/{react,vue,svelte}/`、`tests/e2e/source-adapters.spec.ts`、`tests/unit/inspect-context/source.test.ts`。
 - 配置存储：`src/host/studio/store.ts`、`tests/unit/studio-store.test.ts`。
 - Web 预览：`src/host/targets/web/{adapter,launch}.ts`、`tests/integration/web-adapter/`、`tests/helpers/png.ts`。
 - 预览生命周期：`src/host/preview/session.ts`、`src/client/preview/{Toolbar.tsx,lifecycle.ts,local-url.ts}`、`tests/integration/preview/session-lifecycle.test.ts`、`.tmp/logs/t025-{host,desktop}.json`。

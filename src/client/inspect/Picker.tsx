@@ -287,10 +287,21 @@ export interface PickCardProps {
   onClose(): void
 }
 
-/** Shows what was picked. T029 adds the source location to this card. */
+/** A source path is page data; the card only needs its last segment. */
+function sourceLeaf(file: string): string {
+  const parts = file.split(/[\\/]/)
+  const leaf = parts[parts.length - 1] ?? file
+  return leaf.length > 0 ? leaf : file
+}
+
+/** Shows what was picked, including where it lives in the framework source. */
 export function PickCard({ locale, pick, onClose }: PickCardProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
   const classes = pick.classes.length > 0 ? `.${pick.classes.join('.')}` : ''
+  const source = pick.source
+  const sourceText = source
+    ? `${sourceLeaf(source.file)}${source.line === null ? '' : `:${source.line}`}`
+    : t('preview.pick.sourceUnavailable')
   return (
     <div
       data-vibe-pick-card="1"
@@ -326,6 +337,14 @@ export function PickCard({ locale, pick, onClose }: PickCardProps): React.ReactE
       <p style={metaStyle}>
         {t('preview.pick.box')}: {pick.box.x}, {pick.box.y} · {pick.box.width}×
         {pick.box.height}
+      </p>
+      <p
+        data-vibe-pick-source={source ? '1' : '0'}
+        data-vibe-pick-source-via={source ? source.via : undefined}
+        title={source ? source.file : undefined}
+        style={metaStyle}
+      >
+        {t('preview.pick.source')}: {sourceText}
       </p>
     </div>
   )

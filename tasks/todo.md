@@ -310,12 +310,20 @@
   - 真实 Edge（`tests/integration/preview/picker-edge.test.ts`）10 种元素：role/name/text/visible 全部符合预期（button/input/li/span、aria-label、Shadow DOM 内按钮、nth-of-type 路径），html 非空且 ≤ 2048 B，box 仍与元素 rect 一致。
   - 限制：无障碍名称是近似实现（非完整 accessibility tree），`aria-owns`/`aria-describedby` 与嵌套 landmark 特例未覆盖；拾取卡片尚未展示 text/role（T029/T030 使用这些字段）。
 
-### - [ ] T029 源码适配（React/Vue/Svelte）
+### - [x] T029 源码适配（React/Vue/Svelte）
 
 - **目标**：React fiber、Vue `__file`、Svelte `__svelte_meta`；不可用回退。
 - **验收**：30 个元素 ≥ 80%；生产态/无 source 时不报错；回退明确。
 - **验证**：三 fixture + `pnpm test -- tests/e2e/source-adapters`。
 - **文件**：`src/host/inspect/source/{react,vue,svelte,index}.ts`、tests。
+- **验证结果（2026-10-28）**：
+  - 静态检查：`pnpm typecheck` 0 error；`pnpm test` 52 文件 / 404 用例通过（新增 `tests/unit/inspect-context/source.test.ts` 17 用例；`component/inspect/page-script.test.ts` payload 补 `source` 并新增页面内适配器断言；`component/inspect/picker-ui.test.tsx` 新增 PickCard 源码行；`unit/preview/picker.test.ts` 补脚本组合断言）；`pnpm build` host 181.0 KiB / client 150.0 KiB。日志 `.tmp/logs/t029-{vitest-3,build,e2e-2}.log`。
+  - E2E：`pnpm test:e2e` 9 用例通过（fixture 3 + 新增 `tests/e2e/source-adapters.spec.ts` 6）。三 fixture `fixtures/source/{react,vue,svelte}` 各 30 个 `id` 元素，dev 下 30/30 命中（框架 + 文件 basename + 行号 ±2，实际 0 miss，高于 80% 门槛），控制台/页面错误为 0；每个框架另用真实鼠标点击 `#title` 复核与合成点击一致。
+  - 适配器与回退：`react.ts` 先读 `@react-dev-inspector/babel-plugin` 注入的 `data-inspector-relative-path/-line/-column`（React 19 无 `_debugSource`），再走 React 18 dev fiber `_debugSource`，否则 `null`；`vue.ts` 先读 vnode 隐藏 prop `__v_inspector` 与 `__vue_inspector_store__.vnodeToPos`，再读遗留 `data-v-inspector`，最后组件 `__file`（仅文件、无行号），否则 `null`；`svelte.ts` 从元素向上 ≤ 64 层读 `__svelte_meta.loc`，否则 `null`。每个适配器全程 `try/catch`，页面对象被改写只会退化为 `null`，不影响拾取。
+  - 生产回退：三个 fixture 用 Vite `build()` + `preview()`（输出 `.tmp/source-adapters/<框架>`）跑同一拾取脚本，30/30 拾取仍成功且 `source === null`，无控制台/页面错误——无 source 不是错误，UI 显示“无源码信息”。测试内显式固定 `process.env.NODE_ENV`，否则先启动的 dev server 会把后续 build 的 Vue/Svelte 插件留在 dev 模式而误带 `__file`/`__svelte_meta`。
+  - 信任边界：页面回传的 `source` 经 `normalizeSourceContext()`（`src/host/inspect/source/index.ts`）重新校验：框架白名单、文件去控制字符/折叠空白/截 512 码点、`via` 限 `SOURCE_VIAS` 风格 token、行列为 0–1,000,000 的整数，越界置 `null`；未知字段丢弃。
+  - 注入复用与依赖：仍由 `buildPickerScript()` 用 `toString()` 组合 `reactSource/vueSource/svelteSource` 并作为第 5 个参数传给 `installVibePicker`，未改 T027/T028 结构；未新增依赖（`@react-dev-inspector/babel-plugin`、`vite-plugin-vue-inspector`、`@sveltejs/vite-plugin-svelte` 均已在 devDependencies）。
+  - 限制：React 19 需在目标项目 dev 构建里启用 inspector babel 插件才有一级路径；Vue `__file` 回退只有文件没有行号（不计命中）；Svelte 4 的 `add_location` 与生产态均无行号；`spikes/s4/REPORT.md` 的结论仍适用于手写 fixture，真实项目插件的版本差异需在 G3 复核。
 
 ### - [ ] T030 标注模型、存储与文本渲染
 
