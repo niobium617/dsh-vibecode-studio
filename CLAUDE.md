@@ -2,10 +2,11 @@
 
 ## Session protocol
 - Start: read `tasks/HANDOFF.md`, then only the current task section of `tasks/todo.md`. State the task ID and acceptance criteria in one line before acting.
-- One task per session. Do not re-read approved SPEC/plan documents; cite the section or `file:line` instead.
-- If a task exceeds ~60 minutes or ~150 tool calls, write the handoff and stop. Do not start a second task in the same session.
-- End: tick `tasks/todo.md`, record the verification command and result, update `docs/DEVLOG.md` and `tasks/HANDOFF.md`, then `/clear`. Commit only when the user or the approved workflow requires it.
-- `/compact` at phase boundaries. Preserve the task ID, accepted decisions, changed files, and failing output. Never `/resume` into a different task.
+- One task at a time. Do not re-read approved SPEC/plan documents; cite the section or `file:line` instead.
+- If a task exceeds ~60 minutes or ~150 tool calls, write the handoff and stop.
+- End: tick `tasks/todo.md`, record the verification command and result, update `docs/DEVLOG.md` and `tasks/HANDOFF.md`. Commit only when the user or the approved workflow requires it.
+- Context hygiene: do not `/clear` reflexively after every task — repeated cold starts lower cache hits and waste tokens. At each task end, recommend in one line which case applies: clear when the context is long or the next task is unrelated; keep the session (optionally `/compact`) when the next task builds directly on the same module/files and the context is still lean. Starting that related next task is allowed in the same session. Always prompt the user to clear once a whole feature module or gate (e.g. M3/G3) is complete, and after a long or failing task.
+- `/compact` when context grows mid-module, preserving the task ID, accepted decisions, changed files, and failing output. Never `/resume` into a different task.
 - `tasks/HANDOFF.md` is the canonical handoff. The `handoff` skill is optional; if used, merge into that file instead of replacing it.
 
 ## Token and context discipline
