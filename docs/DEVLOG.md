@@ -443,6 +443,15 @@
 - 计划偏差/限制：
   - 验收写“画布高度 ≥ 面板 60%”，按**舞台（画布区域）**理解并达标；16:9 位图在 320px 宽、768px 高面板中最多只能到 22.2%（304×171），几何上不可能达 60%，位图比例单独记录。
   - 真实系统中文 IME、外部浏览器跳转、P/V/I/C/N/L/S 全量手测矩阵未自动化；L/S 类（切 tab、关面板）沿用 T025 手测与 lifecycle 单测结论。
+
+### U01 补充 — 删除面板内重复标题（人工验证反馈，2026-10-28）
+
+- 背景：人工验证时反馈面板顶部 `Vibe Studio` 标题 + “预览、检查并标注正在运行的应用”副标题与 DSH 侧栏页签重复，占掉约 56 px 画布高度。
+- 变更：`StudioShell.tsx` 去掉 `<header>`（`h2`/`p` 与 `headerStyle`/`titleStyle`/`subtitleStyle`），根网格 3 行改 2 行（`auto minmax(0, 1fr)`：页签行 + 页面体），页签行顶部补 `6px` 内边距；`shell.subtitle` 从 en/zh 两个 catalog 删除（两语 key 集合仍一致）；`index.ts` 的 `shell.title`（侧栏页签名）与 `shell.guide.description`（开始引导卡）保持不动。
+- 测试：`studio-shell.test.tsx` 两处标题断言改为断言无 `heading`、无副标题文本（英文用例同时校验副标题文案不出现）。
+- 验证：人工验证结束后重跑，`pnpm typecheck` 0 error、`pnpm test` 43 文件 / **319 用例全通过**、`pnpm build` host 140.5 KiB / client 140.3 KiB。
+- 过程中一次假失败：人工验证会话在跑时，`tests/integration/web-adapter/edge.test.ts` 的“无 Playwright Edge 残留”断言收到 8 个 pid——那是用户预览的 Edge，与测试共用 `playwright_chromiumdev_profile` 前缀；会话停止后同一用例通过。**教训：真机手测期间不要跑全局进程断言类集成测试。**
+- 影响：预览舞台可用高度增加约 56 px（同一面板高度下舞台占比进一步上升）；设置页与空状态页现在紧贴页签行。
   - 设置页“预览”分组只改目标页视口，不改 DSH 窗口尺寸；不新增 host 契约。
 
 ## 3. 踩坑与已验证经验

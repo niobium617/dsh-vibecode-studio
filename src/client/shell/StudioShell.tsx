@@ -1,7 +1,7 @@
 /**
- * Studio shell: header, internal page tabs and the page placeholder. The DSH
- * sidebar supplies docking, fullscreen and start-here guide; this component
- * only fills the pane body.
+ * Studio shell: internal page tabs and the page placeholder. The DSH sidebar
+ * supplies docking, fullscreen, the pane title and the start-here guide; this
+ * component only fills the pane body, so it no longer repeats the title.
  */
 import * as React from 'react'
 import { browserLocale, createTranslator, type Locale } from '../i18n'
@@ -14,34 +14,19 @@ import { DEFAULT_TAB, STUDIO_TAB_DEFINITIONS } from './tabs'
 
 const rootStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateRows: 'auto auto minmax(0, 1fr)',
+  // Two rows: the page tabs and the page body. The old title/subtitle header
+  // was redundant — DSH already labels the pane with the tab name.
+  gridTemplateRows: 'auto minmax(0, 1fr)',
   height: '100%',
   minHeight: 0,
   font: '13px/1.5 system-ui, sans-serif',
   color: 'var(--dsw-text-primary, inherit)',
 }
 
-const headerStyle: React.CSSProperties = {
-  display: 'grid',
-  gap: 2,
-  padding: '12px 12px 8px',
-}
-
-const titleStyle: React.CSSProperties = {
-  margin: 0,
-  font: '600 14px/1.4 system-ui, sans-serif',
-}
-
-const subtitleStyle: React.CSSProperties = {
-  margin: 0,
-  font: '12px/1.5 system-ui, sans-serif',
-  opacity: 0.7,
-}
-
 const tabListStyle: React.CSSProperties = {
   display: 'flex',
   gap: 2,
-  padding: '0 8px',
+  padding: '6px 8px 0',
   borderBottom: '1px solid var(--dsw-border-color, rgba(127, 127, 127, 0.3))',
 }
 
@@ -98,11 +83,6 @@ export function StudioShell({ locale }: StudioShellProps): React.ReactElement {
 
   return (
     <div data-vibe-shell="1" style={rootStyle}>
-      <header style={headerStyle}>
-        <h2 style={titleStyle}>{t('shell.title')}</h2>
-        <p style={subtitleStyle}>{t('shell.subtitle')}</p>
-      </header>
-
       <div role="tablist" aria-label={t('shell.title')} style={tabListStyle}>
         {STUDIO_TAB_DEFINITIONS.map((tab) => {
           const selected = tab.id === activeTab

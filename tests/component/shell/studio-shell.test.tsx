@@ -25,10 +25,12 @@ function tabNames(): (string | null)[] {
 }
 
 describe('StudioShell', () => {
-  it('renders the header and all internal tabs with Preview selected', () => {
+  it('renders all internal tabs with Preview selected and no repeated header', () => {
     render(<StudioShell locale="en" />)
 
-    expect(screen.getByRole('heading', { name: 'Vibe Studio' })).toBeTruthy()
+    // DSH labels the pane itself; an in-pane title/subtitle would repeat it.
+    expect(screen.queryByRole('heading')).toBeNull()
+    expect(screen.queryByText('Preview, inspect and annotate the running app')).toBeNull()
     expect(tabNames()).toEqual(['Preview', 'Inspect', 'Annotations', 'API', 'Settings'])
 
     const selected = shellTabs().filter(
@@ -72,7 +74,7 @@ describe('StudioShell', () => {
   it('renders translated labels for zh-CN', () => {
     render(<StudioShell locale="zh-CN" />)
 
-    expect(screen.getByRole('heading', { name: 'Vibe Studio' })).toBeTruthy()
+    expect(screen.queryByText('预览、检查并标注正在运行的应用')).toBeNull()
     expect(tabNames()).toEqual(['预览', '检查', '标注', 'API', '设置'])
     expect(screen.getByLabelText('预览地址')).toBeTruthy()
   })

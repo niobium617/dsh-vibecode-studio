@@ -1,6 +1,5 @@
 {
   "shell.title": "Vibe Studio",
-  "shell.subtitle": "Preview, inspect and annotate the running app",
   "shell.guide.description": "Preview, inspect and annotate the running app",
   "tab.preview": "Preview",
   "tab.inspect": "Inspect",

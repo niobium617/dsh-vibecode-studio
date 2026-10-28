@@ -1,6 +1,5 @@
 {
   "shell.title": "Vibe Studio",
-  "shell.subtitle": "预览、检查并标注正在运行的应用",
   "shell.guide.description": "预览、检查并标注正在运行的应用",
   "tab.preview": "预览",
   "tab.inspect": "检查",
