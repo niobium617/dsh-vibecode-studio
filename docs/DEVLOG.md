@@ -7,11 +7,11 @@
 
 ## 1. 当前快照
 
-- 阶段：**Phase 4 实现（M0/G0 已通过，M1 已完成，进入 M2）**。
+- 阶段：**Phase 4 实现（M0/G0 已通过，M1 已完成，M2 已完成）**。
 - 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）、T023 Console 采集与抽屉、T024 Network 采集与抽屉、T025 预览工具栏与生命周期、T026 G2 Preview 评审（通过）。
-- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2**，T016–T026 已完成，下一项 **T027 拾取 overlay 与选择器**。
+- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2**，T016–T026 已完成；界面/产品方向已定稿（`docs/2026-10-28-界面与项目方向.md`），下一项 **U01 预览界面精简（Layout v2）**，之后 T027。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
-- T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T026 已提交并推送到 `origin/task/m2-target-model`（`ebee1e5`），尚未合并入 `main`。手动复测入口见 `docs/2026-10-28-手动测试手册.md`。S3/S4/T010/T014/T015/T020/T021/T022/T025 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
+- T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T026 已提交并推送到 `origin/task/m2-target-model`（`ebee1e5`，文档至 `92ecc32`），尚未合并入 `main`；其后提交（`9c19501`、`b7cde55` 及方向文档）仅本地，推送曾因 GitHub 连接重置失败。手动复测入口见 `docs/2026-10-28-手动测试手册.md`；界面/产品方向见 `docs/2026-10-28-界面与项目方向.md`。S3/S4/T010/T014/T015/T020/T021/T022/T025 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
 
 环境：
@@ -409,6 +409,17 @@
   - 隔离 Desktop（`t026-desktop.mjs` / `t026-desktop.json`，CDP 9225）：25.0 fps；聚焦/键入/点击/滚轮均生效；Console 32 条、Network 71 条；停止 4886 ms、无孤儿，真实 desktop profile 哈希未变。
   - SPEC：FR-PRE-02/04/05/08 本次实测；FR-PRE-01/03/06/07/10 由 T025 与 shell 用例覆盖；FR-PRE-09（多目标独立会话）未验证，当前只注册 web 目标，留到多目标任务。
 - 限制：Desktop 预览 Edge 在后台被遮挡时 Chromium 会节流 rAF/计时器，脚本测量前用 `SetForegroundWindow` 拉起预览窗口；停止清理 Desktop 4886 ms 接近 5 s；真实“关闭整个 DSH 面板”的 stop 仍只有 lifecycle 单测。
+
+### U01 — 界面与项目方向定稿（已完成，2026-10-28）
+
+- 背景：用户手测后反馈“功能正常，界面还得修改”，并提供《M1界面修改意见》（`M1阶段界面审查/M1界面修改意见.docx`）：预览元素过多、画布被挤、参数应外移、面向初学者、复杂调试交给 agent。
+- 决策：UI 打磨不再整体后置。**先插入 U01（Layout v2）再开 T027**，因为拾取 overlay 依赖最终画布几何，先定布局可避免返工；其余 M3–M5 功能范围不变。
+- 产物：
+  - `docs/2026-10-28-界面与项目方向.md`：Layout v2 线框、元素处置表、U01 验收、明确不做、P1–P7 项目方向分级、防跑偏约束、待确认问题。
+  - `tasks/todo.md`：新增 M2.5，U01 置于 T027 前；M3 依赖改为 G2 + U01；任务总数 61→62；关键路径、并行块、批准记录同步。
+  - `tasks/HANDOFF.md`：下一项改为 U01，新增 U01 起步提示与新会话启动语。
+- 验证：仅文档/任务清单，未改产品代码、未跑测试。
+- 待确认：右栏最小宽度 320/360px、抽屉是否可拖拽、“在浏览器打开”位置、P2 一键部署是否单独立项。
 
 ## 3. 踩坑与已验证经验
 

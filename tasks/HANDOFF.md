@@ -2,7 +2,7 @@
 
 > 更新时间：2026-10-28
 > 用途：清理/切换对话后，新会话从这里恢复，不依赖旧聊天记录。
-> 当前阶段：**Phase 4 实现（M0/G0 已通过，M1 已通过 G1，M2 已通过 G2）**；T001–T026 已完成，下一项 T027 拾取 overlay 与选择器（M3 开工）。
+> 当前阶段：**Phase 4 实现（M0/G0 已通过，M1 已通过 G1，M2 已通过 G2）**；T001–T026 已完成，下一项 **U01 预览界面精简（Layout v2）**，完成后才进入 T027 拾取 overlay。
 
 ---
 
@@ -33,7 +33,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 | Phase 1 SPEC | `docs/SPEC-vibecoding-studio.md` | 已批准（2026-10-25） |
 | Phase 2 计划 | `tasks/plan.md` | 已批准（2026-10-25） |
 | Phase 3 任务 | `tasks/todo.md` | 已批准（2026-10-25） |
-| Phase 4 实现 | `spikes/s1/`–`spikes/s4/`、`spikes/s8/`、`spikes/G0.md`、`src/`、`scripts/`、`tests/`、`fixtures/`、`cordis.patch.yml` | M0/G0 已通过；M1 完成并通过 G1（T001–T015）；M2 完成并通过 G2（T016–T026），下一项 T027 |
+| Phase 4 实现 | `spikes/s1/`–`spikes/s4/`、`spikes/s8/`、`spikes/G0.md`、`src/`、`scripts/`、`tests/`、`fixtures/`、`cordis.patch.yml` | M0/G0 已通过；M1 完成并通过 G1（T001–T015）；M2 完成并通过 G2（T016–T026）；下一项 U01（M2.5），之后 T027 |
 
 任务清单已获批准，按 `tasks/todo.md` 顺序执行；如果发现计划假设不成立，先更新 `plan.md`/SPEC，再继续，不要静默改范围。
 
@@ -42,18 +42,27 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 ## 4. 下一步
 
 1. 任务清单已于 2026-10-25 批准，不再重复评审。
-2. T001–T015 已完成并记录验证结果；**T005 G0 与 T015 G1 均已通过（GO）**，T006 脚手架、T007 client loader、T008 host Config、T010 client shell 均已在 `vibe-dev` Web 验证，T009 contracts 由 34 个单测覆盖，T011 transport 由 26 个集成用例 + Web/隔离 Desktop 真实载体验证，T012 harness 由 89 个 Vitest 用例 + 3 个 Playwright E2E 覆盖，T013 store 由 10 个用例覆盖，T014 设置面板由 19 个聚焦用例 + 全量 114 用例覆盖并验证保存/同源/重启持久化，T015 完成干净 profile 安装与 Web/Desktop 双端复核。T016 完成 target 契约、配置校验与 adapter 注册表（21 个聚焦用例）。T017 完成 Web target adapter：Edge 启动/导航/截图/关闭 + 稳定错误映射 + loopback 限制，13 个聚焦用例（真实 Edge + fixture）。T018 完成 S8 进程生命周期 spike：启动 ~0.4 s、treekill 无孤儿、`shell:true` 孤儿风险已验证、端口冲突可读，报告 `spikes/s8/REPORT.md`。T019 完成 dev server supervisor：spawn/HTTP 就绪/日志 ring buffer/停止/tree kill/孤儿兜底与端口冲突映射；23 个聚焦用例（全假进程）、171 个全量用例、真实 Vite 手动 `pass: true`。T020 完成 screencast + 帧路由 + canvas：最新帧缓冲、30 fps deadline 限速、stream/pull 双路由、断流回退与恢复、canvas 合并绘制；28 个聚焦用例、199 个全量用例、Web/隔离 Desktop 手动均通过（Web 断流回退 25.3 fps，Desktop 流式 25.7 fps，内存无增长趋势）。T021 完成输入转发：契约严格校验 + host 比例坐标/CDP 串行派发/按钮与 modifiers + unary `preview.input` + client 透明覆盖层/单飞行合并；23 个聚焦用例、222 个全量用例、typecheck/build 通过；手动 Host/Web/隔离 Desktop 端到端最大 26.3/39.3/14.3 ms，焦点、点击、输入、滚动均达目标，Edge 全退且真实 profile 未改。T022 完成中文输入：`{kind:'text'}` 契约、`Input.insertText` + 逐字回退、隐藏 textarea 只提交组合最终文本、点击定位、粘贴回退与限制提示；39 个聚焦用例、238 个全量用例、typecheck/build 通过，Host/Web/隔离 Desktop 均 `ok:true`，提交 `你好，世界` 且无中间态请求，失败提示与恢复、粘贴均验证，端到端最大 15.7/59.6 ms（Web/Desktop），Edge 全退且真实 profile 未改。T023 完成 Console 采集与抽屉：`preview.console.list`/`clear` 一元方法、独立 CDP 会话采集 console/exception、500 条 / 64 KiB ring buffer、`seq` 跨清空单调、`redactUrl` 与 UTF-8 截断、抽屉增量轮询/过滤/清空；22 个聚焦用例、260 个全量用例、typecheck/build 通过，真实 Edge 手测 510 条后恰 500 条、clear 后 seq 不变且新事件续号，`ok:true`。T024 完成 Network 采集与抽屉：`preview.network.list`/`clear`/`body` 一元方法、独立 CDP 会话采集请求/响应、4xx/5xx 标记、header/URL 脱敏、300 条 / 256 KiB ring buffer、revision 游标让 pending 行原位更新、body 按需 64 KiB 截断；27 个聚焦用例、287 个全量用例、typecheck/build 通过；未做真实 Edge 手测。T025 完成预览工具栏与生命周期：contracts 新增 navigate/reload/viewport/targets 一元方法与 `kind` 快照；host 服务迁到 `session.ts`，1 s 健康检查发现断线即 `failed`（不自动重连），重启先释放旧句柄，reload 无实现时回退 navigate，viewport 复用配置校验并保留 DPR；Web adapter 增加 reload/setViewport/isAlive；client 新增 Toolbar、`local-url` loopback 校验与 `lifecycle`（内部 tab 切换不 stop，shell 卸载才 stop），Canvas 1 s 状态轮询 + 500 ms 帧统计，崩溃提示含 Restart/Stop；14 个聚焦用例、301 个全量用例、typecheck/build 通过，Host 真 Edge 与隔离 Desktop 手动矩阵均 `ok:true`（崩溃 101 ms 检出、停止后 4471/3820 ms 进程全退、无孤儿、真实 profile 未改），T023/T024 抽屉已在真实载体确认。T026 G2 Preview 评审 **通过（GO）**：基线 typecheck 0 error、301 用例、build host 140.5 / client 115.1 KiB；Host 真 Edge、Web（`vibe-dev` + headless Edge）与隔离 Desktop 三端均在 1280×800 实测 24.4–25.9 fps，点击/输入/滚动、Console/Network 抽屉、停止清理（1357/2940/4886 ms、无孤儿）全部通过，真实 desktop profile 哈希未变。**M1 完成；M2 完成并通过 G2，下一项 T027 拾取 overlay 与选择器。**
+2. T001–T015 已完成并记录验证结果；**T005 G0 与 T015 G1 均已通过（GO）**，T006 脚手架、T007 client loader、T008 host Config、T010 client shell 均已在 `vibe-dev` Web 验证，T009 contracts 由 34 个单测覆盖，T011 transport 由 26 个集成用例 + Web/隔离 Desktop 真实载体验证，T012 harness 由 89 个 Vitest 用例 + 3 个 Playwright E2E 覆盖，T013 store 由 10 个用例覆盖，T014 设置面板由 19 个聚焦用例 + 全量 114 用例覆盖并验证保存/同源/重启持久化，T015 完成干净 profile 安装与 Web/Desktop 双端复核。T016 完成 target 契约、配置校验与 adapter 注册表（21 个聚焦用例）。T017 完成 Web target adapter：Edge 启动/导航/截图/关闭 + 稳定错误映射 + loopback 限制，13 个聚焦用例（真实 Edge + fixture）。T018 完成 S8 进程生命周期 spike：启动 ~0.4 s、treekill 无孤儿、`shell:true` 孤儿风险已验证、端口冲突可读，报告 `spikes/s8/REPORT.md`。T019 完成 dev server supervisor：spawn/HTTP 就绪/日志 ring buffer/停止/tree kill/孤儿兜底与端口冲突映射；23 个聚焦用例（全假进程）、171 个全量用例、真实 Vite 手动 `pass: true`。T020 完成 screencast + 帧路由 + canvas：最新帧缓冲、30 fps deadline 限速、stream/pull 双路由、断流回退与恢复、canvas 合并绘制；28 个聚焦用例、199 个全量用例、Web/隔离 Desktop 手动均通过（Web 断流回退 25.3 fps，Desktop 流式 25.7 fps，内存无增长趋势）。T021 完成输入转发：契约严格校验 + host 比例坐标/CDP 串行派发/按钮与 modifiers + unary `preview.input` + client 透明覆盖层/单飞行合并；23 个聚焦用例、222 个全量用例、typecheck/build 通过；手动 Host/Web/隔离 Desktop 端到端最大 26.3/39.3/14.3 ms，焦点、点击、输入、滚动均达目标，Edge 全退且真实 profile 未改。T022 完成中文输入：`{kind:'text'}` 契约、`Input.insertText` + 逐字回退、隐藏 textarea 只提交组合最终文本、点击定位、粘贴回退与限制提示；39 个聚焦用例、238 个全量用例、typecheck/build 通过，Host/Web/隔离 Desktop 均 `ok:true`，提交 `你好，世界` 且无中间态请求，失败提示与恢复、粘贴均验证，端到端最大 15.7/59.6 ms（Web/Desktop），Edge 全退且真实 profile 未改。T023 完成 Console 采集与抽屉：`preview.console.list`/`clear` 一元方法、独立 CDP 会话采集 console/exception、500 条 / 64 KiB ring buffer、`seq` 跨清空单调、`redactUrl` 与 UTF-8 截断、抽屉增量轮询/过滤/清空；22 个聚焦用例、260 个全量用例、typecheck/build 通过，真实 Edge 手测 510 条后恰 500 条、clear 后 seq 不变且新事件续号，`ok:true`。T024 完成 Network 采集与抽屉：`preview.network.list`/`clear`/`body` 一元方法、独立 CDP 会话采集请求/响应、4xx/5xx 标记、header/URL 脱敏、300 条 / 256 KiB ring buffer、revision 游标让 pending 行原位更新、body 按需 64 KiB 截断；27 个聚焦用例、287 个全量用例、typecheck/build 通过；未做真实 Edge 手测。T025 完成预览工具栏与生命周期：contracts 新增 navigate/reload/viewport/targets 一元方法与 `kind` 快照；host 服务迁到 `session.ts`，1 s 健康检查发现断线即 `failed`（不自动重连），重启先释放旧句柄，reload 无实现时回退 navigate，viewport 复用配置校验并保留 DPR；Web adapter 增加 reload/setViewport/isAlive；client 新增 Toolbar、`local-url` loopback 校验与 `lifecycle`（内部 tab 切换不 stop，shell 卸载才 stop），Canvas 1 s 状态轮询 + 500 ms 帧统计，崩溃提示含 Restart/Stop；14 个聚焦用例、301 个全量用例、typecheck/build 通过，Host 真 Edge 与隔离 Desktop 手动矩阵均 `ok:true`（崩溃 101 ms 检出、停止后 4471/3820 ms 进程全退、无孤儿、真实 profile 未改），T023/T024 抽屉已在真实载体确认。T026 G2 Preview 评审 **通过（GO）**：基线 typecheck 0 error、301 用例、build host 140.5 / client 115.1 KiB；Host 真 Edge、Web（`vibe-dev` + headless Edge）与隔离 Desktop 三端均在 1280×800 实测 24.4–25.9 fps，点击/输入/滚动、Console/Network 抽屉、停止清理（1357/2940/4886 ms、无孤儿）全部通过，真实 desktop profile 哈希未变。**M1 完成；M2 完成并通过 G2，下一项 U01 预览界面精简（Layout v2），之后 T027 拾取 overlay 与选择器。**
 3. 每个任务完成即勾选，并在任务下记录验证结果；G0/G1 已通过；后续门禁 G2–G6 通过后才进入下一阶段。
 4. 代码与文档按任务分批提交；私有仓库公开前按 `docs/PUBLISHING.md` 清理机器路径与历史。
-5. 分支基线：M1 已以 `--no-ff` 合并入 `main`（`d1f4053`）。M2 全部在 `task/m2-target-model`（未推送），G2 已通过但**尚未合并 `main`，需用户批准**；合并建议 `--no-ff` 后在 `main` 上打 `M2` 记录。不要回到 `task/m1-foundation`。
+5. 分支基线：M1 已以 `--no-ff` 合并入 `main`（`d1f4053`）。M2 全部在 `task/m2-target-model`，已推送到 `92ecc32`；之后 `9c19501`/`b7cde55` 及本次方向文档提交在本地（推送曾因 GitHub 连接重置失败，需重试）。G2 已通过但**尚未合并 `main`，需用户批准**；合并建议 `--no-ff` 后在 `main` 上打 `M2` 记录。不要回到 `task/m1-foundation`。
 
-### UI 反馈（暂定，2026-10-28）
+### UI 方向已定稿（2026-10-28）
 
-- 用户手测反馈“功能差不多正常，界面还得修改”，但决定**先不动外观**，等 M3–M5 功能齐了再做一轮统一 UI 打磨（建议在 G4/G5 前单独开 UI 任务，按截图逐页对照）。
-- 现在只修“用不下去”的阻塞问题；**画布布局与抽屉展开方式需要先定稿**，因为它们决定 T027 拾取 overlay 的像素对齐，改布局会连带改 overlay。
-- 待用户给出具体问题清单后，按“现在改 / 以后改”两堆分类，再决定是否插入 UI 任务。
+- 依据：用户《M1界面修改意见》+ 会话讨论，完整方向见 **`docs/2026-10-28-界面与项目方向.md`**（Layout v2、元素处置表、U01 验收、P1–P7 项目方向、防跑偏约束）。
+- 结论：**先做 U01 预览界面精简**，再做 T027。原因：T027 拾取 overlay 依赖最终画布几何，先定布局可避免返工。
+- UI 总原则：画布优先；参数进设置或“更多”；底部 tab + 覆盖式抽屉；空/失败态给初学者提示；不做 IDE 化。
+- M3–M5 期间新增界面一律遵守该文档第 1 节六条原则；产品级方向（P2–P6）需先立项/出 SPEC，不夹带实现。
 
-### T027 起步提示（下一会话）
+### U01 起步提示（下一会话）
+
+- 任务段：`tasks/todo.md` 的 **U01 预览界面精简（Layout v2）**；方向与验收见 `docs/2026-10-28-界面与项目方向.md` 第 2 节。
+- 做了什么：状态压成单行（`● 运行中 · 25 fps` + `⋯`）；视口宽高移入设置页“预览”分组；`在浏览器打开/停止/重启` 收进“更多”；Console/Network 改成底部常驻 tab + 覆盖式抽屉；补空状态/失败态提示。
+- 验收：320/400/500px 宽无横向溢出、画布 ≥ 60% 高；常驻行 ≤ 3；抽屉开合画布尺寸不变；P1–P5/V/I/C/N/L/S 全回归；约 25 fps；console 0 error；typecheck/test/build 全绿。
+- 文件：`src/client/preview/{Canvas,PreviewPage,Toolbar}.tsx`、`src/client/preview/*.css`、`src/client/shell/settings/*`、`src/client/locales/*.json`、tests。
+- 约束：只改预览排版与文案，不新增功能；不改 host 契约；不自动发送/批准/提交；不改 `desktop`/`web` profile。
+
+### T027 起步提示（U01 完成后）
 
 - 任务段：`tasks/todo.md` 的 T027“拾取 overlay 与选择器”：注入脚本、Shadow DOM overlay、hover/click、`Esc`、`Alt+Click`、选择器生成。
 - 验收：不触发页面原点击；选择器唯一或标注“非唯一”；10 个元素抽测通过；复用 S4 harness + integration。
@@ -117,8 +126,10 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 
 ```
 读 tasks/HANDOFF.md 的“一句话状态”“下一步”“环境与路径”和“不可违反的约束”，
-任务清单已批准，T001–T026 已完成（G0/G1/G2 通过、M1 完成、M2 完成、host/client 均可在 DSH 加载、Config 可校验、contracts v1 已单测、client shell/右栏 tab 已验证、transport 与真实 Web/Desktop 已通、测试 harness + Vite fixture 已就位、`.vibe` store 与设置面板已验证、target 契约/配置校验/adapter 注册表已完成、Web target adapter 的 Edge 启动/导航/截图/关闭已用真实 Edge 验证、S8 进程生命周期已测量、dev server supervisor 已用假进程单测与真实 Vite 手动验证、screencast/帧路由/canvas 已在 Web 与隔离 Desktop 验证、输入转发点击/滚轮/键盘已用 Host/Web/隔离 Desktop 验证、中文组合输入与失败提示已用 Host/Web/隔离 Desktop 验证、Console 采集/上限/清空已在 Host 与真实 Edge 验证且抽屉有组件测试、Network 采集/脱敏/上限/body 按需与抽屉已通过集成与组件测试、工具栏与崩溃/重启/停止清理已在 Host 真 Edge 与隔离 Desktop 验证、G2 三端实测 24.4–25.9 fps 且输入/抽屉/停止清理通过）；只读 tasks/todo.md 中 T027 一节，从 T027 拾取 overlay 与选择器开始（M3 开工）。
-按 tasks/todo.md 顺序执行，每个任务完成后勾选并记录验证结果；不要通读已批准的 SPEC/plan。
+任务清单已批准，T001–T026 已完成（G0/G1/G2 通过、M1 完成、M2 完成）；界面/产品方向已定稿于 docs/2026-10-28-界面与项目方向.md。
+只读 tasks/todo.md 中 U01 一节，从 U01 预览界面精简（Layout v2）开始：画布优先、参数外移、底部 tab + 覆盖式抽屉、空/失败态引导；只改预览排版与文案，不新增功能、不改 host 契约。
+完成后勾选并记录验证结果（typecheck/test/build + 320/400/500px 截图与回归），再进入 T027。
+不要通读已批准的 SPEC/plan。
 ```
 
 ---
@@ -182,7 +193,8 @@ dsh --profile vibe-dev --dump-config
 
 ## 10. 本次退出状态（2026-10-28）
 
-- 分支 `task/m2-target-model`（未推送）。T016–T024 已提交（T023 `8c2a9bc` + 文档 `83edc9d`，T024 `5027a98`）；T025 已提交 `3b29b6f`（代码、测试与文档）；T026 G2 评审只改 `tasks/todo.md`、`docs/DEVLOG.md`、本文件，无产品代码。
+- 分支 `task/m2-target-model`：已推送到 `92ecc32`；`9c19501`、`b7cde55` 与本次方向文档提交在本地（GitHub 连接重置，推送失败待重试）。T016–T024 已提交（T023 `8c2a9bc` + 文档 `83edc9d`，T024 `5027a98`）；T025 已提交 `3b29b6f`；T026 G2 评审只改文档，无产品代码。
+- **2026-10-28 界面方向定稿**：新增 `docs/2026-10-28-界面与项目方向.md`（Layout v2 + U01 验收 + P1–P7 项目方向 + 防跑偏约束）；`tasks/todo.md` 在 T027 前插入 **U01 预览界面精简**（总数 62），M3 依赖改为 G2 + U01。无产品代码变更，未跑测试（仅文档/任务清单）。
 - **T026 G2 通过**：三端 1280×800 实测 Host 25.8–25.9 fps / Web 24.4 fps / 隔离 Desktop 25.0 fps；点击/键入/滚轮、Console/Network 抽屉、停止清理（1357/2940/4886 ms、无孤儿）均通过；真实 desktop profile 哈希未变。
 - **T023 完成**：新增 `src/host/preview/console.ts`（独立 CDP 会话、`Runtime.enable` 前挂 `consoleAPICalled`/`exceptionThrown`、500 条 / 64 KiB ring buffer、单调 `seq`、脱敏/截断、`stop()` 清理）与 `src/client/preview/ConsoleDrawer.tsx`（增量轮询、去重、过滤、清空、错误提示）；contracts 新增 `preview.console.list`/`preview.console.clear`；Web adapter `console: true`；采集失败只降级能力、不阻断预览。聚焦 3 文件 / 22 用例、全量 35 文件 / 260 用例、typecheck 0 error、build host 116.1 KiB / client 83.4 KiB；真实 Edge 手测 `ok:true`（`.tmp/logs/t023-host.json`），停止后 Edge 全退。
 - **T024 完成**：新增 `src/host/preview/network.ts`（独立 CDP 会话、`Network.enable` 前挂四类事件、300 条 / 256 KiB ring buffer、revision 游标、header/URL 脱敏、4xx/5xx 标记、body 按需 64 KiB 截断、`stop()` 清理）与 `src/client/preview/NetworkDrawer.tsx`（500 ms 增量轮询、按 id 原位更新、Failed 过滤、body 懒加载与缓存、清空、错误提示）；contracts 新增 `preview.network.list`/`clear`/`body`；Web adapter `network: true`；采集失败只降级能力、不阻断预览。聚焦 3 文件 / 27 用例、全量 38 文件 / 287 用例、typecheck 0 error、build host 134.2 KiB / client 102.1 KiB；未做真实 Edge 手测。

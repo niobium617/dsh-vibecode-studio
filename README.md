@@ -4,7 +4,7 @@
 
 **Status: pre-alpha.** The M0 spike gate is complete. Transport, composer handoff, screencast/input/Chinese IME, and element/source mapping are verified; the G0 review selected stream-first frames with a pull fallback, one-shot CDP input, clipboard-only screenshots, and per-framework source adapters. The M1 foundation (package scaffold, contracts, client shell, connection transport, test harness, `.vibe` config store) is in `src/`, `tests/` and `fixtures/`; nothing is published yet. See the [G0 review](spikes/G0.md) for the go/no-go and fallback decisions.
 
-[中文简介](#中文简介) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md) · [Dev log](docs/DEVLOG.md) · [手动测试手册](docs/2026-10-28-手动测试手册.md)
+[中文简介](#中文简介) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md) · [Dev log](docs/DEVLOG.md) · [手动测试手册](docs/2026-10-28-手动测试手册.md) · [界面与项目方向](docs/2026-10-28-界面与项目方向.md)
 
 ## 中文简介
 
@@ -23,6 +23,7 @@ Vibe coding 的关键是让 Agent “看见”结果。截图会丢失元素身�
 
 - **M0 / G0 已通过**：S1 传输、S2 composer 交接、S3 screencast/输入/中文、S4 拾取/源码四个 spike 均完成，结论与回退方案见 [spikes/G0.md](spikes/G0.md)。
 - **M2 完成并通过 G2**：预览闭环（screencast/帧路由/输入/工具栏/生命周期）、Console/Network 采集与抽屉、`.vibe` 设置已在 Host、Web 与隔离 Desktop 载体验证；G2 三端实测 24.4–25.9 fps。手动复测步骤见 [手动测试手册](docs/2026-10-28-手动测试手册.md)。
+- **下一步 U01（Layout v2）**：按用户界面反馈精简预览页——画布优先、参数进设置/“更多”、底部 tab + 覆盖式抽屉；方向与验收见 [界面与项目方向](docs/2026-10-28-界面与项目方向.md)。
 - **尚未发布**：根包可在开发 profile 中加载，但尚未打包发布；`spikes/` 保留为 spike 证据。
 
 ### 计划中的 MVP
@@ -53,7 +54,7 @@ pnpm spike:s3 --seconds 10    # screencast / 输入 / 中文
 pnpm spike:s4                 # React / Vue / Svelte 拾取与源码命中
 ```
 
-完整设计见 [SPEC](docs/SPEC-vibecoding-studio.md)，任务顺序见 [todo.md](tasks/todo.md)，开发记录见 [DEVLOG](docs/DEVLOG.md)，自己复测功能见 [手动测试手册](docs/2026-10-28-手动测试手册.md)。
+完整设计见 [SPEC](docs/SPEC-vibecoding-studio.md)，任务顺序见 [todo.md](tasks/todo.md)，开发记录见 [DEVLOG](docs/DEVLOG.md)，自己复测功能见 [手动测试手册](docs/2026-10-28-手动测试手册.md)，界面与产品方向见 [方向文档](docs/2026-10-28-界面与项目方向.md)。
 
 ## Why
 
@@ -80,7 +81,7 @@ The agent stays in control. Notes are prepared for the composer; nothing is sent
 ## Repository layout
 
 ```text
-docs/        product spec, capability map, DSH ecosystem notes
+docs/        product spec, capability map, DSH ecosystem notes, UI/product direction
 src/         product package (host, client, contracts)
 tests/       Vitest unit/component/integration + Playwright E2E
 fixtures/    vite-basic React app for E2E and preview/inspect tests
