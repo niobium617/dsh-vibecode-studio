@@ -133,6 +133,17 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 - 清理：评审与返工复测写入的 `.vibe/annotations/*.json` 及空 `.vibe/` 已删除；4320/4338 无监听残留、无 Playwright Edge 残留（在跑的 msedge 为用户默认 profile，自身启动于 21:40）；真实 `desktop` profile 未触碰。
 - 基线：`pnpm typecheck` 0 error、`pnpm test` 59 文件 / 507 用例、`pnpm test:e2e` 9/9（`.tmp/logs/g3-{typecheck,test,e2e}.log`）。
 
+### 整体稳定性审查（2026-10-29，只读，未改产品代码）
+
+- 结论：**未发现跨模块冲突或依赖错误**；基线、静态、真实运行时与 profile 隔离四类证据全绿。审查脚本 `.tmp/audit/{static-audit.mjs,smoke.mjs}`，证据 `.tmp/audit/logs/*`（`.tmp/audit/logs/smoke.json` `ok:true`）。详见 DEVLOG“整体稳定性审查”段。
+- 基线：`pnpm typecheck` 0 error；`pnpm test` 60 文件 / **514 用例**（3 次全量中 1 次 Windows `EPERM rename` 失败，复跑 2 次全过）；`pnpm build` host 199.8 / client 204.1 KiB；`pnpm test:e2e` 9/9。
+- 静态：73 文件 / 279 边，0 环、0 方向违规、0 未声明依赖；23/23 一元方法已注册；i18n en=zh=184；`ctx.webServer`/`dangerouslySetInnerHTML`/client console 均为 0。
+- 运行时：5 页签无错误边界；拾取→保存不自动发送；跨页签队列 1 条 + 徽标 1；队列发送进 composer 并清空队列；历史重开/两步删除；设置“预览”1280×720 生效；抽屉可开；停止回 `idle`；`consoleErrors: []`。
+- 依赖/隔离：安装 DSH 0.2.1-rc.2 满足 `engines.dsh >=0.2.1-rc.2`；只有 `vibe-dev` 链接插件，`desktop`/`web` 零引用。
+- 返工（用户批准，仅加固 EPERM 重试）：`annotation-store.ts` 的 `rename` 改为可注入（`AnnotationStoreOptions.renameFile`，默认 `fs.rename`），`replaceFile()` 对 `EPERM`/`EBUSY`/`EACCES` 有界重试 4 次（20/50/100/200 ms），其余错误立即抛出；`createAnnotationStore` 透传可选参数。新增 3 个单测（瞬时 EPERM 恢复、EBUSY 有界失败保旧文件、ENOENT 不重试）。验证：typecheck 0；单文件 5 连跑 13/13；`pnpm test` 3 连跑 **60 文件 / 517 用例全过**；`pnpm build` host 200.6 / client 204.1 KiB；`pnpm test:e2e` 9/9。
+- 仍开放（低，未返工）：拾取模式跨页签保持、保存通知切页签后消失、`.vibe` 取 `process.cwd()`、三个设置字段未消费、`newAnnotationId` 同毫秒理论重号。
+- 清理：冒烟写入的 `.vibe/annotations/*.json` 与空 `.vibe/` 已删除；4320/4338 无残留；真实 `desktop`/`web` 未触碰。
+
 ### T026 遗留
 
 - G2 结论已写入 `tasks/todo.md` T026 段；手测脚本 `.tmp/t026-{host,web,desktop}.mjs` 与结果 `.tmp/logs/t026-*.json` 非产品代码。
@@ -272,4 +283,5 @@ dsh --profile vibe-dev --dump-config
 - **T024 完成**：新增 `src/host/preview/network.ts`（独立 CDP 会话、`Network.enable` 前挂四类事件、300 条 / 256 KiB ring buffer、revision 游标、header/URL 脱敏、4xx/5xx 标记、body 按需 64 KiB 截断、`stop()` 清理）与 `src/client/preview/NetworkDrawer.tsx`（500 ms 增量轮询、按 id 原位更新、Failed 过滤、body 懒加载与缓存、清空、错误提示）；contracts 新增 `preview.network.list`/`clear`/`body`；Web adapter `network: true`；采集失败只降级能力、不阻断预览。聚焦 3 文件 / 27 用例、全量 38 文件 / 287 用例、typecheck 0 error、build host 134.2 KiB / client 102.1 KiB；未做真实 Edge 手测。
 - **T025 完成**：contracts 新增 `preview.session.navigate`/`reload`/`viewport`/`preview.targets` 与 `kind` 快照；host 会话服务迁到 `src/host/preview/session.ts`（`checkHealth()` 由 snapshot/stream/start 触发，断线置 `failed` + `target_unavailable`，不自动重连；重启先 `release()`；reload 回退 navigate；viewport 保留 DPR）；Web adapter 增加 reload/setViewport/isAlive；client 新增 `Toolbar.tsx`、`local-url.ts`、`lifecycle.ts`，Canvas 1 s 状态轮询 + 500 ms 帧统计 + 崩溃提示/重启；Shell 卸载才 stop。聚焦 3 文件 / 14 用例、全量 41 文件 / 301 用例、typecheck 0 error、build host 140.5 KiB / client 115.1 KiB；Host 真 Edge `.tmp/logs/t025-host.json` 与隔离 Desktop `.tmp/logs/t025-desktop.json` 均 `ok:true`：崩溃 101 ms 检出且不自动重启、重启成功、Desktop 切 tab 会话保留、停止后 4471/3820 ms 内进程全退且无孤儿、真实 profile 哈希未变；T023/T024 抽屉在真实载体有数据。
 - 环境沿用 M1 结论：`vibe-dev/cordis.patch.yml` 已持久禁用 `vibe-s1-spike`/`vibe-s2-spike`；真实 `desktop`/`web` profile 未改。M1 已合并入 `main`（`d1f4053`）。
+- **整体稳定性审查完成（2026-10-29）**：四类证据全绿（typecheck 0、514/514、build 0、e2e 9/9；静态 0 环/0 方向违规/0 未声明依赖、23/23 方法、i18n 184/184；真实冒烟 `ok:true`；仅 `vibe-dev` 装插件），未发现跨模块冲突或依赖错误。按用户批准，仅对 Windows `EPERM rename` 偶发做加固：`annotation-store` 的 `replaceFile()` 对 `EPERM`/`EBUSY`/`EACCES` 有界重试 4 次，新增 3 个单测；复测 typecheck 0、全量 3 连跑 517/517、build host 200.6 / client 204.1 KiB、e2e 9/9。其余低风险项未返工。证据 `.tmp/audit/logs/*`，见 DEVLOG 同名段。
 - **T034 G3 评审与返工完成（2026-10-29，GO）**：初评基线 `pnpm typecheck` 0 error、`pnpm test` 59 文件 / 507 用例、`pnpm test:e2e` 9/9；50 元素源码 50/50 命中（100%）、标注最坏 4,096 B ≤ 4 KB、不自动发送均通过，“≤3 步”为 4–5 个动作未达标。经用户批准返工：保存通知新增“发送到对话”（`AnnotationSaveNotice.tsx`、`sendQueuedAnnotation`/`clipboardSender` 共用、`StudioShell` 注入 composer handoff），复测 3 个动作直达 composer、四项验收全过；`pnpm test` 60 文件 / 514 用例、`pnpm test:e2e` 9/9、`pnpm build` host 199.8 / client 204.1 KiB。证据 `.tmp/logs/g3-{source,budget,live}.json` 与 `.tmp/g3/`；`.vibe/` 已清理、端口/Playwright Edge 无残留。未开工 M4 T035。

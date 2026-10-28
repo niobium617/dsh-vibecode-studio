@@ -565,6 +565,29 @@
 - 环境：评审与复测写入的 `.vibe/annotations/*.json` 与空 `.vibe/` 已删除；4320/4338 无监听残留、无 Playwright Edge 残留（在跑的 msedge 为用户 21:40 自启的默认 profile）；真实 `desktop` profile 未触碰。脚本 `.tmp/g3/{source-sample.ts,budget.ts,live.mjs}` 非产品代码。
 - 结论：**4 项验收全部通过，G3 GO**；第 3 项按用户确认口径“点元素 → 保存 → 发送 = 3 次点击”达标，开启拾取仍为额外 1 次点击。遗留：composer 截断无提示、`fixtures/vite-basic` `source: null`、通知与队列发送互不感知进行中状态。未开始 M4。
 
+### 整体稳定性审查（2026-10-29，只读，未改产品代码）
+
+- 背景：M1–M3 已逐任务验收，但未做过一次跨模块整体核对；本次按用户要求检查“功能之间是否冲突、是否有依赖错误、整体是否稳定并符合设计要求”。审查期不改 `src/`、配置、依赖或 profile，发现的问题先记录、返工与否交用户决定。
+- 方法（四类证据）：
+  - 基线：`pnpm typecheck` 0 error；`pnpm test` 60 文件 / 514 用例；`pnpm build` host 199.8 / client 204.1 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/audit/logs/{typecheck,test-full-*,build,e2e}.log`。
+  - 静态审计（`.tmp/audit/static-audit.mjs`）：一元方法接线（contracts 常量 ↔ host `registry.register` ↔ client 调用方）、i18n key 对等与使用、import 图（方向/环/裸依赖）、护栏 grep（`ctx.webServer`、`dangerouslySetInnerHTML`、client console）。
+  - 运行时冒烟（`.tmp/audit/smoke.mjs`）：`vibe-dev` + headless Edge 走完五个页签、拾取→保存→通知发送、跨页签队列/历史、重复拾取、设置→预览、Console/Network 抽屉、停止；结束后自清理 `.vibe`。
+  - 依赖与隔离：`engines.dsh` 对照安装版本；只读核对三个 profile 的插件链接。
+- 结果：
+  - 静态：73 文件 / 279 边，**0 环、0 方向违规、0 未声明依赖**；23 个一元方法全部在 host 注册（`studio.ping` 无客户端调用者为设计）；en=zh=184，无缺失/空值，未使用 key 经逐条核对均为动态拼接；`ctx.webServer` 0、`dangerouslySetInnerHTML` 0、client console 0。
+  - 运行时（`.tmp/audit/logs/smoke.json`，`ok:true`）：5 页签全部渲染且 `errorBoundary:false`；拾取→保存后 composer 仍为空（不自动发送），通知为“已加入标注队列 / 发送到对话 / 查看队列”；切到标注页签后队列 1 条、徽标 1、历史 1 条；从队列发送后 composer 含标记、队列 0；历史重开入队、两步删除后 0；设置“预览”读到 1280×720 并提示“已应用到运行中的预览。”；Console/Network 抽屉可开；停止后 `state:"idle"`；`consoleErrors: []`。
+  - 依赖：安装 `@deepseek-ai/dsh` 0.2.1-rc.2，满足 `engines.dsh >=0.2.1-rc.2`；运行时仅 import `@deepseek-ai/schemastery`（已声明）。
+  - 隔离：只有 `vibe-dev` 链接本插件并列入 `dsh.profile.bundles`；`desktop`/`web` 零引用。
+- 发现（未改代码，待用户决定）：
+  - 中：Windows 下 `annotation-store.save()` 覆盖既有文件时 `rename` 偶发 `EPERM`（3 次全量中 1 次失败，单文件连跑 5 次全过）。影响仅历史落盘，UI 已有“已加入队列，但没能保存到历史。”降级，队列与发送不受影响。已在同次返工中加有界重试（见下）。
+  - 低：拾取模式在切换页签后仍保持（Host 持有），返回预览页时开关仍为按下——目标默认 headless，影响有限，但缺“离开即暂停”的选择。
+  - 低：保存通知在切走预览页签后消失（队列/历史已保留该条），用户切回看不到刚保存的反馈。
+  - 低：`.vibe` 根目录取 `process.cwd()`（`src/host/index.ts` 已有 TODO），从别的目录启动 DSH 时历史会落到启动目录；同一次运行内一致。
+  - 低（已知）：`retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 已解析但尚未消费（DEVLOG 已记）；`newAnnotationId` 在同一毫秒、两个客户端并发时理论可重（id 去重会挡重复入队）。
+  - 信息：composer 中的标注文本为英文结构化格式，属 SPEC“注释用英文；UI 文案 zh/en 分离”的设计，不是本地化缺陷。
+- 返工（用户批准，2026-10-29，仅加固 EPERM 重试）：`src/host/inspect/annotation-store.ts` 把 `rename` 抽成可注入的 `RenameFile`（`AnnotationStoreOptions.renameFile`，生产默认 `fs.rename`），新增 `replaceFile()`：对 `EPERM`/`EBUSY`/`EACCES` 最多重试 4 次（20/50/100/200 ms，共 5 次尝试），其余错误立即抛出；临时文件清理与 `io` 错误映射不变。`createAnnotationStore(projectDir, options?)` 透传可选参数。新增 3 个单测：连续 2 次 EPERM 后成功（`attempts=3`）、EBUSY 持续失败有界退避后报 `io` 且旧文件与目录保持不变（`attempts=5`）、`ENOENT` 不重试（`attempts=1`）。验证：`pnpm typecheck` 0 error；单文件 5 连跑 13/13；`pnpm test` 3 连跑 **60 文件 / 517 用例全过**；`pnpm build` host 200.6 / client 204.1 KiB；`pnpm test:e2e` 9/9。未动其余低风险项。
+- 清理：冒烟写入的 `.vibe/annotations/*.json` 与空 `.vibe/` 已删除；4320/4338 无监听残留、无 Playwright Edge 残留；真实 `desktop`/`web` profile 未触碰。脚本与日志在 `.tmp/audit/`，不入库。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
