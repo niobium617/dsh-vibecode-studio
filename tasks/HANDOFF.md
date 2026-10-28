@@ -103,7 +103,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 - 验证：`pnpm typecheck` 0 error、`pnpm test` 56 文件 / 446 用例（`tests/component/annotation` 3 文件 / 32 用例，含“无自动发送”用例）、`pnpm build` host 192.8 / client 179.4 KiB。日志 `.tmp/logs/t031-*.log`。
 - 关键约束（后续任务沿用）：跨页签状态放模块级 store（预览页与标注页互斥挂载）；发送只有用户点击触发，失败必须保留草稿；空态不能提前 `return`，否则同帧反馈丢失；只跑目录用 `pnpm exec vitest run <path>`，`pnpm test -- <path>` 不过滤。
 - 遗留：队列只在面板会话内存中（T033 持久化）；未接 composer（T032 替换 `send`）；气泡位置在拾取时一次计算，视口/滚动后不重算；未做 `vibe-dev` + headless Edge 手测，3 步闭环真机证据留 G3/T034。
-- 提交：见 §10。
+- 提交：`f6bab7d feat(annotation): T031 element bubble and side-panel queue`（`task/m3-inspect`，未 push）。
 
 ### T026 遗留
 
@@ -232,7 +232,7 @@ dsh --profile vibe-dev --dump-config
 
 ## 10. 本次退出状态（2026-10-28）
 
-- **T031 完成**：新增 `src/client/inspect/{AnnotationBubble,AnnotationQueue}.tsx` 与 `tests/component/annotation/`（3 文件 / 32 用例），接入 `Canvas.tsx`/`StudioShell.tsx`，两语各 +20 key；发送只在点击时发生，默认复制 `renderAnnotationText`，发送器可注入给 T032。`pnpm typecheck` 0 error；`pnpm exec vitest run tests/component/annotation` 32/32；`pnpm test` 56 文件 / 446 用例（`.tmp/logs/t031-test.log`）；`pnpm build` host 192.8 / client 179.4 KiB（`.tmp/logs/t031-build.log`）。提交哈希见下方下行或 `git log`；分支 `task/m3-inspect` 未推送、未合并。遗留见 §4 T031 段。
+- **T031 完成**：新增 `src/client/inspect/{AnnotationBubble,AnnotationQueue}.tsx` 与 `tests/component/annotation/`（3 文件 / 32 用例），接入 `Canvas.tsx`/`StudioShell.tsx`，两语各 +20 key；发送只在点击时发生，默认复制 `renderAnnotationText`，发送器可注入给 T032。`pnpm typecheck` 0 error；`pnpm exec vitest run tests/component/annotation` 32/32；`pnpm test` 56 文件 / 446 用例（`.tmp/logs/t031-test.log`）；`pnpm build` host 192.8 / client 179.4 KiB（`.tmp/logs/t031-build.log`）。提交 `f6bab7d` + 文档提交；分支 `task/m3-inspect` 未推送、未合并。遗留见 §4 T031 段。
 - **T030 完成**：新增 `src/host/inspect/annotation-store.ts`（`.vibe/annotations/<id>.json` 一标注一文件、64 KiB 上限、原子替换、坏数据读取为 `null`/列表跳过、越界 junction/symlink 拒绝）、`tests/unit/annotation/annotation-store.test.ts`（10 用例），契约导出 `isAnnotationId`，`src/host/index.ts` 导出 store。`pnpm typecheck` 0 error；`pnpm test` 53 文件 / 414 用例（`.tmp/logs/t030-test.log`）；`pnpm build` host 192.8 / client 150.0 KiB（`.tmp/logs/t030-build.log`）。提交 `e78fb99` + 文档 `e68b354`；分支 `task/m3-inspect` 未推送、未合并。遗留见 §4 T030 段。
 - **T029 完成**：新增 `src/host/inspect/source/{index,react,vue,svelte}.ts`、`fixtures/source/{react,vue,svelte}`（各 30 元素）、`tests/e2e/source-adapters.spec.ts`（6 用例）、`tests/unit/inspect-context/source.test.ts`（17 用例）；`inject.ts` 加第 5 个页面适配器、`Picker.tsx` 显示源码行、两语 +2 key。`pnpm typecheck` 0 error；`pnpm test` 52 文件 / 404 用例；`pnpm build` host 181.0 / client 150.0 KiB；`pnpm test:e2e` 9/9（dev 各 30/30 命中、生产各 30/30 `source: null`）。提交 `ecbe9cd` + 文档 `5eb6b30`。遗留见 §4 T029 段。
 - **T028 完成**：新增 `src/host/inspect/{dom,accessibility}.ts`（可序列化的 DOM/无障碍提取 + Host 侧重新校验）、`tests/unit/inspect-context/` 2 文件 / 20 用例；`inject.ts` 回传 `html/text/visible/role/name`，`ElementContext` 新增 `name`/`visible`，注解文本同步；`picker-edge.test.ts` 增加真实 Edge 上下文断言。`pnpm typecheck` 0 error；`pnpm test` 51 文件 / 384 用例（`.tmp/logs/t028-full.log`）；`pnpm build` host 172.8 / client 149.1 KiB（`.tmp/logs/t028-build.log`）。分支 `task/m3-inspect` 未推送、未合并。遗留见 §4 T028 段。
