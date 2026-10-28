@@ -147,8 +147,8 @@ export interface PreviewSessionSnapshot {
 /**
  * Picker state (T027). `seq` advances on every pick and cancel so the panel can
  * tell a repeated pick of the same element from "no new event". The pick reuses
- * `ElementContext`; T027 fills selector/identity/box, while text, html, role and
- * source stay empty until T028/T029 extract them.
+ * `ElementContext`; T027 fills selector/identity/box, T028 fills text, html,
+ * role, name and visibility, and T029 fills `source`.
  */
 export interface PickSnapshot {
   readonly active: boolean

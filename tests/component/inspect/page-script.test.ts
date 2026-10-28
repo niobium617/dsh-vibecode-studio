@@ -119,6 +119,11 @@ describe('installVibePicker', () => {
       id: null,
       classes: ['primary'],
       box: { x: 10, y: 20, width: 100, height: 30 },
+      html: '<button data-testid="save" class="primary">Save</button>',
+      text: 'Save',
+      visible: true,
+      role: 'button',
+      name: 'Save',
     })
   })
 

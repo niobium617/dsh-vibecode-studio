@@ -24,8 +24,10 @@ const PICK: ElementContext = {
   id: null,
   classes: ['primary', 'large'],
   role: null,
+  name: '',
   text: '',
   html: '',
+  visible: true,
   box: { x: 10, y: 20, width: 100, height: 30 },
   source: null,
 }

@@ -9,7 +9,7 @@
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，M1 已完成，M2 已完成）**。
 - 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）、T023 Console 采集与抽屉、T024 Network 采集与抽屉、T025 预览工具栏与生命周期、T026 G2 Preview 评审（通过）。
-- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），下一项 **T027 拾取 overlay 与选择器**。
+- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），**T027 拾取 overlay 与选择器、T028 元素上下文提取已完成**，下一项 **T029 源码适配（React/Vue/Svelte）**。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
 - T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T026 已提交并推送到 `origin/task/m2-target-model`（`ebee1e5`，文档至 `92ecc32`），尚未合并入 `main`；其后 `9c19501..88a4070`（方向/手册文档、U01 实现、去重复标题）已推送到 `origin/task/m2-target-model`（`92ecc32..88a4070`，2026-10-28）；`f64e928`（清理残留 locale key 与过期布局引用）推送后，以 `--no-ff` 合并入 `main`（合并提交 `768e129`，`main` 树与分支一致），功能分支保留。手动复测入口见 `docs/2026-10-28-手动测试手册.md`；界面/产品方向见 `docs/2026-10-28-界面与项目方向.md`。S3/S4/T010/T014/T015/T020/T021/T022/T025 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
@@ -486,6 +486,18 @@
   - 测试：新增 `tests/unit/preview/picker.test.ts`（11）、`tests/component/inspect/selector.test.ts`（9）、`tests/component/inspect/page-script.test.ts`（8）、`tests/component/inspect/picker-ui.test.tsx`（6）、`tests/integration/preview/picker-service.test.ts`（4）、`tests/integration/preview/picker-edge.test.ts`（真实 Edge，10 元素抽测），toolbar 用例补 2 条。
 - 验证：`pnpm typecheck` 0 error；`pnpm test` 49 文件 / **363 用例全通过**；`pnpm build` host 159.6 KiB / client 149.1 KiB。真实 Edge 验收细节见 `tasks/todo.md` T027“验证结果”。
 - 计划偏差/限制：拾取卡片只做组件测试，未做 `vibe-dev` 截图（任务验证要求为 S4 harness + integration）；`text/html/role/source` 仍是空占位，T028/T029 填充。
+
+### T028 — 元素上下文提取（已完成，2026-10-28）
+
+- 背景：T027 只回传 selector/identity/box，`text/html/role/source` 为空占位；FR-PICK-02 要求元素上下文含文本、角色、可见性。
+- 结果：
+  - `src/host/inspect/dom.ts`（新增）：`extractDomContext()` 在页面内克隆元素、去掉 `script/style/template/noscript`、深度 ≤ 6 / 元素节点 ≤ 200，空白归一后按 UTF-8 截到 2048 B（`…` 计入预算；截断落在标签中间时回退到最后一个完整标签）；文本优先 `innerText`、无 `innerText` 时用去脚本克隆的 `textContent`，折叠空白后截到 200 码点；可见性检查连接状态、`hidden`、rect 尺寸、`display/visibility/opacity` 与 `checkVisibility()`。Host 侧 `normalizeDomSnippet`/`normalizeElementText`/`normalizeVisibility` 重新校验页面数据。
+  - `src/host/inspect/accessibility.ts`（新增）：`describeAccessibility(element, roles)` 近似可访问名称（`aria-labelledby` → `aria-label` → 原生 alt/value/label/legend/caption/figcaption → title → placeholder → 文本内容，landmark 不用文本内容）与角色（显式 `role` 经 ARIA 1.2 白名单校验，否则原生映射）；Host 侧 `normalizeRole`/`normalizeAccessibleName` 再次收口。
+  - `src/host/inspect/inject.ts`：`installVibePicker()` 接收 DOM/无障碍提取器并在点击时把 `html/text/visible/role/name` 一并上报（异常只留空字段，不阻断拾取）；`buildPickerScript()` 组合四个自包含函数，角色白名单以 JSON 参数传入页面；`normalizePickedElement()` 填充新字段。
+  - `src/contracts/inspect.ts`：`ElementContext` 新增 `name`（可访问名称，非 `name` 属性）与 `visible`，`isElementContext` 同步；`src/contracts/annotation.ts` 渲染 `name`/`visible`。
+  - 测试：新增 `tests/unit/inspect-context/{dom,accessibility}.test.ts`；`unit/preview/picker.test.ts` 与 `component/inspect/page-script.test.ts` 更新 payload/上限断言；`integration/preview/picker-edge.test.ts` 对 10 种元素新增 role/name/text/visible/html 断言。
+- 验证：`pnpm typecheck` 0 error；`pnpm test` 51 文件 / **384 用例全通过**；`pnpm build` host 172.8 KiB / client 149.1 KiB；真实 Edge 10/10 上下文正确。日志 `.tmp/logs/t028-*.log`。
+- 计划偏差/限制：名称是近似实现（无完整 accessibility tree、未覆盖 `aria-owns`/嵌套 landmark 特例）；拾取卡片暂不展示 text/role，留 T029/T030。
 
 ## 3. 踩坑与已验证经验
 

@@ -15,8 +15,10 @@ export function annotationFixture(overrides: Partial<Annotation> = {}): Annotati
       id: null,
       classes: ['primary'],
       role: 'button',
+      name: 'Save changes',
       text: 'Save changes',
       html: '<button class="primary">Save changes</button>',
+      visible: true,
       box: { x: 10, y: 20, width: 120, height: 32 },
       source: {
         framework: 'react',

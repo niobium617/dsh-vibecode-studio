@@ -86,9 +86,11 @@ function elementText(element: ElementContext): string {
     `id: ${element.id ?? 'none'}`,
     `classes: ${element.classes.join(' ') || 'none'}`,
     `role: ${element.role ?? 'none'}`,
+    `name: ${element.name || 'none'}`,
     `text: ${truncateChars(element.text, ELEMENT_TEXT_CHARS)}`,
     `html: ${truncateUtf8(element.html, DOM_SNIPPET_BYTES)}`,
     `box: ${element.box.x},${element.box.y} ${element.box.width}x${element.box.height}`,
+    `visible: ${element.visible}`,
     `source: ${sourceText(element)}`,
   ].join('\n')
 }

@@ -21,6 +21,23 @@ import {
 let server: ViteDevServer | undefined
 let baseUrl = ''
 
+/** T028 context each fixture target must report from the real page. */
+const EXPECTED_CONTEXT: Record<
+  string,
+  { readonly role: string | null; readonly name: string; readonly text: string }
+> = {
+  testid: { role: 'button', name: 'Buy', text: 'Buy' },
+  id: { role: 'textbox', name: '', text: '' },
+  aria: { role: 'button', name: 'Pick close dialog', text: 'x' },
+  name: { role: 'textbox', name: '', text: '' },
+  className: { role: 'button', name: 'Pay', text: 'Pay' },
+  nth: { role: 'listitem', name: '2', text: '2' },
+  ghost: { role: 'button', name: 'B', text: 'B' },
+  generated: { role: null, name: 'G', text: 'G' },
+  shadow: { role: 'button', name: 'Inner', text: 'Inner' },
+  path: { role: null, name: '2', text: '2' },
+}
+
 interface FixtureTarget {
   readonly name: string
   readonly expected: string
@@ -288,6 +305,14 @@ describe('preview picker (Edge)', () => {
             width: target.width,
             height: target.height,
           })
+          // T028: DOM/accessibility context must come from the real page.
+          const context = EXPECTED_CONTEXT[target.name]
+          expect(picked.pick.role).toBe(context.role)
+          expect(picked.pick.name).toBe(context.name)
+          expect(picked.pick.text).toBe(context.text)
+          expect(picked.pick.visible).toBe(true)
+          expect(picked.pick.html.length).toBeGreaterThan(0)
+          expect(picked.pick.html.length).toBeLessThanOrEqual(2048)
 
           // The selector must resolve to exactly the element that was clicked,
           // including inside the shadow root.

@@ -295,12 +295,20 @@
   - 客户端：工具栏 `⌖` 开关（仅 ready 且 `capabilities.pick` 时可用）、拾取中顶栏提示 + 画布 crosshair、拾取卡片（selector 可整段选中复制、唯一/非唯一徽标、tag/classes/box、可收起）；轮询 active 300 ms / idle 1000 ms；Esc 由页面上报后 UI 自动同步。
   - 限制：拾取卡片只做组件测试（T027 验证要求为 S4 harness + integration），未做 `vibe-dev` 截图；`text/html/role/source` 仍为空占位，由 T028/T029 填充。
 
-### - [ ] T028 元素上下文提取
+### - [x] T028 元素上下文提取
 
 - **目标**：DOM 片段、文本、role/name、box、可见性；深度/长度上限。
 - **验收**：DOM ≤ 2 KB；文本 ≤ 200 字；box/role 正确；单测通过。
 - **验证**：`pnpm test -- tests/unit/inspect-context`。
 - **文件**：`src/host/inspect/{dom,accessibility}.ts`、tests。
+- **验证结果（2026-10-28）**：
+  - 静态检查：`pnpm typecheck` 0 error；`pnpm test` 51 文件 / 384 用例通过（新增 `tests/unit/inspect-context/{dom,accessibility}.test.ts` 2 文件 / 20 用例；`unit/preview/picker.test.ts` 补 T028 字段解析与上限断言；`component/inspect/page-script.test.ts` 更新 payload）；`pnpm build` host 172.8 KiB / client 149.1 KiB。日志 `.tmp/logs/t028-{typecheck,full,build}.log`。
+  - 页面侧：`src/host/inspect/dom.ts` 的 `extractDomContext()` 克隆节点、去掉 `script/style/template/noscript`、深度 ≤ 6、元素节点 ≤ 200，`outerHTML` 空白归一后按 UTF-8 截到 2048 B（连同 `…` 计入预算，半截标签回退到最后一个完整标签）；文本取 `innerText`（缺失时用去脚本克隆的 `textContent`），空白折叠后截到 200 码点（含 `…`）；可见性 = 已连接、无 `hidden`、rect 宽高 > 0、`display/visibility/opacity` 非隐藏、`checkVisibility({checkOpacity,checkVisibilityCSS})` 不否决。
+  - 无障碍：`src/host/inspect/accessibility.ts` 的 `describeAccessibility(element, roles)` 先按 `aria-labelledby → aria-label → 原生（alt/value/label/legend/caption/figcaption）→ title → placeholder → 文本内容` 计算名称（landmark 不用文本内容），再取显式 `role`（白名单 `ARIA_ROLES`，非法 token 丢弃）或原生映射（button/a/input 分类型/select/textarea/h1–h6/img/nav/main/aside/form/section/table/tr/td/li 等）；名称截 200 码点。
+  - 信任边界：页面回传的 `html/text/role/name/visible` 在 `normalizePickedElement()` 里经 `normalizeDomSnippet`（≤ 2 KB UTF-8，去控制字符）、`normalizeElementText`（≤ 200 码点）、`normalizeRole`（单 token + ARIA 白名单）、`normalizeAccessibleName`、`normalizeVisibility`（仅字面 `true`）重新校验；`ElementContext` 新增 `name` 与 `visible` 并更新 `isElementContext`，注解文本同步输出 `name`/`visible`。
+  - 注入复用：`buildPickerScript()` 组合 `buildSelector` + `extractDomContext` + `describeAccessibility` + `installVibePicker`，角色白名单以 JSON 参数传入页面（避免序列化函数引用模块常量），仍拒绝 esbuild `keepNames` 泄漏；提取异常只让该字段留空，不影响拾取。
+  - 真实 Edge（`tests/integration/preview/picker-edge.test.ts`）10 种元素：role/name/text/visible 全部符合预期（button/input/li/span、aria-label、Shadow DOM 内按钮、nth-of-type 路径），html 非空且 ≤ 2048 B，box 仍与元素 rect 一致。
+  - 限制：无障碍名称是近似实现（非完整 accessibility tree），`aria-owns`/`aria-describedby` 与嵌套 landmark 特例未覆盖；拾取卡片尚未展示 text/role（T029/T030 使用这些字段）。
 
 ### - [ ] T029 源码适配（React/Vue/Svelte）
 

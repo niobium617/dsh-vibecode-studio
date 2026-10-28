@@ -146,8 +146,10 @@ const PICKED: ElementContext = {
   id: 'save',
   classes: [],
   role: null,
+  name: '',
   text: '',
   html: '',
+  visible: true,
   box: { x: 1, y: 2, width: 3, height: 4 },
   source: null,
 }

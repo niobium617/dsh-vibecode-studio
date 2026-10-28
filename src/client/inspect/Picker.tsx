@@ -287,7 +287,7 @@ export interface PickCardProps {
   onClose(): void
 }
 
-/** Shows what was picked. T028/T029 add text, role and source to this card. */
+/** Shows what was picked. T029 adds the source location to this card. */
 export function PickCard({ locale, pick, onClose }: PickCardProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
   const classes = pick.classes.length > 0 ? `.${pick.classes.join('.')}` : ''

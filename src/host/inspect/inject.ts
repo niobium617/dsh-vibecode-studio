@@ -16,6 +16,13 @@ import { studioError } from '../../contracts/errors'
 import type { ElementBox, ElementContext } from '../../contracts/inspect'
 import type { PickSnapshot } from '../../contracts/transport'
 import type { ScreencastPageLike, ScreencastSessionLike } from '../targets/types'
+import { ARIA_ROLES, describeAccessibility, normalizeAccessibility } from './accessibility'
+import {
+  extractDomContext,
+  normalizeDomSnippet,
+  normalizeElementText,
+  normalizeVisibility,
+} from './dom'
 import { buildSelector } from './selector'
 
 export const PICK_BINDING_NAME = '__vibePick'
@@ -35,13 +42,20 @@ export interface PickerPageConfig {
 }
 
 type PageSelect = (element: Element) => { selector: string; unique: boolean }
+type PageDom = (element: Element) => { html: string; text: string; visible: boolean }
+type PageAccess = (element: Element) => { role: string | null; name: string }
 
 /**
  * Runs inside the target page. Must stay self-contained: it is serialized and
- * evaluated there, and it only sees `config` plus the selector function the
- * Host passes in.
+ * evaluated there, and it only sees `config` plus the three extractors the
+ * Host passes in (selector, DOM context, accessibility).
  */
-export function installVibePicker(config: PickerPageConfig, select: PageSelect): boolean {
+export function installVibePicker(
+  config: PickerPageConfig,
+  select: PageSelect,
+  domOf: PageDom,
+  accessOf: PageAccess,
+): boolean {
   // Only the main frame drives the overlay. Without this guard the script
   // (installed in every frame by addScriptToEvaluateOnNewDocument) would also
   // answer Alt+Click inside iframes with iframe-relative boxes.
@@ -205,6 +219,28 @@ export function installVibePicker(config: PickerPageConfig, select: PageSelect):
       if (classes.length >= 8) break
       classes.push(className)
     }
+    // Extraction is best-effort: a page object that throws on innerText or
+    // getComputedStyle must still produce a pick with the selector and box.
+    let html = ''
+    let text = ''
+    let visible = false
+    let role: string | null = null
+    let name = ''
+    try {
+      const dom = domOf(target)
+      html = dom.html
+      text = dom.text
+      visible = dom.visible === true
+    } catch {
+      // Keep the empty defaults.
+    }
+    try {
+      const access = accessOf(target)
+      role = access.role
+      name = access.name
+    } catch {
+      // Keep the empty defaults.
+    }
     report({
       kind: 'pick',
       alt: event.altKey === true,
@@ -214,6 +250,11 @@ export function installVibePicker(config: PickerPageConfig, select: PageSelect):
       id: target.id || null,
       classes,
       box: boxOf(target),
+      html: typeof html === 'string' ? html : '',
+      text: typeof text === 'string' ? text : '',
+      visible,
+      role: typeof role === 'string' ? role : null,
+      name: typeof name === 'string' ? name : '',
     })
   }
 
@@ -275,8 +316,10 @@ export function installVibePicker(config: PickerPageConfig, select: PageSelect):
  */
 export function buildPickerScript(config: PickerPageConfig): string {
   const selectSource = buildSelector.toString()
+  const domSource = extractDomContext.toString()
+  const accessSource = describeAccessibility.toString()
   const installSource = installVibePicker.toString()
-  const combined = `${selectSource}\n${installSource}`
+  const combined = `${selectSource}\n${domSource}\n${accessSource}\n${installSource}`
   // esbuild's keepNames helper is not defined in the page; fail loudly here
   // instead of throwing inside the target.
   if (/(?:^|[^.\w$])__name\s*\(/.test(combined)) {
@@ -285,8 +328,12 @@ export function buildPickerScript(config: PickerPageConfig): string {
   return [
     '(function(){',
     `var __vibeSelect = ${selectSource};`,
+    `var __vibeDom = ${domSource};`,
+    `var __vibeAccess = ${accessSource};`,
+    `var __vibeRoles = ${JSON.stringify(ARIA_ROLES)};`,
+    'var __vibeAccessFor = function (element) { return __vibeAccess(element, __vibeRoles); };',
     `var __vibeInstall = ${installSource};`,
-    `return __vibeInstall(${JSON.stringify(config)}, __vibeSelect);`,
+    `return __vibeInstall(${JSON.stringify(config)}, __vibeSelect, __vibeDom, __vibeAccessFor);`,
     '})()',
   ].join('\n')
 }
@@ -344,8 +391,8 @@ function shortString(value: unknown, max: number): string | null {
 
 /**
  * The page is untrusted: even our own binding can be called by page script, so
- * every field is re-validated and bounded here. Text, html, role and source are
- * placeholders until T028/T029 fill them.
+ * every field is re-validated and bounded here. `source` is a placeholder until
+ * T029 fills it.
  */
 export function normalizePickedElement(value: Record<string, unknown>): ElementContext | null {
   const selector = shortString(value.selector, MAX_SELECTOR_CHARS)
@@ -367,15 +414,18 @@ export function normalizePickedElement(value: Record<string, unknown>): ElementC
     width: Math.max(0, clampCoordinate(rawBox.width)),
     height: Math.max(0, clampCoordinate(rawBox.height)),
   }
+  const accessibility = normalizeAccessibility(value)
   return {
     selector,
     unique: value.unique === true,
     tag: tag.toLowerCase(),
     id,
     classes,
-    role: null,
-    text: '',
-    html: '',
+    role: accessibility.role,
+    name: accessibility.name,
+    text: normalizeElementText(value.text),
+    html: normalizeDomSnippet(value.html),
+    visible: normalizeVisibility(value.visible),
     box,
     source: null,
   }

@@ -4,6 +4,7 @@
  * page-script test and the real-Edge integration test.
  */
 import { describe, expect, it } from 'vitest'
+import { utf8Bytes } from '../../../src/contracts/budget'
 import {
   buildPickerScript,
   createPreviewPicker,
@@ -86,7 +87,11 @@ describe('buildPickerScript', () => {
   it('composes both functions so the page has no module references', () => {
     const script = buildPickerScript({ binding: '__vibePick', overlayId: '__vibe-picker-host' })
     expect(script).toContain('function buildSelector')
+    expect(script).toContain('function extractDomContext')
+    expect(script).toContain('function describeAccessibility')
     expect(script).toContain('function installVibePicker')
+    expect(script).toContain('__vibeDom')
+    expect(script).toContain('__vibeAccess')
     expect(script).toContain('"binding":"__vibePick"')
     expect(script).not.toContain('__name(')
     expect(script).not.toMatch(/\bimport\b/)
@@ -94,7 +99,7 @@ describe('buildPickerScript', () => {
 })
 
 describe('normalizePickedElement', () => {
-  it('keeps the selector fields and leaves T028/T029 fields as placeholders', () => {
+  it('fills absent context fields with safe defaults', () => {
     const element = normalizePickedElement(JSON.parse(pickPayload()))
     expect(element).toEqual({
       selector: '#save',
@@ -103,10 +108,33 @@ describe('normalizePickedElement', () => {
       id: 'save',
       classes: ['primary', 'large'],
       role: null,
+      name: '',
       text: '',
       html: '',
+      visible: false,
       box: { x: 10, y: 20, width: 100, height: 32 },
       source: null,
+    })
+  })
+
+  it('keeps the T028 context fields the page extracted', () => {
+    const element = normalizePickedElement(
+      JSON.parse(
+        pickPayload({
+          role: 'button',
+          name: 'Save',
+          text: 'Save',
+          html: '<button>Save</button>',
+          visible: true,
+        }),
+      ),
+    )
+    expect(element).toMatchObject({
+      role: 'button',
+      name: 'Save',
+      text: 'Save',
+      html: '<button>Save</button>',
+      visible: true,
     })
   })
 
@@ -122,6 +150,11 @@ describe('normalizePickedElement', () => {
       classes: ['ok', 42, 'x'.repeat(200), ...Array.from({ length: 12 }, (_, i) => `c${i}`)],
       unique: 'yes',
       box: { x: Number.NaN, y: 1e9, width: -5, height: '2' },
+      role: 'BUTTON primary',
+      name: '  Save   changes  ',
+      text: 'S'.repeat(400),
+      html: '<div>'.repeat(1000),
+      visible: 'yes',
     })
     expect(bounded).not.toBeNull()
     expect(bounded!.selector).toHaveLength(512)
@@ -130,6 +163,11 @@ describe('normalizePickedElement', () => {
     expect(bounded!.classes).toHaveLength(8)
     expect(bounded!.classes[1]).toBe('x'.repeat(64))
     expect(bounded!.box).toEqual({ x: 0, y: 1_000_000, width: 0, height: 0 })
+    expect(bounded!.role).toBe('button')
+    expect(bounded!.name).toBe('Save changes')
+    expect(Array.from(bounded!.text)).toHaveLength(200)
+    expect(utf8Bytes(bounded!.html)).toBeLessThanOrEqual(2048)
+    expect(bounded!.visible).toBe(false)
   })
 })
 
