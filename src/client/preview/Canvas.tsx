@@ -30,7 +30,10 @@ import {
   type PreviewTargetsResult,
 } from '../../contracts/transport'
 import { createTranslator, type Locale } from '../i18n'
+import { AnnotationBubble, placeBubble } from '../inspect/AnnotationBubble'
+import { addAnnotationToQueue, createElementAnnotation } from '../inspect/AnnotationQueue'
 import { PickCard, usePicker } from '../inspect/Picker'
+import { setActiveTab } from '../shell/store'
 import { callUnary } from '../transport/client'
 import { ConsoleDrawer, type ConsoleCounts } from './ConsoleDrawer'
 import { InputLayer } from './InputLayer'
@@ -187,6 +190,32 @@ const pickHintStyle: React.CSSProperties = {
   pointerEvents: 'none',
 }
 
+const noticeStyle: React.CSSProperties = {
+  position: 'absolute',
+  right: 8,
+  bottom: 8,
+  zIndex: 5,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  margin: 0,
+  padding: '3px 6px 3px 8px',
+  borderRadius: 4,
+  background: 'rgba(0, 0, 0, 0.72)',
+  color: '#e6e6e6',
+  font: '11px/1.4 system-ui, sans-serif',
+}
+
+const noticeButtonStyle: React.CSSProperties = {
+  font: 'inherit',
+  padding: '1px 6px',
+  borderRadius: 3,
+  border: '1px solid rgba(255, 255, 255, 0.4)',
+  background: 'transparent',
+  color: 'inherit',
+  cursor: 'pointer',
+}
+
 function drawerLayerStyle(open: boolean): React.CSSProperties {
   return {
     display: open ? 'grid' : 'none',
@@ -238,6 +267,7 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
   const [stats, setStats] = React.useState<PreviewTransportStats | null>(null)
   const [stageSize, setStageSize] = React.useState<StageSize | null>(null)
   const [drawer, setDrawer] = React.useState<PreviewDrawerKind | null>(null)
+  const [queueNotice, setQueueNotice] = React.useState(false)
   const [consoleCounts, setConsoleCounts] = React.useState<ConsoleCounts>({
     total: 0,
     errors: 0,
@@ -263,6 +293,12 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
     enabled: canPick,
     onError: (failure) => setError(errorMessage(failure)),
   })
+  const pickedElement = picker.pick
+
+  // A fresh pick reopens the comment bubble and hides the previous confirmation.
+  React.useEffect(() => {
+    if (pickedElement !== null) setQueueNotice(false)
+  }, [pickedElement])
 
   const stageRef = React.useRef<HTMLDivElement | null>(null)
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null)
@@ -545,6 +581,22 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
       ? { position: 'relative', width: '100%', maxWidth: '100%', aspectRatio: String(aspect) }
       : { position: 'relative', width: box.width, height: box.height }
 
+  // The canvas is centred in the stage by flex, so the drawn frame's stage
+  // offset follows from the measured stage and the fitted box (T031 bubble).
+  const stageFrame =
+    box !== null && stageSize !== null
+      ? {
+          left: Math.max(0, (stageSize.width - box.width) / 2),
+          top: Math.max(0, (stageSize.height - box.height) / 2),
+          width: box.width,
+          height: box.height,
+        }
+      : null
+  const bubblePlacement =
+    pickedElement !== null && snapshot?.viewport && stageFrame !== null
+      ? placeBubble({ box: pickedElement.box, viewport: snapshot.viewport, frame: stageFrame })
+      : null
+
   const consoleTab: TabCount = { available: canConsole, count: consoleCounts.total }
   const networkTab: TabCount = { available: canNetwork, count: networkCounts.total }
 
@@ -637,8 +689,44 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
           </p>
         ) : null}
 
-        {picker.pick ? (
-          <PickCard locale={locale} pick={picker.pick} onClose={picker.dismiss} />
+        {pickedElement ? (
+          <PickCard locale={locale} pick={pickedElement} onClose={picker.dismiss} />
+        ) : null}
+
+        {pickedElement !== null && bubblePlacement !== null && snapshot?.targetId ? (
+          <AnnotationBubble
+            locale={locale}
+            element={pickedElement}
+            placement={bubblePlacement}
+            onSave={(comment) => {
+              const targetId = snapshot?.targetId ?? null
+              if (targetId === null) return
+              const annotation = createElementAnnotation({
+                targetId,
+                comment,
+                element: pickedElement,
+              })
+              if (addAnnotationToQueue(annotation)) {
+                setQueueNotice(true)
+                picker.dismiss()
+              }
+            }}
+            onCancel={picker.dismiss}
+          />
+        ) : null}
+
+        {queueNotice ? (
+          <div data-vibe-annotation-notice="1" role="status" style={noticeStyle}>
+            <span>{t('annotation.bubble.saved')}</span>
+            <button
+              type="button"
+              data-vibe-annotation-view="1"
+              style={noticeButtonStyle}
+              onClick={() => setActiveTab('annotations')}
+            >
+              {t('annotation.queue.view')}
+            </button>
+          </div>
         ) : null}
 
         {error === null ? null : (

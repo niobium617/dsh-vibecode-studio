@@ -338,12 +338,20 @@
   - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm test` 53 文件 / 414 用例；`pnpm build` host 192.8 KiB / client 150.0 KiB。日志 `.tmp/logs/t030-{typecheck,test,build}.log`。
   - 限制：store 尚未接入 host 服务/agent 工具（T031 用模型、T033 做历史列表与搜索）；未替目标项目写 `.vibe/annotations` 的 gitignore；同一 id 并发保存以最后完成的 `rename` 为准，无文件锁；未做跨进程历史大小/保留期清理（`retentionDays` 属 T033/G3）。
 
-### - [ ] T031 标注气泡与队列
+### - [x] T031 标注气泡与队列
 
 - **目标**：元素旁气泡、侧栏队列、编辑/取消/发送；空状态。
 - **验收**：拾取 → 写意见 → 放入对话 ≤ 3 步；组件测试通过。
 - **验证**：`pnpm test -- tests/component/annotation` + 手动。
 - **文件**：`src/client/inspect/{AnnotationBubble,AnnotationQueue}.tsx`、tests。
+- **验证结果（2026-10-28）**：
+  - 气泡：`src/client/inspect/AnnotationBubble.tsx` 导出纯函数 `placeBubble`（把元素 `box` 按 `frame/viewport` 缩放后放在元素下方，越界右移夹紧、下方不足时翻到上方，帧小于气泡时贴边钳制，零视口按 1 px 防除零）与 `AnnotationBubble`（`role=group`、代码头 `tag.classes`、`autoFocus`、2 000 字符上限、空意见拒绝并以 `role=status` 说明、`Ctrl/Cmd+Enter` 保存、`Esc` 取消）。
+  - 队列：`src/client/inspect/AnnotationQueue.tsx` 提供模块级 store（`useSyncExternalStore`：`addAnnotationToQueue`/`updateQueuedAnnotation`/`removeQueuedAnnotation`/`clearAnnotationQueue`/`annotationQueueSnapshot`，快照在下次变更前保持同一引用）、`createElementAnnotation`（复用 T030 `Annotation` 与 `asTargetId`）、`renderAnnotationText` 发送文本；列表最新在前，显示选择器、时间、源码末段行、意见，动作“发送到对话/编辑/移除”，编辑支持保存/取消与空值提示；空态复用 shell `EmptyState`。
+  - 发送：注入式 `AnnotationSender`，默认 `copyAnnotationToClipboard(renderAnnotationText(...))`（S2 回退）；**只在点击时发送**，成功后移除草稿并显示发送器返回消息或默认文案，失败保留草稿并 `role=alert`；发送中禁用该条动作。未接 composer，T032 再替换发送器。
+  - 接线：`Canvas.tsx` 在拾取后按舞台框计算 `placeBubble` 并把保存结果入队，同时显示“已加入队列 / 查看队列”提示；`StudioShell.tsx` 的标注页签渲染队列，并在有草稿时给 tab 加数量徽标（`aria-hidden`，不改变可访问名）。两语各 +20 key，key 集合 160/160 一致。
+  - 验收对应：`tests/component/annotation/annotation-bubble.test.tsx`（11）、`annotation-queue.test.tsx`（19）、`annotation-shell.test.tsx`（2），覆盖定位/空意见/Ctrl+Enter/Esc、增删改与通知、无自动发送、发送成功/失败/剪贴板回退/发送中禁用、跨重挂载保留、壳层徽标与列表、中文文案。
+  - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm test` 56 文件 / 446 用例；`pnpm build` host 192.8 KiB / client 179.4 KiB。日志 `.tmp/logs/t031-{typecheck,test,build}.log`。
+  - 限制：队列只在面板会话内存中，重开 DSH 面板即清空（持久化/历史属 T033）；未做 `vibe-dev` + headless Edge 的真实气泡定位截图，3 步闭环的真机证据留 G3/T034；尚未接 composer，发送目前落到剪贴板；气泡位置在视口变化后不重算（拾取时一次计算），滚动页面时元素框仍是拾取瞬间的值。
 
 ### - [ ] T032 Composer handoff
 
