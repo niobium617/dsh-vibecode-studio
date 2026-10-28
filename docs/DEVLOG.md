@@ -596,6 +596,13 @@
 - 验证：仅文档改动，未改 `src/`、测试、依赖或 profile，故不重跑 typecheck/单测/build/e2e；手册内命令按当前 `package.json` 脚本与 `tests/e2e/source-adapters.spec.ts` 的真实启动方式核对。
 - 同步：`README.md` 状态句、导航链接、M3 完成条目与“下一步 T035”均已更新并链到新手册。
 
+### M3 合并（2026-10-29，用户手测通过后批准）
+
+- 用户按 `docs/2026-10-29-M3手动测试手册.md` 完成手动检测，功能无问题，批准提交、推送与合并。
+- 回归（分支 `task/m3-inspect` 末端 `830fd0a`，与合并后的 `main` 树一致）：`pnpm typecheck` 0 error；`pnpm test` 60 文件 / **517 用例**；`pnpm build` host 200.6 / client 204.1 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/merge-{typecheck,test,test-2,build,e2e}.log`。
+- 首跑全量 1 失败（环境误报，已复现处理）：`tests/integration/preview/picker-edge.test.ts` 的“无 Playwright Edge 残留”断言在测试结束时看到 10 个带 `playwright_chromiumdev_profile` 的 Edge 进程，5 s 内未退出；单文件复跑通过、全量复跑 517/517 通过，失败属测试窗口内机器上有其他 Edge 未退（用户手测预览），非产品缺陷。未杀任何用户进程。
+- 合并：`task/m3-inspect`（`830fd0a`）以 `--no-ff` 合并入 `main`（`eae874a`）并推送（`fcabc0a..eae874a`）；`main` 树与分支末端一致；`task/m3-inspect` 远端保留。未开始 M4/T035。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
