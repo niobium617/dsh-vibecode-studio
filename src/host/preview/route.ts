@@ -22,6 +22,9 @@ import {
   PREVIEW_NETWORK_BODY_METHOD,
   PREVIEW_NETWORK_CLEAR_METHOD,
   PREVIEW_NETWORK_LIST_METHOD,
+  PREVIEW_PICK_START_METHOD,
+  PREVIEW_PICK_STATUS_METHOD,
+  PREVIEW_PICK_STOP_METHOD,
   PREVIEW_RELOAD_METHOD,
   PREVIEW_START_METHOD,
   PREVIEW_STATUS_METHOD,
@@ -90,6 +93,16 @@ export function registerPreviewMethods(
   const offViewport = registry.register(PREVIEW_VIEWPORT_METHOD, async (params) =>
     service.setViewport(params),
   )
+  // T027 element picking: start/stop mutate the page overlay, status is polled.
+  const offPickStart = registry.register(PREVIEW_PICK_START_METHOD, async () =>
+    service.pickStart(),
+  )
+  const offPickStop = registry.register(PREVIEW_PICK_STOP_METHOD, async () =>
+    service.pickStop(),
+  )
+  const offPickStatus = registry.register(PREVIEW_PICK_STATUS_METHOD, async () =>
+    service.pickStatus(),
+  )
   return () => {
     offStart()
     offStop()
@@ -104,6 +117,9 @@ export function registerPreviewMethods(
     offNavigate()
     offReload()
     offViewport()
+    offPickStart()
+    offPickStop()
+    offPickStatus()
   }
 }
 

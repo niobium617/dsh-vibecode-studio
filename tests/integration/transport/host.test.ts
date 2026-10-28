@@ -68,6 +68,7 @@ describe('host transport registration', () => {
       `vibe-studio: ${HEALTH_PATH}`,
       `vibe-studio: ${REQUEST_PATH}`,
       'vibe-studio: settings methods',
+      'vibe-studio: annotation history methods',
       'vibe-studio: preview methods',
       `vibe-studio: ${STREAM_PATH}`,
       `vibe-studio: ${FRAME_PATH}`,

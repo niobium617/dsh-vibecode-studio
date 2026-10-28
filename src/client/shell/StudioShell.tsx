@@ -5,6 +5,10 @@
  */
 import * as React from 'react'
 import { browserLocale, createTranslator, type Locale } from '../i18n'
+import { AnnotationQueue, useAnnotationQueue } from '../inspect/AnnotationQueue'
+import { AnnotationHistory } from '../inspect/History'
+import { persistAnnotation } from '../inspect/history-store'
+import { createComposerHandoffSender } from '../inspect/handoff'
 import { PreviewPage } from '../preview/Canvas'
 import { stopPreviewSession } from '../preview/lifecycle'
 import { SettingsPage } from './settings/SettingsPage'
@@ -49,6 +53,19 @@ const panelStyle: React.CSSProperties = {
   overflow: 'auto',
 }
 
+/** Queue size next to the tab label; hidden from the accessible name. */
+const tabBadgeStyle: React.CSSProperties = {
+  display: 'inline-block',
+  minWidth: 14,
+  marginLeft: 4,
+  padding: '0 4px',
+  borderRadius: 999,
+  background: 'var(--dsw-accent-color, #4f8cff)',
+  color: '#fff',
+  font: '600 9px/1.6 system-ui, sans-serif',
+  textAlign: 'center',
+}
+
 /**
  * The preview page is its own fixed-height layout (canvas plus drawers), so the
  * panel must not scroll it; scrolling would resize the canvas over and over.
@@ -67,6 +84,10 @@ export function StudioShell({ locale }: StudioShellProps): React.ReactElement {
   const activeLocale = locale ?? browserLocale()
   const t = React.useMemo(() => createTranslator(activeLocale), [activeLocale])
   const { activeTab } = useShellState()
+  const queuedAnnotations = useAnnotationQueue()
+  // T032: sending lands in the active chat draft (or the clipboard when no
+  // composer is attached); the queue reports which one.
+  const handoff = React.useMemo(() => createComposerHandoffSender(activeLocale), [activeLocale])
   const current =
     STUDIO_TAB_DEFINITIONS.find((tab) => tab.id === activeTab) ??
     STUDIO_TAB_DEFINITIONS.find((tab) => tab.id === DEFAULT_TAB)!
@@ -98,6 +119,11 @@ export function StudioShell({ locale }: StudioShellProps): React.ReactElement {
               onClick={() => setActiveTab(tab.id)}
             >
               {t(tab.labelKey)}
+              {tab.id === 'annotations' && queuedAnnotations.length > 0 ? (
+                <span aria-hidden="true" data-vibe-annotation-count={queuedAnnotations.length} style={tabBadgeStyle}>
+                  {queuedAnnotations.length}
+                </span>
+              ) : null}
             </button>
           )
         })}
@@ -113,7 +139,12 @@ export function StudioShell({ locale }: StudioShellProps): React.ReactElement {
           {current.id === 'settings' ? (
             <SettingsPage locale={activeLocale} />
           ) : current.id === 'preview' ? (
-            <PreviewPage locale={activeLocale} />
+            <PreviewPage locale={activeLocale} send={handoff} />
+          ) : current.id === 'annotations' ? (
+            <>
+              <AnnotationQueue locale={activeLocale} send={handoff} persist={persistAnnotation} />
+              <AnnotationHistory locale={activeLocale} />
+            </>
           ) : (
             <EmptyState title={t('state.empty.title')} body={t(current.emptyKey)} />
           )}

@@ -17,6 +17,7 @@
  * what the display can actually paint, however fast CDP delivers frames.
  */
 import * as React from 'react'
+import type { Annotation } from '../../contracts/annotation'
 import type { TargetKind, TargetViewport } from '../../contracts/target'
 import {
   PREVIEW_NAVIGATE_METHOD,
@@ -30,6 +31,16 @@ import {
   type PreviewTargetsResult,
 } from '../../contracts/transport'
 import { createTranslator, type Locale } from '../i18n'
+import { AnnotationBubble, placeBubble } from '../inspect/AnnotationBubble'
+import {
+  addAnnotationToQueue,
+  createElementAnnotation,
+  type AnnotationSender,
+} from '../inspect/AnnotationQueue'
+import { AnnotationSaveNotice } from '../inspect/AnnotationSaveNotice'
+import { persistAnnotation } from '../inspect/history-store'
+import { PickCard, usePicker } from '../inspect/Picker'
+import { setActiveTab } from '../shell/store'
 import { callUnary } from '../transport/client'
 import { ConsoleDrawer, type ConsoleCounts } from './ConsoleDrawer'
 import { InputLayer } from './InputLayer'
@@ -171,6 +182,21 @@ const inputHintStyle: React.CSSProperties = {
   pointerEvents: 'none',
 }
 
+const pickHintStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: 8,
+  left: 8,
+  right: 8,
+  zIndex: 2,
+  margin: 0,
+  padding: '2px 6px',
+  borderRadius: 4,
+  background: 'rgba(59, 130, 246, 0.88)',
+  color: '#fff',
+  font: '11px/1.4 system-ui, sans-serif',
+  pointerEvents: 'none',
+}
+
 function drawerLayerStyle(open: boolean): React.CSSProperties {
   return {
     display: open ? 'grid' : 'none',
@@ -209,9 +235,16 @@ export function fitContain(
 
 export interface PreviewPageProps {
   readonly locale?: Locale
+  /** Composer handoff for the save notice; defaults to the clipboard. */
+  readonly send?: AnnotationSender
 }
 
-export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
+interface QueueNotice {
+  readonly kind: 'saved' | 'unsaved'
+  readonly annotation: Annotation
+}
+
+export function PreviewPage({ locale, send }: PreviewPageProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
   const [url, setUrl] = React.useState(DEFAULT_PREVIEW_URL)
   const [kind, setKind] = React.useState<TargetKind>('web')
@@ -222,6 +255,8 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
   const [stats, setStats] = React.useState<PreviewTransportStats | null>(null)
   const [stageSize, setStageSize] = React.useState<StageSize | null>(null)
   const [drawer, setDrawer] = React.useState<PreviewDrawerKind | null>(null)
+  // `unsaved` means the note is in the queue but the history file was not written.
+  const [queueNotice, setQueueNotice] = React.useState<QueueNotice | null>(null)
   const [consoleCounts, setConsoleCounts] = React.useState<ConsoleCounts>({
     total: 0,
     errors: 0,
@@ -232,6 +267,27 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
     total: 0,
     failed: 0,
   })
+
+  const state = snapshot?.status ?? 'idle'
+  const ready = state === 'ready'
+  // Stop releases the host collectors before the session reports idle. Keep the
+  // drawers from polling that half-torn-down session (it answers `unsupported`)
+  // and close any open drawer as soon as the user asks to stop.
+  const stopping = busy === 'stop'
+  const canPick = ready && !stopping && snapshot?.capabilities?.pick === true
+
+  // The picker polls the Host, which owns the page overlay; the panel only
+  // reads its snapshot (T027).
+  const picker = usePicker({
+    enabled: canPick,
+    onError: (failure) => setError(errorMessage(failure)),
+  })
+  const pickedElement = picker.pick
+
+  // A fresh pick reopens the comment bubble and hides the previous confirmation.
+  React.useEffect(() => {
+    if (pickedElement !== null) setQueueNotice(null)
+  }, [pickedElement])
 
   const stageRef = React.useRef<HTMLDivElement | null>(null)
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null)
@@ -490,12 +546,6 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
     window.open(target, '_blank', 'noopener,noreferrer')
   }
 
-  const state = snapshot?.status ?? 'idle'
-  const ready = state === 'ready'
-  // Stop releases the host collectors before the session reports idle. Keep the
-  // drawers from polling that half-torn-down session (it answers `unsupported`)
-  // and close any open drawer as soon as the user asks to stop.
-  const stopping = busy === 'stop'
   const canConsole = ready && !stopping && snapshot?.capabilities?.console === true
   const canNetwork = ready && !stopping && snapshot?.capabilities?.network === true
 
@@ -520,6 +570,22 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
       ? { position: 'relative', width: '100%', maxWidth: '100%', aspectRatio: String(aspect) }
       : { position: 'relative', width: box.width, height: box.height }
 
+  // The canvas is centred in the stage by flex, so the drawn frame's stage
+  // offset follows from the measured stage and the fitted box (T031 bubble).
+  const stageFrame =
+    box !== null && stageSize !== null
+      ? {
+          left: Math.max(0, (stageSize.width - box.width) / 2),
+          top: Math.max(0, (stageSize.height - box.height) / 2),
+          width: box.width,
+          height: box.height,
+        }
+      : null
+  const bubblePlacement =
+    pickedElement !== null && snapshot?.viewport && stageFrame !== null
+      ? placeBubble({ box: pickedElement.box, viewport: snapshot.viewport, frame: stageFrame })
+      : null
+
   const consoleTab: TabCount = { available: canConsole, count: consoleCounts.total }
   const networkTab: TabCount = { available: canNetwork, count: networkCounts.total }
 
@@ -534,6 +600,8 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
         busy={busy}
         stats={stats}
         stageSize={stageSize}
+        picking={picker.picking}
+        canPick={canPick}
         onKindChange={setKind}
         onUrlChange={setUrl}
         onSubmit={() => void (ready ? handleNavigate() : handleStart())}
@@ -541,6 +609,7 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
         onReload={() => void handleReload()}
         onViewportChange={(viewport) => void handleViewport(viewport)}
         onOpenExternal={handleOpenExternal}
+        onPickToggle={picker.toggle}
       />
 
       <div ref={stageRef} data-vibe-stage="1" style={stageStyle}>
@@ -556,6 +625,7 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
             <InputLayer
               canvasRef={canvasRef}
               locale={locale}
+              picking={picker.picking}
               onError={(failure) => {
                 if (mountedRef.current) setError(errorMessage(failure))
               }}
@@ -596,11 +666,64 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
           </div>
         ) : null}
 
-        {ready ? (
+        {ready && !picker.picking ? (
           <p data-vibe-input-hint="1" style={inputHintStyle}>
             {t('preview.input.hint')}
           </p>
         ) : null}
+
+        {picker.picking ? (
+          <p data-vibe-pick-hint="1" role="status" style={pickHintStyle}>
+            {t('preview.pick.hint.active')}
+          </p>
+        ) : null}
+
+        {pickedElement ? (
+          <PickCard locale={locale} pick={pickedElement} onClose={picker.dismiss} />
+        ) : null}
+
+        {pickedElement !== null && bubblePlacement !== null && snapshot?.targetId ? (
+          <AnnotationBubble
+            locale={locale}
+            element={pickedElement}
+            placement={bubblePlacement}
+            onSave={(comment) => {
+              const targetId = snapshot?.targetId ?? null
+              if (targetId === null) return
+              const annotation = createElementAnnotation({
+                targetId,
+                comment,
+                element: pickedElement,
+              })
+              if (addAnnotationToQueue(annotation)) {
+                setQueueNotice({ kind: 'saved', annotation })
+                picker.dismiss()
+                // History is a local record only; a failure never blocks the
+                // queue, it just downgrades the notice.
+                void persistAnnotation(annotation).then((saved) => {
+                  if (saved) return
+                  setQueueNotice((current) =>
+                    current?.annotation.id === annotation.id
+                      ? { ...current, kind: 'unsaved' }
+                      : current,
+                  )
+                })
+              }
+            }}
+            onCancel={picker.dismiss}
+          />
+        ) : null}
+
+        {queueNotice === null ? null : (
+          <AnnotationSaveNotice
+            key={queueNotice.annotation.id}
+            locale={locale}
+            annotation={queueNotice.annotation}
+            persisted={queueNotice.kind === 'saved'}
+            onViewQueue={() => setActiveTab('annotations')}
+            send={send}
+          />
+        )}
 
         {error === null ? null : (
           <p role="alert" style={errorBannerStyle}>

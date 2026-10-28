@@ -269,3 +269,37 @@ describe('preview toolbar (U01 layout v2)', () => {
     expect(screen.getByLabelText('Target')).toBeTruthy()
   })
 })
+
+describe('preview toolbar (T027 picker)', () => {
+  it('offers the pick toggle only while live and reports clicks', () => {
+    const onPickToggle = vi.fn()
+    renderToolbar({
+      snapshot: snapshot({ capabilities: { ...CAPABILITIES, pick: true } }),
+      canPick: true,
+      onPickToggle,
+    })
+
+    const toggle = screen.getByRole('button', { name: 'Pick element' })
+    expect(toggle).toHaveProperty('disabled', false)
+    fireEvent.click(toggle)
+    expect(onPickToggle).toHaveBeenCalledTimes(1)
+
+    cleanup()
+    // Idle sessions have nothing to pick.
+    renderToolbar({ snapshot: null, canPick: true, onPickToggle })
+    expect(screen.queryByRole('button', { name: 'Pick element' })).toBeNull()
+  })
+
+  it('disables the toggle when the target cannot pick and shows the pressed state', () => {
+    renderToolbar({ canPick: false, picking: false, onPickToggle: vi.fn() })
+    expect(screen.getByRole('button', { name: 'Pick element' })).toHaveProperty(
+      'disabled',
+      true,
+    )
+
+    cleanup()
+    renderToolbar({ canPick: true, picking: true, onPickToggle: vi.fn() })
+    const toggle = screen.getByRole('button', { name: 'Stop picking' })
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+  })
+})

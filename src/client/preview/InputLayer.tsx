@@ -194,6 +194,8 @@ export interface InputLayerProps {
   readonly send?: InputSender
   readonly onError?: (error: unknown) => void
   readonly locale?: Locale
+  /** Pick mode is on: show a crosshair. Events still reach the page (T027). */
+  readonly picking?: boolean
 }
 
 export function InputLayer({
@@ -202,6 +204,7 @@ export function InputLayer({
   send,
   onError,
   locale,
+  picking = false,
 }: InputLayerProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
   const layerRef = React.useRef<HTMLDivElement | null>(null)
@@ -347,11 +350,12 @@ export function InputLayer({
     <div
       ref={layerRef}
       data-vibe-input="1"
+      data-vibe-picking={picking ? '1' : undefined}
       role="group"
       tabIndex={0}
       aria-label={t('preview.input.label')}
-      title={t('preview.input.hint')}
-      style={layerStyle}
+      title={picking ? t('preview.pick.hint') : t('preview.input.hint')}
+      style={picking ? { ...layerStyle, cursor: 'crosshair' } : layerStyle}
       onPointerDown={onPointerEvent}
       onPointerUp={onPointerEvent}
       onPointerMove={onPointerEvent}

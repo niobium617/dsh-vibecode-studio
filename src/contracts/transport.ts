@@ -17,6 +17,7 @@ import {
   type TargetKind,
   type TargetViewport,
 } from './target'
+import type { ElementContext } from './inspect'
 import type { ConsoleEntry, NetworkEntry } from './telemetry'
 
 export const TRANSPORT_VERSION = 1
@@ -58,6 +59,15 @@ export const PREVIEW_CONSOLE_CLEAR_METHOD = 'preview.console.clear'
 export const PREVIEW_NETWORK_LIST_METHOD = 'preview.network.list'
 export const PREVIEW_NETWORK_CLEAR_METHOD = 'preview.network.clear'
 export const PREVIEW_NETWORK_BODY_METHOD = 'preview.network.body'
+/** Element picking (T027); the page overlay reports through a CDP binding. */
+export const PREVIEW_PICK_START_METHOD = 'preview.pick.start'
+export const PREVIEW_PICK_STOP_METHOD = 'preview.pick.stop'
+export const PREVIEW_PICK_STATUS_METHOD = 'preview.pick.status'
+/** Annotation history (T033); persistence lives in `.vibe/annotations`. */
+export const ANNOTATION_HISTORY_LIST_METHOD = 'annotation.history.list'
+export const ANNOTATION_HISTORY_GET_METHOD = 'annotation.history.get'
+export const ANNOTATION_HISTORY_SAVE_METHOD = 'annotation.history.save'
+export const ANNOTATION_HISTORY_REMOVE_METHOD = 'annotation.history.remove'
 
 /** Unary requests carry input events and small commands; 64 KiB is ample. */
 export const MAX_UNARY_BODY_BYTES = 64 * 1024
@@ -137,6 +147,20 @@ export interface PreviewSessionSnapshot {
   readonly fps: number
   readonly quality: number
   readonly lastError?: StudioError
+}
+
+/**
+ * Picker state (T027). `seq` advances on every pick and cancel so the panel can
+ * tell a repeated pick of the same element from "no new event". The pick reuses
+ * `ElementContext`; T027 fills selector/identity/box, T028 fills text, html,
+ * role, name and visibility, and T029 fills `source`.
+ */
+export interface PickSnapshot {
+  readonly active: boolean
+  readonly seq: number
+  readonly pick: ElementContext | null
+  /** Host wall-clock time of the last pick or cancel; null before the first. */
+  readonly ts: number | null
 }
 
 export interface PreviewStartParams {

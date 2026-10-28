@@ -7,6 +7,11 @@
  */
 import { Config, resolveConfig, type VibeStudioConfig } from './config'
 import {
+  AnnotationHistoryService,
+  createAnnotationHistoryService,
+  registerAnnotationHistoryMethods,
+} from './inspect/history'
+import {
   registerPreviewMethods,
   registerPreviewRoutes,
   type PreviewService,
@@ -42,6 +47,13 @@ export {
   UnaryRegistry,
 } from './transport'
 export type { UnaryCallContext, UnaryHandler } from './transport'
+export {
+  AnnotationHistoryService,
+  createAnnotationHistoryService,
+  registerAnnotationHistoryMethods,
+  toAnnotationHistoryError,
+} from './inspect/history'
+export type { AnnotationHistoryServiceOptions } from './inspect/history'
 export { createTargetAdapterRegistry } from './targets/registry'
 export type { TargetAdapterRegistry } from './targets/registry'
 export { validateTargetConfig } from './targets/validate'
@@ -88,6 +100,28 @@ export type {
   PreviewConsoleCollectorOptions,
   PreviewConsoleStats,
 } from './preview/console'
+export {
+  buildPickerScript,
+  createPreviewPicker,
+  normalizePickedElement,
+  PICK_BINDING_NAME,
+  PICK_OVERLAY_ID,
+} from './inspect/inject'
+export type { PreviewPicker, PreviewPickerOptions } from './inspect/inject'
+export {
+  ANNOTATION_DIR_NAME,
+  ANNOTATION_FILE_EXT,
+  AnnotationStore,
+  AnnotationStoreError,
+  createAnnotationStore,
+  MAX_ANNOTATION_FILE_BYTES,
+} from './inspect/annotation-store'
+export type {
+  AnnotationListResult,
+  AnnotationStoreErrorCode,
+} from './inspect/annotation-store'
+export { buildSelector } from './inspect/selector'
+export type { SelectorResult } from './inspect/selector'
 export { createWebTargetAdapter, WEB_TARGET_CAPABILITIES } from './targets/web/adapter'
 export type {
   WebTargetAdapter,
@@ -145,6 +179,8 @@ export interface VibeStudioService {
   readonly targets: TargetAdapterRegistry
   /** Preview session + shared latest-frame buffer (T020). */
   readonly preview: PreviewService
+  /** Persisted annotation history under `.vibe/annotations` (T033). */
+  readonly annotationHistory: AnnotationHistoryService
 }
 
 /** Minimal Cordis surface used at this stage. */
@@ -170,6 +206,16 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
     setupSettings()
   }
 
+  // T033 annotation history shares the project root with settings; the panel
+  // saves, searches, reopens and deletes through these unary methods.
+  const annotationHistory = createAnnotationHistoryService({ projectDir: process.cwd() })
+  const setupAnnotationHistory = () => registerAnnotationHistoryMethods(registry, annotationHistory)
+  if (typeof ctx.effect === 'function') {
+    ctx.effect(setupAnnotationHistory, 'vibe-studio: annotation history methods')
+  } else {
+    setupAnnotationHistory()
+  }
+
   // T020 preview: unary lifecycle methods plus the stream/pull frame routes.
   const preview = createPreviewService({ targets })
   const setupPreview = () => {
@@ -192,5 +238,6 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
     settings,
     targets,
     preview,
+    annotationHistory,
   } satisfies VibeStudioService)
 }

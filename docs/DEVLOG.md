@@ -8,8 +8,8 @@
 ## 1. 当前快照
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，M1 已完成，M2 已完成）**。
-- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）、T023 Console 采集与抽屉、T024 Network 采集与抽屉、T025 预览工具栏与生命周期、T026 G2 Preview 评审（通过）。
-- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），下一项 **T027 拾取 overlay 与选择器**。
+- 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）、T023 Console 采集与抽屉、T024 Network 采集与抽屉、T025 预览工具栏与生命周期、T026 G2 Preview 评审（通过）、T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 三框架源码适配、T030 标注模型与存储、T031 标注气泡与队列。
+- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），**T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 源码适配（React/Vue/Svelte）、T030 标注模型与存储、T031 标注气泡与队列、T032 Composer handoff、T033 标注历史 已完成**；**T034 G3 评审完成（GO）**：初评“≤3 步”实测 4–5 个动作，经用户批准在保存通知加“发送到对话”后为 3 个动作（点元素 → 保存 → 发送），复测四项验收全过（源码 100%、标注 4,095 B ≤ 4 KB、不自动发送），M3 完成；手动复测入口见 `docs/2026-10-29-M3手动测试手册.md`（M2 见 `docs/2026-10-28-手动测试手册.md`）。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
 - T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T026 已提交并推送到 `origin/task/m2-target-model`（`ebee1e5`，文档至 `92ecc32`），尚未合并入 `main`；其后 `9c19501..88a4070`（方向/手册文档、U01 实现、去重复标题）已推送到 `origin/task/m2-target-model`（`92ecc32..88a4070`，2026-10-28）；`f64e928`（清理残留 locale key 与过期布局引用）推送后，以 `--no-ff` 合并入 `main`（合并提交 `768e129`，`main` 树与分支一致），功能分支保留。手动复测入口见 `docs/2026-10-28-手动测试手册.md`；界面/产品方向见 `docs/2026-10-28-界面与项目方向.md`。S3/S4/T010/T014/T015/T020/T021/T022/T025 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
@@ -473,6 +473,129 @@
   - `main` 验证：`pnpm typecheck` 0 error、`pnpm test` 43 / 319、`pnpm build` host 140.5 KiB / client 139.2 KiB。
   - `task/m2-target-model` 本地与远端均保留，未删；下一任务从 `main` 新建分支。
 
+### T027 — 拾取 overlay 与选择器（已完成，2026-10-28）
+
+- 背景：S4 spike 已验证 CDP 注入 + Shadow DOM overlay 可行，本任务落成产品代码。契约新增 `PickSnapshot`（`active/seq/pick/ts`）与三个一元方法 `preview.pick.{start,stop,status}`。
+- 结果：
+  - `src/host/inspect/selector.ts`（新增）：`buildSelector()` 按 SPEC §6.4 分级——唯一 `data-testid` → 唯一 `id` → `aria-label`/`name`（先带 tag 再全局）→ 语义 class（跳过 >40 字符、非标识符、纯数字、`[_-][a-f0-9]{5,}`/`css-*` 生成式）→ `nth-of-type` 路径，并在最近的唯一 `id`/`data-testid` 祖先处截短；每个候选在 `getRootNode()` 作用域内验证，结果带 `unique`。
+  - `src/host/inspect/inject.ts`（新增）：`installVibePicker()` 在页面内创建 open Shadow DOM overlay（`all: initial` + `z-index: 2147483647` + `pointer-events:none`），仅顶层帧安装，`pointermove` 穿透 open shadow 命中并画框/标签，捕获阶段吞掉 press 与 click，`Esc` 取消（上报 `{kind:'cancel'}`），`Alt+Click` 免模式拾取，重复安装先 `dispose()` 旧实例；`createPreviewPicker()` 用独立 CDP 会话完成 `Runtime.enable → Runtime.addBinding → Page.addScriptToEvaluateOnNewDocument → Runtime.evaluate`，页面回传的 payload 全部重新校验/截断（selector 512、id 256、tag 64、≤8×64 classes、box ±1e6、≤8 KiB）。
+  - `src/host/preview/{session,route}.ts`、`src/host/targets/web/adapter.ts`、`src/host/index.ts`：picker 随会话创建，脚本被页面拒绝时把 `capabilities.pick` 降为 false 而不让预览失败；navigate/reload 后 `reset()`；释放顺序为 input → picker → adapter。
+  - `src/client/inspect/Picker.tsx`（新增）：`usePicker()` 轮询 `preview.pick.status`（active 300 ms / idle 1000 ms）、`PickToggle`（工具栏 `⌖`，`aria-pressed`）、`PickCard`（selector 整段可选中复制、唯一/非唯一徽标、tag/classes/box、可收起）。
+  - `src/client/preview/{Toolbar,Canvas,InputLayer}.tsx`：工具栏新增拾取开关；画布拾取中显示蓝色提示条与 crosshair（`data-vibe-picking`），拾取结果卡片浮在舞台右上；`src/client/locales/{en,zh-CN}.json` 新增 10 个 key，两语仍一致。
+  - 关键约束：`buildSelector`/`installVibePicker` 经 `Function.prototype.toString()` 序列化进页面，**模块级常量在页面里是 free variable**——选择器里的 `MAX_CLASS_CHARS`/`MAX_CLASS_CANDIDATES` 已移入函数体，`buildPickerScript` 另拒绝 esbuild `keepNames` 的 `__name(` 泄漏（否则页面内 ReferenceError 且点击无上报）。`Runtime.enable` 也是必需的，否则 `Runtime.bindingCalled` 不投递到该会话。
+  - 测试：新增 `tests/unit/preview/picker.test.ts`（11）、`tests/component/inspect/selector.test.ts`（9）、`tests/component/inspect/page-script.test.ts`（8）、`tests/component/inspect/picker-ui.test.tsx`（6）、`tests/integration/preview/picker-service.test.ts`（4）、`tests/integration/preview/picker-edge.test.ts`（真实 Edge，10 元素抽测），toolbar 用例补 2 条。
+- 验证：`pnpm typecheck` 0 error；`pnpm test` 49 文件 / **363 用例全通过**；`pnpm build` host 159.6 KiB / client 149.1 KiB。真实 Edge 验收细节见 `tasks/todo.md` T027“验证结果”。
+- 计划偏差/限制：拾取卡片只做组件测试，未做 `vibe-dev` 截图（任务验证要求为 S4 harness + integration）；`text/html/role/source` 仍是空占位，T028/T029 填充。
+
+### T028 — 元素上下文提取（已完成，2026-10-28）
+
+- 背景：T027 只回传 selector/identity/box，`text/html/role/source` 为空占位；FR-PICK-02 要求元素上下文含文本、角色、可见性。
+- 结果：
+  - `src/host/inspect/dom.ts`（新增）：`extractDomContext()` 在页面内克隆元素、去掉 `script/style/template/noscript`、深度 ≤ 6 / 元素节点 ≤ 200，空白归一后按 UTF-8 截到 2048 B（`…` 计入预算；截断落在标签中间时回退到最后一个完整标签）；文本优先 `innerText`、无 `innerText` 时用去脚本克隆的 `textContent`，折叠空白后截到 200 码点；可见性检查连接状态、`hidden`、rect 尺寸、`display/visibility/opacity` 与 `checkVisibility()`。Host 侧 `normalizeDomSnippet`/`normalizeElementText`/`normalizeVisibility` 重新校验页面数据。
+  - `src/host/inspect/accessibility.ts`（新增）：`describeAccessibility(element, roles)` 近似可访问名称（`aria-labelledby` → `aria-label` → 原生 alt/value/label/legend/caption/figcaption → title → placeholder → 文本内容，landmark 不用文本内容）与角色（显式 `role` 经 ARIA 1.2 白名单校验，否则原生映射）；Host 侧 `normalizeRole`/`normalizeAccessibleName` 再次收口。
+  - `src/host/inspect/inject.ts`：`installVibePicker()` 接收 DOM/无障碍提取器并在点击时把 `html/text/visible/role/name` 一并上报（异常只留空字段，不阻断拾取）；`buildPickerScript()` 组合四个自包含函数，角色白名单以 JSON 参数传入页面；`normalizePickedElement()` 填充新字段。
+  - `src/contracts/inspect.ts`：`ElementContext` 新增 `name`（可访问名称，非 `name` 属性）与 `visible`，`isElementContext` 同步；`src/contracts/annotation.ts` 渲染 `name`/`visible`。
+  - 测试：新增 `tests/unit/inspect-context/{dom,accessibility}.test.ts`；`unit/preview/picker.test.ts` 与 `component/inspect/page-script.test.ts` 更新 payload/上限断言；`integration/preview/picker-edge.test.ts` 对 10 种元素新增 role/name/text/visible/html 断言。
+- 验证：`pnpm typecheck` 0 error；`pnpm test` 51 文件 / **384 用例全通过**；`pnpm build` host 172.8 KiB / client 149.1 KiB；真实 Edge 10/10 上下文正确。日志 `.tmp/logs/t028-*.log`。
+- 计划偏差/限制：名称是近似实现（无完整 accessibility tree、未覆盖 `aria-owns`/嵌套 landmark 特例）；拾取卡片暂不展示 text/role，留 T029/T030。
+
+### T029 — 源码适配（React/Vue/Svelte）（已完成，2026-10-28）
+
+- 背景：S4 spike 证明三框架能取到元素源码行，但 React 19 没有 `_debugSource`、Vue 的 `data-v-inspector` 运行时被移入 vnode、生产构建没有任何元数据。本任务把 S4 的取法产品化，并补上“取不到”的明确回退。
+- 结果：
+  - `src/host/inspect/source/react.ts`（新增）：`reactSource()` 先读 `@react-dev-inspector/babel-plugin` 在 dev 构建期写入的 `data-inspector-relative-path/-line/-column`（经 `closest` 兼容包装元素），再沿 `__reactFiber$*` 的 `return` 链 ≤ 64 层找 React 18 dev 的 `_debugSource`，否则 `null`。
+  - `src/host/inspect/source/vue.ts`（新增）：`vueSource()` 沿 `__vnode` 父链 ≤ 64 层，优先用 `__vue_inspector_store__.vnodeToPos`（`vite-plugin-vue-inspector` v7 的全局表），其次读 vnode 不可枚举 prop `__v_inspector`（`file:line:column`），再退回遗留的 `data-v-inspector` 属性，最后用 `__vueParentComponent.type.__file` / `__vnode.ctx.type.__file` 只给文件（无行号），否则 `null`。
+  - `src/host/inspect/source/svelte.ts`（新增）：`svelteSource()` 从元素向上 ≤ 64 层读 `__svelte_meta.loc`（Svelte 5 dev 运行时；生产构建没有），否则 `null`。
+  - `src/host/inspect/source/index.ts`（新增）：`SOURCE_VIAS` 与 Host 侧 `normalizeSourceContext()`——框架白名单、文件去控制字符/折叠空白/截 512 码点、`via` 限适配器 token、行列为 0–1,000,000 整数，未知字段丢弃，越界置 `null`。
+  - `src/host/inspect/inject.ts`：`installVibePicker()` 接收第 5 个页面提取器 `sourceOf`，点击时 `try/catch` 取 source 并随 payload 上报；`buildPickerScript()` 用 `toString()` 组合三个适配器，`return __vibeReactSource(el) || __vibeVueSource(el) || __vibeSvelteSource(el)`；`normalizePickedElement()` 经 `normalizeSourceContext` 填充 `ElementContext.source`。
+  - `src/client/inspect/Picker.tsx`：`PickCard` 新增源码行——显示文件末段 + 行号（`App.vue:14`）、完整路径放 `title`、`data-vibe-pick-source-via` 暴露取法；无源码时显示“无源码信息”，不隐藏该行。两语新增 `preview.pick.source` / `preview.pick.sourceUnavailable`。
+  - `fixtures/source/{react,vue,svelte}`（新增）：三套最小 Vite 应用，各 30 个带 `id` 的元素、每元素单独一行，分别启用 inspector Babel 插件、`vite-plugin-vue-inspector`、Svelte 5 dev 编译。
+  - 测试：新增 `tests/unit/inspect-context/source.test.ts`（17 用例：三适配器主路径/回退/异常，`normalizeSourceContext` 边界）、`tests/e2e/source-adapters.spec.ts`（每框架 dev 30/30 命中与真实鼠标复核 + 生产 30/30 `source: null`）；`component/inspect/page-script.test.ts` payload 补 `source` 并新增页面内 React 属性断言；`component/inspect/picker-ui.test.tsx` 新增源码行 2 例；`unit/preview/picker.test.ts` 补脚本组合断言。
+- 验证：`pnpm typecheck` 0 error；`pnpm test` 52 文件 / **404 用例全通过**；`pnpm build` host 181.0 KiB / client 150.0 KiB；`pnpm test:e2e` **9 用例全通过**（dev 三框架 30/30 命中、生产三框架 30/30 回退为 null、0 控制台/页面错误）。日志 `.tmp/logs/t029-*.log`。
+- 计划偏差/限制：React 19 的一级路径依赖目标项目启用 inspector babel 插件；Vue `__file` 回退只有文件、不计命中；Svelte 4 的 `add_location` 未单独适配；三 fixture 均为手写最小应用，真实项目插件版本差异留 G3 复核；e2e 紧接 `pnpm test` 时 Playwright 的 Edge 进程可能尚未退完，会误触发 `picker-edge` 的清理断言（单独重跑即通过）。
+
+### T030 — 标注模型、存储与文本渲染（已完成，2026-10-28）
+
+- 背景：T009 已有 `Annotation` 契约与渲染（JSON 往返、4 KB 预算、`<untrusted-page-content>` 包裹），但没有落盘方式，历史（T033）和标注队列（T031）都无处可存。SPEC §6.5 规定 `.vibe/annotations/*.json`，一条标注一个文件。
+- 结果：
+  - `src/contracts/annotation.ts`：新增并导出 `isAnnotationId()`（`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`），`isAnnotation` 改用它——id 同时是文件名，必须排除路径分隔符、前导点和空 stem。
+  - `src/host/inspect/annotation-store.ts`（新增）：`AnnotationStore` / `createAnnotationStore(projectDir)`。`save()` 先 `isAnnotation` 校验、`serializeAnnotation` 后按 UTF-8 字节限 64 KiB，再在 `.vibe/annotations` 同目录写 `wx` 临时文件并 `rename` 原子替换（覆盖同 id）；`read()` 对缺失、坏 JSON、形状不合法、超 64 KiB、symlink 或 realpath 越出目录的文件返回 `null`；`list()` 只认 `<合法 id>.json`、逐个校验、跳过坏文件、按 `createdAt` 倒序（同时间按 id）；`remove()` 返回是否删除；`.vibe` 或 `.vibe/annotations` 为越界 junction/symlink 时抛 `path_outside_project`。
+  - `src/host/index.ts`：导出 store、错误类与 `ANNOTATION_DIR_NAME`/`ANNOTATION_FILE_EXT`/`MAX_ANNOTATION_FILE_BYTES`。
+  - 测试：新增 `tests/unit/annotation/annotation-store.test.ts`（10 用例）：磁盘往返、原子写无临时残留、save→read→render 后 ≤ 4 KB 且不可信边界只出现一次（含页面 HTML 试图闭合标签）、坏/非法/超大文件回退为 `null` 且 `list` 跳过、非法与超限保存不落盘、非法 id 不触达文件系统、删除/空历史、`.vibe` junction 越界拒绝。
+- 验证：`pnpm typecheck` 0 error；`pnpm test` 53 文件 / **414 用例全通过**（`tests/unit/annotation` 10 + 原 `tests/unit/contracts/annotation.test.ts` 9）；`pnpm build` host 192.8 KiB / client 150.0 KiB。日志 `.tmp/logs/t030-{typecheck,test,build}.log`。
+- 计划偏差/限制：契约保持 `src/contracts/annotation.ts` 单文件（未拆 `annotation/` 目录，避免无收益的导入改写）；store 未接入 host 服务/agent 工具（T031 用模型、T033 做列表/搜索/重开）；未替目标项目生成 `.vibe/annotations` 的 gitignore；同一 id 并发保存以最后 `rename` 为准，无文件锁。
+
+### T031 — 标注气泡与队列（已完成，2026-10-28）
+
+- 背景：T027 的拾取卡片只展示元素，T030 的 `Annotation` 模型与 `renderAnnotationText` 没有客户端入口；预览页（气泡）和标注页签（队列）是两个互斥挂载的页面，状态不能放在任一页面组件里。
+- 结果：
+  - `src/client/inspect/AnnotationBubble.tsx`（新增）：`placeBubble({ box, viewport, frame })` 把元素 `box` 按 `frame/viewport` 缩放后放在元素下方（`BUBBLE_GAP` 6），右侧越界时夹到帧内（`BUBBLE_MARGIN` 4），下方放不下时翻到上方，帧小于气泡时贴左上角，零视口按 1 px 处理；`AnnotationBubble` 渲染 `role=group` 气泡（代码头 `tag.classes`）、自动聚焦的 textarea（2 000 字符上限，与 `ANNOTATION_COMMENT_MAX_CHARS` 一致）、`Ctrl/Cmd+Enter` 保存、`Esc` 取消、空意见拒绝并给出 `role=status` 说明。
+  - `src/client/inspect/AnnotationQueue.tsx`（新增）：模块级 store + `useSyncExternalStore`（新增置顶、同 id 替换、编辑拒绝空值与未知 id、移除返回是否命中、无变更不发通知、快照在变更前保持同一引用）；`createElementAnnotation` 复用 T030 模型与品牌 `TargetId`；`renderAnnotationText` 生成发送文本；列表最新在前，显示选择器、本地时间、源码末段与行号、意见，动作为发送/编辑/移除，编辑态可保存或取消；空态复用 `EmptyState`。发送器 `AnnotationSender` 可注入，默认 `copyAnnotationToClipboard`（S2 回退），成功后移除草稿并显示返回消息，失败保留草稿并 `role=alert`，发送中禁用该条动作；**没有定时器或副作用，只有点击才发送**。
+  - `src/client/preview/Canvas.tsx`：拾取后由 `stageSize` + `fitContain` 得到舞台框，再调用 `placeBubble` 定位气泡；保存即入队并 `dismiss()` 拾取，显示“已加入队列”提示与“查看队列”按钮（切到标注页签）。新拾取会清掉上一条提示。
+  - `src/client/shell/StudioShell.tsx`：标注页签渲染 `<AnnotationQueue>`；队列非空时 tab 上加数量徽标（`aria-hidden`，tab 的可访问名不变）。
+  - 两语 catalog 各 +20 key（`annotation.bubble.*`、`annotation.queue.*`、`annotation.item.*`），`page.annotations.empty` 改为引导文案；key 集合 160/160 一致。
+  - 测试：`tests/component/annotation/` 3 文件 / 32 用例——定位（缩放/右缘夹紧/翻转/小帧/零视口）、气泡（渲染与焦点、空意见、trim、快捷键、取消、中文）、store（新增置顶/通知次数/非法拒绝）、列表（空态、顺序与字段、编辑保存/取消/空值、移除、发送成功/默认剪贴板/失败保留/发送中禁用/剪贴板写失败/跨重挂载/中文）、壳层（空态、徽标不改变 tab 名、列表可达）。
+- 验证：`pnpm typecheck` 0 error；`pnpm test` 56 文件 / **446 用例全通过**；`pnpm exec vitest run tests/component/annotation` 3 文件 / 32 用例；`pnpm build` host 192.8 KiB / client 179.4 KiB。日志 `.tmp/logs/t031-{typecheck,test,build}.log`。
+- 计划偏差/限制：发送暂落剪贴板（composer 属 T032，发送器已预留注入点）；队列只在面板会话内存中，重开面板即清空（持久化/历史属 T033）；气泡位置在拾取时一次计算，视口或页面滚动后不重算；未做真实 `vibe-dev` 手测，3 步闭环的真机证据留 G3/T034。
+
+### T033 — 标注历史（已完成，2026-10-28）
+
+- 背景：T030 已把标注落盘到 `.vibe/annotations/<id>.json`，T031/T032 的队列只在面板内存里，重开面板即清空；需要将这些文件变成可浏览、可检索、可重新打开、可删除的历史，且在重启与坏文件下都不崩。
+- 结果：
+  - 契约（`src/contracts/annotation.ts`）：新增 `AnnotationHistoryQuery`/`AnnotationHistoryEntry`/`AnnotationHistoryResult`、`AnnotationHistorySaveResult`/`RemoveResult`、`isAnnotationHistoryQuery`、`isAnnotationIdParams`、`matchesAnnotationQuery`、`toAnnotationHistoryEntry`；查询上限 200 字符，`limit` 默认 50、最大 200，意见预览 300 字符 + `…`；摘要只带选择器/标签/源码位置，不带 `element.html`。搜索对 id/targetId/意见/选择器/标签/可访问名/文本/源码文件做大小写不敏感子串匹配（中文同样生效）。`src/contracts/transport.ts` 新增 `annotation.history.{list,get,save,remove}`。
+  - Host（`src/host/inspect/history.ts` 新增）：`AnnotationHistoryService` 的 `list` 返回 `{entries,total,skipped}`（先全量过滤再截断，`total` 为截断前数量），`get` 对缺失/损坏文件抛 `not_found`，`save` 复用 store 校验，`remove` 对未知 id 返回 `{removed:false}`；`toAnnotationHistoryError` 把 store 错误映射成稳定码（`invalid_annotation`/`annotation_too_large`→`invalid_input`、`project_missing`→`not_found`、`path_outside_project`→`permission_denied`、`invalid_project_path`→`invalid_config`、`io`→`internal`）；`registerAnnotationHistoryMethods` 注册四个一元方法。`annotation-store.ts` 增加 `listWithIssues()`（`list()` 委托它）：坏 JSON、空文件、字段不合法、超 64 KiB、符号链接与越界文件计 `skipped`，不让一个坏文件毁掉整页历史。`src/host/index.ts` 通过 `ctx.effect` 注册并把 `annotationHistory` 放进 `ctx.provide('vibeStudio')`。
+  - Client（`src/client/inspect/history-store.ts` 新增）：沿用 T031 模块级 store + `useSyncExternalStore`，注入式 `AnnotationHistoryApi`，`requestSeq` 保证快速输入时最新请求胜出；`loadAnnotationHistory` 只改内存，`persistAnnotation` 失败返回 `false` 不抛，`reopenAnnotationFromHistory` 读全文后放回队列（不发消息），`removeHistoryAnnotation` 删除后刷新列表。
+  - UI（`src/client/inspect/History.tsx` 新增）：标题/计数、搜索框、加载/错误（重试）/空态/无匹配（清空搜索）/坏数据提示，条目显示选择器、本地时间、源码末段、意见；动作为重新打开与删除（二次确认），成功与失败均有 `role=status`/`role=alert` 反馈；全部钩子走 `data-vibe-history-*`。`StudioShell.tsx` 在标注页签并列队列与历史并注入 `persist`；`Canvas.tsx` 气泡保存后写历史，失败只降级提示；`AnnotationQueue.tsx` 编辑保存后写穿历史（`persist` 可选，存量 19 个队列用例无需改动）。两语各 +23 key，key 集合 184/184 一致。
+  - 测试（新增 41 用例）：`tests/unit/annotation-history/history.test.ts` 27 个（排序、摘要字段、意见截断、空目录、limit/total、坏文件与超限跳过、查询校验、越界 junction→`permission_denied`、各字段与中文搜索、`get` 缺失/损坏、保存校验与覆盖、删除与“重启后仍删除”、unary 信封 400/404、注入 store）；`tests/component/annotation/annotation-history.test.tsx` 14 个（空态、条目渲染、坏数据提示、错误重试、中文、搜索与清空、重新打开入队且不发送、打开失败、两步删除/取消/已不存在/失败保留、与队列互不干扰）。`tests/setup/component.ts` 统一注入无网络 fake API，`tests/unit/config.test.ts` 与 `tests/integration/transport/host.test.ts` 顺带补上新服务与 effect 标签。
+- 验证：`pnpm typecheck` 0 error；`pnpm test` 59 文件 / **507 用例全通过**；`pnpm build` host 199.8 KiB / client 202.1 KiB。手动（`.tmp/t033-history.mjs` → `.tmp/logs/t033-history.json`，`ok:true`）：真实 Host 经 `annotation.history.save` 写入 2 条（HTTP 200，磁盘 2 文件）→ 面板列出 2 条 → 搜索“品牌色”仅 1 条 → 重新打开后队列 1 条、composer 仍为空（未自动发送）→ 停 Host 并写入坏文件 → 重启后列表仍 2 条并提示“已跳过 1 个无法读取的标注文件。”→ 两步确认删除 1 条（“标注已删除。”、该文件已删、另一条仍在、列表剩 1）；7 条 DSH 自身 mux/资源断线属停/重启噪声，Studio 面板 0 异常；清理只删本轮 3 个 id，空的 `.vibe/annotations`、`.vibe` 已移除，4337 无 LISTEN 残留。日志 `.tmp/logs/t033-{unit,component,full,test-all,typecheck,build,history}.log`。
+- 计划偏差/限制：客户端 store 命名 `history-store.ts`（`history.ts` 与 `History.tsx` 仅大小写不同会被 TS `forceConsistentCasingInFileNames` 拒绝）；搜索在 Host 端全量过滤后才截断，未做索引/分页；历史只是本地记录，不随发送删除、不进聊天；保存失败不影响队列；未接 region/截图来源的历史展示。
+
+### T034 — G3 Inspect 评审与返工（GO，2026-10-29）
+
+- 背景：M3 的 T027–T033 已完成，G3 需验证圈选/标注/发送闭环与预算：50 元素源码 ≥ 80%、标注 ≤ 4 KB、从拾取到 composer ≤ 3 步、不自动发送。初评按“不改产品代码”执行；初评未达标后经用户批准返工并复测。
+- 基线：`pnpm typecheck` 0 error、`pnpm test` 59 文件 / 507 用例、`pnpm test:e2e` 9/9。
+- 初评结果：
+  - ① 源码命中：`50/50 = 100%`（React 17 / Vue 17 / Svelte 16，门槛 80%），0 miss、0 console/pageerror；用真实 `buildPickerScript` + `normalizePickedElement` 在 Vite dev server + headless Edge 上逐元素拾取（`.tmp/g3/source-sample.ts` → `.tmp/logs/g3-source.json`）。`pnpm test:e2e` 的 90 元素（三框架各 30/30，行号 ±2）为交叉证据。
+  - ② 标注预算：最坏输入下 `renderAnnotationText` 输出 4,094–4,096 B，均 ≤ 4,096，且无断代理对（2,000 字中文、2,000 ASCII、1,000 emoji 三组，`.tmp/logs/g3-budget.json`）。真实载体把 2,000 字中文意见送进 composer 后实测 **4,095 B**。
+  - ③ 3 步进 composer：**未达标**。真实 Web 闭环记录的用户动作为：开启“拾取”→ 点击画布元素 → 输入意见 + `Ctrl+Enter` 保存 → 点击“查看队列”→ 点击“发送”（从点元素算 4 个动作）。预览与标注页签互斥，预览页签内没有发送入口，所以“查看队列”是必要点击；只有按语义阶段（圈选 / 写意见保存 / 发送）才算 3 步。
+  - ④ 不自动发送：通过。保存气泡后 composer 为空、页面外 marker 0；点发送后状态“已插入对话草稿，尚未发送。”，4 s 后 composer 文本逐字节不变（4,095 B）、面板外 marker 0、无用户消息；`handoff.ts` 只调用 `captureInsertion`/`insertText`/可选 `setDraft`，没有 `submit`/`send` 路径（`.tmp/logs/g3-live.json`，`ok:true`）。
+- 缺口：保存通知只有“查看队列”。建议在通知里加“发送到对话”（或气泡保存后直接提供发送），把动作压到 3 次点击。附带发现：2,000 字中文意见会在 composer 被截到约 1,617 字且气泡无截断提示；`fixtures/vite-basic` 拾取 `source: null` 属 T029 已知限制（真实项目需 dev 构建插件）。
+- 返工（用户选择“通知里加‘发送到对话’”）：新增 `src/client/inspect/AnnotationSaveNotice.tsx`（保存通知：文案 + “发送到对话” + “查看队列”；本地 `idle/pending/done`，成功后隐藏发送按钮，失败保留重试）；`AnnotationQueue.tsx` 抽出并导出 `sendQueuedAnnotation`（成功才出队、失败保留草稿、无消息回退 `annotation.item.sent`）与 `clipboardSender`，队列与通知共用同一规则；`Canvas.tsx` 的 `queueNotice` 改为 `{kind, annotation}` 并渲染通知（`key` 用标注 id 重置发送状态，历史落盘失败仍只降级文案）；`StudioShell.tsx` 把 composer handoff 同时注入 `PreviewPage`（新增可选 `send` prop，缺省走剪贴板）。两语无新增 key（复用 `annotation.item.send/sending/sent/sendFailed`）。
+- 返工验证：`pnpm typecheck` 0 error；`pnpm test` 60 文件 / **514 用例**（新增 `tests/component/annotation/annotation-save-notice.test.tsx` 7 用例：不自动发送、成功清队列并隐藏按钮、无消息回退剪贴板文案、失败保留队列可重试、发送中禁用、历史失败仍可发送、中文）；`pnpm test:e2e` 9/9；`pnpm build` host 199.8 / client 204.1 KiB。真实 Web 复测（`.tmp/g3/live.mjs` → `.tmp/logs/g3-live.json`，`ok:true`）：动作 `pick-element → save-bubble → send-now`（从点元素算 **3 个**，含开启拾取 4 个），composer 4,095 B ≤ 4,096，保存后 composer 空、发送后 4 s 逐字节不变、面板外 marker 0、发送后队列 0 条、console 0。
+- 环境：评审与复测写入的 `.vibe/annotations/*.json` 与空 `.vibe/` 已删除；4320/4338 无监听残留、无 Playwright Edge 残留（在跑的 msedge 为用户 21:40 自启的默认 profile）；真实 `desktop` profile 未触碰。脚本 `.tmp/g3/{source-sample.ts,budget.ts,live.mjs}` 非产品代码。
+- 结论：**4 项验收全部通过，G3 GO**；第 3 项按用户确认口径“点元素 → 保存 → 发送 = 3 次点击”达标，开启拾取仍为额外 1 次点击。遗留：composer 截断无提示、`fixtures/vite-basic` `source: null`、通知与队列发送互不感知进行中状态。未开始 M4。
+
+### 整体稳定性审查（2026-10-29，只读，未改产品代码）
+
+- 背景：M1–M3 已逐任务验收，但未做过一次跨模块整体核对；本次按用户要求检查“功能之间是否冲突、是否有依赖错误、整体是否稳定并符合设计要求”。审查期不改 `src/`、配置、依赖或 profile，发现的问题先记录、返工与否交用户决定。
+- 方法（四类证据）：
+  - 基线：`pnpm typecheck` 0 error；`pnpm test` 60 文件 / 514 用例；`pnpm build` host 199.8 / client 204.1 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/audit/logs/{typecheck,test-full-*,build,e2e}.log`。
+  - 静态审计（`.tmp/audit/static-audit.mjs`）：一元方法接线（contracts 常量 ↔ host `registry.register` ↔ client 调用方）、i18n key 对等与使用、import 图（方向/环/裸依赖）、护栏 grep（`ctx.webServer`、`dangerouslySetInnerHTML`、client console）。
+  - 运行时冒烟（`.tmp/audit/smoke.mjs`）：`vibe-dev` + headless Edge 走完五个页签、拾取→保存→通知发送、跨页签队列/历史、重复拾取、设置→预览、Console/Network 抽屉、停止；结束后自清理 `.vibe`。
+  - 依赖与隔离：`engines.dsh` 对照安装版本；只读核对三个 profile 的插件链接。
+- 结果：
+  - 静态：73 文件 / 279 边，**0 环、0 方向违规、0 未声明依赖**；23 个一元方法全部在 host 注册（`studio.ping` 无客户端调用者为设计）；en=zh=184，无缺失/空值，未使用 key 经逐条核对均为动态拼接；`ctx.webServer` 0、`dangerouslySetInnerHTML` 0、client console 0。
+  - 运行时（`.tmp/audit/logs/smoke.json`，`ok:true`）：5 页签全部渲染且 `errorBoundary:false`；拾取→保存后 composer 仍为空（不自动发送），通知为“已加入标注队列 / 发送到对话 / 查看队列”；切到标注页签后队列 1 条、徽标 1、历史 1 条；从队列发送后 composer 含标记、队列 0；历史重开入队、两步删除后 0；设置“预览”读到 1280×720 并提示“已应用到运行中的预览。”；Console/Network 抽屉可开；停止后 `state:"idle"`；`consoleErrors: []`。
+  - 依赖：安装 `@deepseek-ai/dsh` 0.2.1-rc.2，满足 `engines.dsh >=0.2.1-rc.2`；运行时仅 import `@deepseek-ai/schemastery`（已声明）。
+  - 隔离：只有 `vibe-dev` 链接本插件并列入 `dsh.profile.bundles`；`desktop`/`web` 零引用。
+- 发现（未改代码，待用户决定）：
+  - 中：Windows 下 `annotation-store.save()` 覆盖既有文件时 `rename` 偶发 `EPERM`（3 次全量中 1 次失败，单文件连跑 5 次全过）。影响仅历史落盘，UI 已有“已加入队列，但没能保存到历史。”降级，队列与发送不受影响。已在同次返工中加有界重试（见下）。
+  - 低：拾取模式在切换页签后仍保持（Host 持有），返回预览页时开关仍为按下——目标默认 headless，影响有限，但缺“离开即暂停”的选择。
+  - 低：保存通知在切走预览页签后消失（队列/历史已保留该条），用户切回看不到刚保存的反馈。
+  - 低：`.vibe` 根目录取 `process.cwd()`（`src/host/index.ts` 已有 TODO），从别的目录启动 DSH 时历史会落到启动目录；同一次运行内一致。
+  - 低（已知）：`retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 已解析但尚未消费（DEVLOG 已记）；`newAnnotationId` 在同一毫秒、两个客户端并发时理论可重（id 去重会挡重复入队）。
+  - 信息：composer 中的标注文本为英文结构化格式，属 SPEC“注释用英文；UI 文案 zh/en 分离”的设计，不是本地化缺陷。
+- 返工（用户批准，2026-10-29，仅加固 EPERM 重试）：`src/host/inspect/annotation-store.ts` 把 `rename` 抽成可注入的 `RenameFile`（`AnnotationStoreOptions.renameFile`，生产默认 `fs.rename`），新增 `replaceFile()`：对 `EPERM`/`EBUSY`/`EACCES` 最多重试 4 次（20/50/100/200 ms，共 5 次尝试），其余错误立即抛出；临时文件清理与 `io` 错误映射不变。`createAnnotationStore(projectDir, options?)` 透传可选参数。新增 3 个单测：连续 2 次 EPERM 后成功（`attempts=3`）、EBUSY 持续失败有界退避后报 `io` 且旧文件与目录保持不变（`attempts=5`）、`ENOENT` 不重试（`attempts=1`）。验证：`pnpm typecheck` 0 error；单文件 5 连跑 13/13；`pnpm test` 3 连跑 **60 文件 / 517 用例全过**；`pnpm build` host 200.6 / client 204.1 KiB；`pnpm test:e2e` 9/9。未动其余低风险项。
+- 清理：冒烟写入的 `.vibe/annotations/*.json` 与空 `.vibe/` 已删除；4320/4338 无监听残留、无 Playwright Edge 残留；真实 `desktop`/`web` profile 未触碰。脚本与日志在 `.tmp/audit/`，不入库。
+
+### 文档 — M3 手动测试手册（2026-10-29，仅文档）
+
+- 背景：M2 已有 `docs/2026-10-28-手动测试手册.md`，M3（T027–T034）只在 `tasks/todo.md` 与 DEVLOG 里留有验收记录，用户按同一结构补一份可自测的手册。
+- 产出：新增 `docs/2026-10-29-M3手动测试手册.md`（约 35–45 分钟，单次完整复测）：一次性准备（`pnpm install`/`build`、profile 链接核对与 `link:` 兜底）、启动（4320 fixture、可选 4321/4322/4323 三框架源码 fixture、`vibe-dev` 4317）、分组流程（拾取开关与 Alt+Click、拾取/卡片/气泡、意见输入与保存通知、通知“发送到对话”、队列、历史含坏文件注入、源码适配、4 KB 预算测量、清理）、测试表 K/X/S/A/N/Q/H/B/L（共 50 项）、G3 四项验收映射与 T027–T034 覆盖表、易误判的正常行为、排障、结果记录模板（`.tmp/logs/manual-2026-10-29-m3.md`）。
+- 口径：所有步骤对照当前实现（组件文案、`data-vibe-*` 钩子、Host 侧规则）编写；明确“拾取模式保存后仍保持”“通知切页签后消失但队列/历史保留”“队列仅内存、F5 清空而历史落盘”“3 动作不含开启拾取”“`fixtures/vite-basic` 无源码属设计”“2,000 字中文意见在 composer 被截到约 1,617 字且无提示”等易误判点。
+- 验证：仅文档改动，未改 `src/`、测试、依赖或 profile，故不重跑 typecheck/单测/build/e2e；手册内命令按当前 `package.json` 脚本与 `tests/e2e/source-adapters.spec.ts` 的真实启动方式核对。
+- 同步：`README.md` 状态句、导航链接、M3 完成条目与“下一步 T035”均已更新并链到新手册。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -560,6 +683,20 @@
 30. **Vue inspector 的 DOM 属性运行时不存在**：`data-v-inspector` 被 `vite-plugin-vue-inspector` 移入 vnode 不可枚举 prop `__v_inspector` 并删除属性；读 DOM 属性会全部失败，应读 `el.__vnode` / `__vue_inspector_store__.vnodeToPos`。
 31. **Svelte 源码只在 dev**：`__svelte_meta` 由 dev 运行时 `assign_location` 设置，生产构建没有；产品里必须能显示“源码不可用”。
 
+### 源码适配 / Vite 测试
+
+1. **Vite JS API 不会重置 `NODE_ENV`**：同一 Node 进程里先 `createServer()` 会把 `process.env.NODE_ENV` 固定为 `development`（只在未设置时才给默认值），随后 `build()` 解析出的 `config.isProduction` 仍是 false，`@vitejs/plugin-vue` 继续注入 `__file`、Svelte 插件继续编译 dev 的 `__svelte_meta`——“生产产物带源码”。测试里在 `createServer`/`build`/`preview` 前后显式设置并恢复 `NODE_ENV`；单独跑生产用例时不会暴露（首次 build 自己设成 production）。
+2. **序列化适配器同样禁止模块常量**：`reactSource/vueSource/svelteSource` 和 T027/T028 的页面函数一样用 `toString()` 进页面，`MAX_*` 与 `cleanFile`/`position` 等辅助函数必须写在函数体内；页面里找不到就是 ReferenceError。
+3. **`Object.keys` 只列 enumerable 自有属性**：React 的 `__reactFiber$*`、Vue 的 `__vnode` 运行时是普通赋值（enumerable），jsdom 测试用 `Object.defineProperty` 伪造时必须传 `enumerable: true`，否则适配器看不到。
+4. **`preview()` 的 `PreviewOptions` 没有 `outDir`**：传 `preview.outDir` 会 TS2345；把 `build.outDir` 以内联 config 同时传给 `build()` 和 `preview()`，二者都按 `build.outDir` 找静态文件。
+
+### 标注存储 / 文件
+
+1. **`lstat` 的 symlink 判断要放在 `isFile()` 之前**：`lstat` 对符号链接返回 link 类型，`isFile()` 为 false；先判 `!isFile()` 会让 symlink 分支永远不可达。正确顺序是 `!info || info.isSymbolicLink() || !info.isFile()`，再 realpath 校验仍在目录内。
+2. **用户项目里的 `.vibe` 不可信**：它可能是指向项目外的 junction（Windows）或 symlink。写前 `mkdir` 后对 `.vibe/annotations` 做 `realpath` 并与项目 realpath 比较；读时先拒绝链接目录，再对每个文件 realpath 比较，防止借链接读到任意路径。
+3. **一条坏标注不能拖垮整个历史**：`read` 对坏 JSON/形状非法/超限文件返回 `null`，`list` 逐个 `try` 跳过，只让真正的 IO 错误（以及越界链接）抛出。
+4. **文件大小在解析前就要卡住**：先 `lstat().size` 挡住超大文件，读入后再按 UTF-8 字节复核（防读取期间被写大），避免 `JSON.parse` 吃进任意大小输入。
+
 ### 预览 / 浏览器
 
 32. **进程检查会匹配到自己**：用 `CommandLine -like '*playwright_chromiumdev_profile*'` 查残留时，执行检查的 shell/PowerShell 自身也含该字符串，会误报。必须同时限定 `name='msedge.exe'`（或进程名）并匹配 `--user-data-dir=*playwright_chromiumdev_profile*`。
@@ -567,6 +704,15 @@
 34. **`playwright-core` 必须懒加载且保持 external**：host 用 `packages: 'external'` 打包，动态 `import()` 留在产物里；模块加载不依赖浏览器，缺失时由 `launchEdge` 转成 `target_unavailable`，避免插件启动即崩。打包任务需把它从 devDependency 提升为运行时依赖。
 35. **`fetch` 不能脱离 `window` 调用**：`const f = window.fetch; f(url)` 在 Chromium 抛 `TypeError: Illegal invocation`，而 Node/测试的注入实现不会暴露；`PreviewTransport` 默认改为 `(input, init) => fetch(input, init)`。Web 手测两条通道同时“静默无帧”时先查这里。
 36. **Electron 的 `dsh-app://` 支持流式响应**：Desktop 的手测里 multipart `/api/vibe/stream` 正常持续出帧（25.7 fps），未退化到 pull；但 headless Edge 的 Web 手测才是断流回退的主证据。
+
+### 标注 UI / 客户端状态
+
+1. **跨页签状态放模块级 store**：气泡在预览页、队列在标注页签，两者互斥挂载；状态放进任一组件都会随切换丢失。用模块级数组 + `useSyncExternalStore`（快照在变更前保持同一引用、无变更不发通知），壳层的 tab 徽标与队列列表读同一份数据。
+2. **气泡定位不必读 canvas DOM**：舞台框由 `stageSize` + `fitContain` 计算后 flex 居中，元素 `box` 按 `frame/viewport` 缩放即可换算到屏幕坐标；把夹紧/翻转变成一个纯函数 `placeBubble`，几何用例不必挂载组件。
+3. **发送失败必须保留草稿**：只有 `await send()` 成功后才从队列删除；失败显示 `role=alert` 并保留条目，避免用户意见因一次剪贴板/传输失败而丢失。
+4. **空态不能提前 return**：队列清空的同一渲染里还要显示“发送成功”反馈；若在 `queue.length === 0` 时直接返回 `EmptyState`，反馈会被丢掉。改成始终渲染容器、只条件渲染列表与底部提示。
+5. **`pnpm test -- <path>` 在本仓库不过滤**：`--` 之后的路径会被当成重复参数，vitest 仍跑全量。只跑目录用 `pnpm exec vitest run <path>`（HANDOFF §9 已记录，T031 再次踩到）。
+6. **闭环入口要放在用户动作的落点**：预览页签与标注页签互斥，保存通知是唯一“刚发生且可见”的位置；把“发送到对话”放在通知里，动作从 4–5 个压到 3 个（点元素 → 保存 → 发送）。G3 初评的“≤3 步”失败正是因为入口藏在另一个页签。发送规则（成功才出队、失败保留草稿、无消息回退剪贴板文案）抽成 `sendQueuedAnnotation` 供队列与通知共用，避免两处行为漂移；通知用 `key={annotation.id}` 重置本地发送状态，防止上一条的结果串到下一条。
 
 ## 4. 已改变的计划假设
 
@@ -592,6 +738,11 @@
 - **T024 已完成**：Network 事件采集（4xx/5xx 标记、header/URL 脱敏、300 条 / 256 KiB 上限、body 按需 64 KiB 截断）、revision 游标增量轮询与网络抽屉（原位更新、Failed 过滤、body 懒加载）均通过集成与组件测试；T025 已在隔离 Desktop 确认抽屉有数据。
 - **T025 已完成**：工具栏 navigate/reload/viewport/外部打开、崩溃提示与显式重启、内部切 tab 保会话、停止后 5 s 内进程全退且无孤儿，Host 真 Edge 与隔离 Desktop 均 `ok:true`；证据 `.tmp/logs/t025-{host,desktop}.json`。限制：崩溃不自动重连、改 DPR 需重启。
 - **T026（M2）**：G2 Preview 评审，复核闭环/性能（10 fps、输入、Console/Network、停止清理）与 SPEC 条目。T020/T021 已接好预览会话与输入覆盖层；T008 的 `retentionDays`/`contextBudgetBytes`/`screenshotEnabled` 将随截图与上下文任务逐步消费；T009 的 contracts 由后续页面逐步引用。
+- **T027–T029 已完成**：拾取 overlay/选择器、元素上下文（text/html/role/name/visible）、三框架源码适配（React `data-inspector` → fiber、Vue `__v_inspector` → `data-v-inspector` → `__file`、Svelte `__svelte_meta`），页面数据全部在 Host 侧重新校验。`fixtures/source/*` e2e 在三框架 dev 各 30/30 命中，生产构建 30/30 回退为 `source: null` 且无错误。限制：源码行依赖目标项目 dev 构建的插件，生产态只显示“无源码信息”。
+- **T030 已完成**：`.vibe/annotations/<id>.json` 一条标注一个文件，保存前校验并限 64 KiB、原子替换；读取把坏数据当缺失、列表跳过，越界 junction/symlink 拒绝；渲染往返仍 ≤ 4 KB 且不可信包裹完整。限制：尚未接入 host 服务/工具与历史 UI（T031/T033）。
+- **T031 已完成**：预览页拾取后在元素旁弹气泡，保存进入侧栏队列（模块级 store，tab 带数量徽标），支持编辑/取消/发送/移除与空态；发送只在点击时发生，默认复制 `renderAnnotationText`，发送器可注入给 T032 接 composer。限制：队列不落盘（T033）、未做 `vibe-dev` 手测（G3）。
+- **T032 已完成**：`src/client/inspect/handoff.ts` 通过 `conversation.input.left` 的作用域 slot 取公开 `inputActions`，按会话保存 composer 快照；标注文本用 `captureInsertion` + `insertText` 插入草稿（已有草稿前置 `\n\n`），只有 `insertText` 明确返回 `false` 才退回 `setDraft`，抛错或无 composer 时回退剪贴板；`insertText`/`setDraft` 都不触发提交。`StudioShell` 把发送器注入 `AnnotationQueue`，状态提示区分“已插入对话草稿”与“已复制到剪贴板”。`pnpm test` 57 文件 / 466 用例、`pnpm build` host 192.8 / client 184.7 KiB；Web（`.tmp/logs/t032-web.json`）与隔离 Desktop（`.tmp/logs/t032-desktop.json`）均 `ok:true`：草稿含完整标注、面板外 0、3 s 后未自动提交、新会话为空且切回原会话草稿仍在、停止后 Edge 全退、真实 profile 未改。限制：附件未接（S2 无公开附件 API）；隔离 Desktop 载体无法新建会话，跨会话隔离以 Web + 组件测试为准。
+- **T033 已完成**：标注历史以 `.vibe/annotations` 为唯一事实源，`AnnotationHistoryService` 提供 `annotation.history.{list,get,save,remove}` 四个一元方法（列表返回摘要 + `total` + `skipped`，搜索大小写不敏感并覆盖中文）；侧栏标注页签在队列下方展示历史，可搜索、重新打开（仅入队，不发送）、两步确认删除；气泡保存与队列编辑都会写穿历史，写失败只降级提示。`pnpm test` 59 文件 / 507 用例、`pnpm build` host 199.8 / client 202.1 KiB；手动 `.tmp/logs/t033-history.json` `ok:true`：写入 2 条 → 搜到 1 条 → 重开入队未发送 → 停 Host 写入坏文件 → 重启仍 2 条且提示跳过 1 → 删除 1 条生效，面板 0 异常。限制：客户端 store 名为 `history-store.ts`（大小写冲突）；搜索全量过滤后再截断，未分页。
 - **S2 遗留**：如果上游未来公开附件创建/释放 API，再评估直接截图附件；先复测切会话保留和失败清理。
 - **Desktop 遗留**：S2 跨会话未测到，后续需要能稳定创建第二个命名会话的测试环境。
 - **成本**：避免无必要的全仓读取和重复验收；每个任务完成即提交、记录、清理进程。
@@ -627,7 +778,10 @@ pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 - S8 进程生命周期：[REPORT](../spikes/s8/REPORT.md)、[run.ts](../spikes/s8/run.ts)；原始数据 `.tmp/logs/s8-results.json`。
 - 任务与验收：[todo.md](../tasks/todo.md)。
 - 测试 harness：`vitest.config.ts`、`playwright.config.ts`、`fixtures/vite-basic/`、`tests/e2e/fixture.spec.ts`。
+- 源码适配：`src/host/inspect/source/`、`fixtures/source/{react,vue,svelte}/`、`tests/e2e/source-adapters.spec.ts`、`tests/unit/inspect-context/source.test.ts`。
 - 配置存储：`src/host/studio/store.ts`、`tests/unit/studio-store.test.ts`。
+- 标注存储：`src/host/inspect/annotation-store.ts`、`src/contracts/annotation.ts`、`tests/unit/annotation/annotation-store.test.ts`、`tests/unit/contracts/annotation.test.ts`。
+- Composer handoff：`src/client/inspect/handoff.ts`、`tests/component/annotation/composer-handoff.test.tsx`、`.tmp/logs/t032-{web,desktop}.json`。
 - Web 预览：`src/host/targets/web/{adapter,launch}.ts`、`tests/integration/web-adapter/`、`tests/helpers/png.ts`。
 - 预览生命周期：`src/host/preview/session.ts`、`src/client/preview/{Toolbar.tsx,lifecycle.ts,local-url.ts}`、`tests/integration/preview/session-lifecycle.test.ts`、`.tmp/logs/t025-{host,desktop}.json`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。

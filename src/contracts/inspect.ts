@@ -27,9 +27,14 @@ export interface ElementContext {
   readonly tag: string
   readonly id: string | null
   readonly classes: readonly string[]
+  /** Explicit or implicit ARIA role, e.g. `button`; null when unknown. */
   readonly role: string | null
+  /** Accessible name, not the `name` attribute. */
+  readonly name: string
   readonly text: string
   readonly html: string
+  /** Whether the element had a non-zero box and was not CSS-hidden. */
+  readonly visible: boolean
   readonly box: ElementBox
   readonly source: SourceContext | null
 }
@@ -79,8 +84,10 @@ export function isElementContext(value: unknown): value is ElementContext {
     Array.isArray(value.classes) &&
     value.classes.every((entry) => typeof entry === 'string') &&
     (value.role === null || typeof value.role === 'string') &&
+    typeof value.name === 'string' &&
     typeof value.text === 'string' &&
     typeof value.html === 'string' &&
+    typeof value.visible === 'boolean' &&
     isElementBox(value.box) &&
     (value.source === null || isSourceContext(value.source))
   )

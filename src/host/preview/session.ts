@@ -39,7 +39,10 @@ import {
   type PreviewSessionState,
   type PreviewStartParams,
   type PreviewTargetsResult,
+  type PickSnapshot,
 } from '../../contracts/transport'
+import type { PreviewPicker } from '../inspect/inject'
+import { createPreviewPicker } from '../inspect/inject'
 import type { TargetAdapter } from '../targets/types'
 import { validateTargetConfig } from '../targets/validate'
 import type { TargetAdapterRegistry } from '../targets/registry'
@@ -85,6 +88,12 @@ export interface PreviewService {
   reload(): Promise<PreviewSessionSnapshot>
   /** Resizes the live viewport; DPR needs a restart (T025). */
   setViewport(params: unknown): Promise<PreviewSessionSnapshot>
+  /** Turns the in-page picker overlay on (T027). */
+  pickStart(): Promise<PickSnapshot>
+  /** Turns it off; safe to call when no preview runs. */
+  pickStop(): Promise<PickSnapshot>
+  /** Polled by the panel while a pick is pending (T027). */
+  pickStatus(): PickSnapshot
   dispose(): Promise<void>
 }
 
@@ -109,6 +118,10 @@ export interface PreviewServiceOptions {
   readonly createNetwork?: (
     page: NonNullable<ReturnType<NonNullable<TargetAdapter['screencastPage']>>>,
   ) => PreviewNetworkCollector
+  /** Test seam: substitutes the injected picker (T027). */
+  readonly createPicker?: (
+    page: NonNullable<ReturnType<NonNullable<TargetAdapter['screencastPage']>>>,
+  ) => PreviewPicker
 }
 
 function toPreviewError(error: unknown): StudioError {
@@ -142,6 +155,7 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
   let inputSupported = false
   let consoleCollector: PreviewConsoleCollector | undefined
   let networkCollector: PreviewNetworkCollector | undefined
+  let picker: PreviewPicker | undefined
   let targetId: string | null = null
   let kind: TargetKind | null = null
   let url: string | null = null
@@ -197,6 +211,10 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     inputDispatcher = undefined
     inputSupported = false
     if (activeInput) await activeInput.stop().catch(() => undefined)
+    // The picker holds its own CDP session and a page binding.
+    const activePicker = picker
+    picker = undefined
+    if (activePicker) await activePicker.dispose().catch(() => undefined)
     const activeAdapter = adapter
     adapter = undefined
     if (activeAdapter) await activeAdapter.stop().catch(() => undefined)
@@ -313,6 +331,21 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
       }
     }
 
+    // Picking degrades like the other auxiliary capabilities: a page that
+    // refuses the injected script loses the button, not the preview.
+    let pickReady = false
+    if (session.capabilities.pick) {
+      let createdPicker: PreviewPicker | undefined
+      try {
+        createdPicker = options.createPicker?.(page) ?? createPreviewPicker({ page })
+        await createdPicker.install()
+        picker = createdPicker
+        pickReady = true
+      } catch {
+        await createdPicker?.dispose().catch(() => undefined)
+      }
+    }
+
     targetId = session.targetId
     kind = session.kind
     url = session.url
@@ -321,6 +354,7 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
       ...session.capabilities,
       ...(session.capabilities.console && !consoleReady ? { console: false } : {}),
       ...(session.capabilities.network && !networkReady ? { network: false } : {}),
+      ...(session.capabilities.pick && !pickReady ? { pick: false } : {}),
     }
     state = 'ready'
     return snapshot()
@@ -422,6 +456,8 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     }
     await active.navigate(params.url)
     url = params.url.trim()
+    // The new document runs a fresh, idle picker script.
+    picker?.reset()
     return snapshot()
   }
 
@@ -436,6 +472,7 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
         capability: 'reload',
       })
     }
+    picker?.reset()
     return snapshot()
   }
 
@@ -476,6 +513,43 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     await active.setViewport(applied)
     viewport = applied
     return snapshot()
+  }
+
+  const IDLE_PICK: PickSnapshot = Object.freeze({
+    active: false,
+    seq: 0,
+    pick: null,
+    ts: null,
+  })
+
+  function requirePicker(): PreviewPicker {
+    if (state !== 'ready') throw notRunning()
+    if (!picker) {
+      throw studioError('unsupported', 'vibe-studio: element picking is unavailable', {
+        capability: 'pick',
+      })
+    }
+    return picker
+  }
+
+  async function pickStart(): Promise<PickSnapshot> {
+    const active = requirePicker()
+    await active.activate()
+    return active.snapshot()
+  }
+
+  async function pickStop(): Promise<PickSnapshot> {
+    // Stop is idempotent: the panel calls it from a finally block that may run
+    // after the session was stopped or crashed.
+    if (state !== 'ready' || !picker) return IDLE_PICK
+    const active = picker
+    await active.deactivate()
+    return active.snapshot()
+  }
+
+  function pickStatus(): PickSnapshot {
+    if (state !== 'ready' || !picker) return IDLE_PICK
+    return picker.snapshot()
   }
 
   async function start(params: PreviewStartParams): Promise<PreviewSessionSnapshot> {
@@ -534,6 +608,9 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     navigate,
     reload,
     setViewport,
+    pickStart,
+    pickStop,
+    pickStatus,
     async dispose() {
       await stop()
     },
