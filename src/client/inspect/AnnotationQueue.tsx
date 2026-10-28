@@ -268,6 +268,11 @@ export interface AnnotationQueueProps {
   readonly locale?: Locale
   /** Injectable handoff; defaults to the clipboard fallback until T032. */
   readonly send?: AnnotationSender
+  /**
+   * Optional history write-through; the shell injects the T033 saver. Edits
+   * stay valid in the queue even when persistence fails.
+   */
+  readonly persist?: (annotation: Annotation) => Promise<boolean>
 }
 
 /**
@@ -278,6 +283,7 @@ export interface AnnotationQueueProps {
 export function AnnotationQueue({
   locale,
   send = defaultSender,
+  persist,
 }: AnnotationQueueProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
   const queue = useAnnotationQueue()
@@ -298,10 +304,18 @@ export function AnnotationQueue({
       setEditWarned(true)
       return
     }
-    if (updateQueuedAnnotation(id, draft)) {
-      setEditingId(null)
-      setEditWarned(false)
-    }
+    const current = queue.find((entry) => entry.id === id) ?? null
+    if (!updateQueuedAnnotation(id, draft)) return
+    setEditingId(null)
+    setEditWarned(false)
+    if (!persist || !current) return
+    const updated: Annotation = { ...current, comment: draft.trim() }
+    setFeedback(null)
+    void persist(updated).then((saved) => {
+      if (!saved) {
+        setFeedback({ kind: 'error', message: t('annotation.history.saveFailed') })
+      }
+    })
   }
 
   const handleSend = async (annotation: Annotation): Promise<void> => {

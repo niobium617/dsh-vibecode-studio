@@ -32,6 +32,7 @@ import {
 import { createTranslator, type Locale } from '../i18n'
 import { AnnotationBubble, placeBubble } from '../inspect/AnnotationBubble'
 import { addAnnotationToQueue, createElementAnnotation } from '../inspect/AnnotationQueue'
+import { persistAnnotation } from '../inspect/history-store'
 import { PickCard, usePicker } from '../inspect/Picker'
 import { setActiveTab } from '../shell/store'
 import { callUnary } from '../transport/client'
@@ -267,7 +268,8 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
   const [stats, setStats] = React.useState<PreviewTransportStats | null>(null)
   const [stageSize, setStageSize] = React.useState<StageSize | null>(null)
   const [drawer, setDrawer] = React.useState<PreviewDrawerKind | null>(null)
-  const [queueNotice, setQueueNotice] = React.useState(false)
+  // `unsaved` means the note is in the queue but the history file was not written.
+  const [queueNotice, setQueueNotice] = React.useState<'saved' | 'unsaved' | null>(null)
   const [consoleCounts, setConsoleCounts] = React.useState<ConsoleCounts>({
     total: 0,
     errors: 0,
@@ -297,7 +299,7 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
 
   // A fresh pick reopens the comment bubble and hides the previous confirmation.
   React.useEffect(() => {
-    if (pickedElement !== null) setQueueNotice(false)
+    if (pickedElement !== null) setQueueNotice(null)
   }, [pickedElement])
 
   const stageRef = React.useRef<HTMLDivElement | null>(null)
@@ -707,17 +709,26 @@ export function PreviewPage({ locale }: PreviewPageProps): React.ReactElement {
                 element: pickedElement,
               })
               if (addAnnotationToQueue(annotation)) {
-                setQueueNotice(true)
+                setQueueNotice('saved')
                 picker.dismiss()
+                // History is a local record only; a failure never blocks the
+                // queue, it just downgrades the notice.
+                void persistAnnotation(annotation).then((saved) => {
+                  if (!saved) setQueueNotice('unsaved')
+                })
               }
             }}
             onCancel={picker.dismiss}
           />
         ) : null}
 
-        {queueNotice ? (
+        {queueNotice !== null ? (
           <div data-vibe-annotation-notice="1" role="status" style={noticeStyle}>
-            <span>{t('annotation.bubble.saved')}</span>
+            <span>
+              {queueNotice === 'unsaved'
+                ? t('annotation.history.saveFailed')
+                : t('annotation.bubble.saved')}
+            </span>
             <button
               type="button"
               data-vibe-annotation-view="1"

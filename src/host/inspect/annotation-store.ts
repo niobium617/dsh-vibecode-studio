@@ -27,6 +27,12 @@ export const ANNOTATION_DIR_NAME = 'annotations'
 export const ANNOTATION_FILE_EXT = '.json'
 export const MAX_ANNOTATION_FILE_BYTES = 64 * 1024
 
+export interface AnnotationListResult {
+  readonly annotations: Annotation[]
+  /** `.json` files with a valid id stem that read as invalid or missing. */
+  readonly skipped: number
+}
+
 export type AnnotationStoreErrorCode =
   | 'invalid_project_path'
   | 'project_missing'
@@ -163,11 +169,20 @@ export class AnnotationStore {
 
   /** All readable annotations, newest first; bad files are skipped. */
   async list(): Promise<Annotation[]> {
+    return (await this.listWithIssues()).annotations
+  }
+
+  /**
+   * `list()` plus a count of files that look like annotations but could not be
+   * read, so the panel can say data was skipped instead of silently losing it.
+   */
+  async listWithIssues(): Promise<AnnotationListResult> {
     try {
       const dir = await this.existingDir()
-      if (!dir) return []
+      if (!dir) return { annotations: [], skipped: 0 }
       const entries = await readdir(dir, { withFileTypes: true })
       const found: Annotation[] = []
+      let skipped = 0
       for (const entry of entries) {
         if (!entry.isFile()) continue
         if (!entry.name.endsWith(ANNOTATION_FILE_EXT)) continue
@@ -175,8 +190,9 @@ export class AnnotationStore {
         if (!isAnnotationId(id)) continue
         const annotation = await this.readFile(dir, entry.name)
         if (annotation) found.push(annotation)
+        else skipped += 1
       }
-      return found.sort(byNewest)
+      return { annotations: found.sort(byNewest), skipped }
     } catch (error) {
       if (error instanceof AnnotationStoreError) throw error
       throw new AnnotationStoreError(

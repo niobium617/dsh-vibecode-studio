@@ -63,6 +63,11 @@ export const PREVIEW_NETWORK_BODY_METHOD = 'preview.network.body'
 export const PREVIEW_PICK_START_METHOD = 'preview.pick.start'
 export const PREVIEW_PICK_STOP_METHOD = 'preview.pick.stop'
 export const PREVIEW_PICK_STATUS_METHOD = 'preview.pick.status'
+/** Annotation history (T033); persistence lives in `.vibe/annotations`. */
+export const ANNOTATION_HISTORY_LIST_METHOD = 'annotation.history.list'
+export const ANNOTATION_HISTORY_GET_METHOD = 'annotation.history.get'
+export const ANNOTATION_HISTORY_SAVE_METHOD = 'annotation.history.save'
+export const ANNOTATION_HISTORY_REMOVE_METHOD = 'annotation.history.remove'
 
 /** Unary requests carry input events and small commands; 64 KiB is ample. */
 export const MAX_UNARY_BODY_BYTES = 64 * 1024

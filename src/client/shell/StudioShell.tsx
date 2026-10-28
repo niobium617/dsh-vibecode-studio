@@ -6,6 +6,8 @@
 import * as React from 'react'
 import { browserLocale, createTranslator, type Locale } from '../i18n'
 import { AnnotationQueue, useAnnotationQueue } from '../inspect/AnnotationQueue'
+import { AnnotationHistory } from '../inspect/History'
+import { persistAnnotation } from '../inspect/history-store'
 import { createComposerHandoffSender } from '../inspect/handoff'
 import { PreviewPage } from '../preview/Canvas'
 import { stopPreviewSession } from '../preview/lifecycle'
@@ -139,7 +141,10 @@ export function StudioShell({ locale }: StudioShellProps): React.ReactElement {
           ) : current.id === 'preview' ? (
             <PreviewPage locale={activeLocale} />
           ) : current.id === 'annotations' ? (
-            <AnnotationQueue locale={activeLocale} send={handoff} />
+            <>
+              <AnnotationQueue locale={activeLocale} send={handoff} persist={persistAnnotation} />
+              <AnnotationHistory locale={activeLocale} />
+            </>
           ) : (
             <EmptyState title={t('state.empty.title')} body={t(current.emptyKey)} />
           )}
