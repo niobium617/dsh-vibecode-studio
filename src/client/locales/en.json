@@ -120,6 +120,7 @@
   "annotation.item.send": "Send to chat",
   "annotation.item.sending": "Sending…",
   "annotation.item.sent": "Copied to the clipboard — paste it into the chat.",
+  "annotation.item.inserted": "Inserted into the chat draft — nothing was sent.",
   "annotation.item.sendFailed": "Could not send this annotation. Try again.",
   "annotation.item.noElement": "No element context",
   "annotation.item.editEmpty": "The comment cannot be empty.",

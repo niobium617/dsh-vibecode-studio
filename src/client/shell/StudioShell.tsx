@@ -6,6 +6,7 @@
 import * as React from 'react'
 import { browserLocale, createTranslator, type Locale } from '../i18n'
 import { AnnotationQueue, useAnnotationQueue } from '../inspect/AnnotationQueue'
+import { createComposerHandoffSender } from '../inspect/handoff'
 import { PreviewPage } from '../preview/Canvas'
 import { stopPreviewSession } from '../preview/lifecycle'
 import { SettingsPage } from './settings/SettingsPage'
@@ -82,6 +83,9 @@ export function StudioShell({ locale }: StudioShellProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(activeLocale), [activeLocale])
   const { activeTab } = useShellState()
   const queuedAnnotations = useAnnotationQueue()
+  // T032: sending lands in the active chat draft (or the clipboard when no
+  // composer is attached); the queue reports which one.
+  const handoff = React.useMemo(() => createComposerHandoffSender(activeLocale), [activeLocale])
   const current =
     STUDIO_TAB_DEFINITIONS.find((tab) => tab.id === activeTab) ??
     STUDIO_TAB_DEFINITIONS.find((tab) => tab.id === DEFAULT_TAB)!
@@ -135,7 +139,7 @@ export function StudioShell({ locale }: StudioShellProps): React.ReactElement {
           ) : current.id === 'preview' ? (
             <PreviewPage locale={activeLocale} />
           ) : current.id === 'annotations' ? (
-            <AnnotationQueue locale={activeLocale} />
+            <AnnotationQueue locale={activeLocale} send={handoff} />
           ) : (
             <EmptyState title={t('state.empty.title')} body={t(current.emptyKey)} />
           )}
