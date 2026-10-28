@@ -266,7 +266,7 @@
   - 帧率约 25 fps 不下降；浏览器 console 0 error。
   - 手动回归 P1–P5、V1–V6、I1–I8、C1–C5、N1–N6、L1–L7、S1–S7（编号见 `docs/2026-10-28-手动测试手册.md`）。
 - **验证**：`pnpm typecheck`、`pnpm test`、`pnpm build`；`vibe-dev` + headless Edge 在 320/400/500px 三档各截图 + 断言；组件测试更新。
-- **文件**：`src/client/preview/{Canvas,PreviewPage,Toolbar}.tsx`、`src/client/shell/settings/*`、`src/client/locales/*.json`、`src/client/preview/*.css`、tests。
+- **文件**：`src/client/preview/{Canvas,Toolbar,PreviewTabs,ConsoleDrawer,NetworkDrawer}.tsx`、`src/client/shell/StudioShell.tsx`、`src/client/shell/settings/{SettingsPage,PreviewSettings}.tsx`、`src/client/locales/*.json`、tests（实现无 CSS 文件，全部内联样式）。
 - **验证结果（2026-10-28）**：
   - 静态检查：`pnpm typecheck` 0 error；`pnpm test` 43 文件 / 319 用例通过（新增 `preview-tabs.test.tsx`、`preview-settings.test.tsx`，重写 toolbar/console/network/studio-shell 用例）；`pnpm build` host 140.5 KiB / client 140.9 KiB。
   - 真实载体（`.tmp/u01-verify.mjs` → `.tmp/logs/u01-verify.json`，`vibe-dev` + headless Edge 1440×900，右栏强制 320/400/500px，`ok:true`）：三档面板宽均无横向溢出（document/预览根/状态行/地址行 scrollWidth == clientWidth，预览根 scrollHeight == clientHeight）；舞台（画布区域）高 657.6px = 面板 768.6px 的 **85.6% ≥ 60%**，实际位图按 16:9 居中letterbox（320px 宽时位图 304×171 = 22.2%，受几何限制，非布局问题）；常驻行恰 3（工具条/舞台/tab），视口宽高输入 0；抽屉开/关（Console→Network→关）canvas 恒为 304×171；fps 264 帧 / 10.1 s = **26.2 fps**（状态条运行中 · 30 fps 为目标值），≥ 20；点击/键入 `hello`/滚轮 500px 均经 InputLayer 生效；Console 18 条、Network 46 条，tab 标签 `控制台 (17)` / `网络 (42)`；失败态（不可达 4399）显示 3 条检查项 + 重启按钮，重启到良好地址成功；停止后 3086 ms 内 9 个目标 Edge 进程全退、无孤儿、状态回空闲。
