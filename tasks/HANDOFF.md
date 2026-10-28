@@ -60,6 +60,8 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 - 验证：`pnpm typecheck` 0 error、`pnpm test` 43/319、`pnpm build` host 140.5 / client 140.9 KiB；真机 `.tmp/u01-verify.mjs` → `.tmp/logs/u01-verify.json`（`ok:true`）：320/400/500px 无横向溢出、舞台 85.6%、常驻行 3、视口输入 0、抽屉开合 canvas 恒 304×171、26.2 fps、输入生效、Console 18 / Network 46 条、失败卡片 3 检查项 + 重启成功、停止 3086 ms 无孤儿；正常流程 console 0 error。
 - 真机修复：① `pageStyle` 4 个网格行值配 3 个子节点 → 舞台被压成 171px；② Stop 时 host 先释放采集器、状态仍 ready，抽屉 500 ms 轮询得 501 → `busy === 'stop'` 立即停用并关闭抽屉。
 - 遗留：位图在 320px 宽时只能占面板 22.2%（16:9 几何限制，验收按“舞台 ≥60%”记录）；真实中文 IME、外部浏览器跳转、L/S 类手测沿用 T025 结论；失败态测试必然产生 1 条 503 日志（设计性错误响应）。
+- 补充（人工验证反馈，`1aa4f91`）：删掉面板内重复的 `Vibe Studio` 标题与副标题，根网格 3→2 行，舞台多出约 56 px；`shell.subtitle` 从两语 catalog 删除。重跑 `pnpm test` 43/319 全通过。推送至 `origin/task/m2-target-model`，**未合并 main**。
+- 教训：真机手测期间别跑全局进程断言类集成测试（`edge.test.ts` 会把用户预览的 Edge 当残留）。
 
 ### T027 起步提示（U01 完成后）
 
