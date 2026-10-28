@@ -2,7 +2,7 @@
 
 > 更新时间：2026-10-28
 > 用途：清理/切换对话后，新会话从这里恢复，不依赖旧聊天记录。
-> 当前阶段：**Phase 4 实现（M0/G0 已通过，M1 已通过 G1，M2 已通过 G2）**；T001–T026 与 **U01 预览界面精简（Layout v2）** 已完成，下一项 **T027 拾取 overlay 与选择器**。
+> 当前阶段：**Phase 4 实现（M0/G0 已通过，M1 已通过 G1，M2 已通过 G2）**；T001–T026 与 **U01 预览界面精简（Layout v2）** 已完成，并已合并入 `main`（`768e129`）；下一项 **T027 拾取 overlay 与选择器**。
 
 ---
 
@@ -19,7 +19,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 1. [docs/SPEC-vibecoding-studio.md](../docs/SPEC-vibecoding-studio.md) — 需求、可行性、MVP 切分、安全边界。
 2. [docs/CAPABILITY-MAP.md](../docs/CAPABILITY-MAP.md) — 8 个模块、依赖方向、构建顺序。
 3. [tasks/plan.md](./plan.md) — D1–D12 技术决策、M0–M6、G0–G6、S1–S8。
-4. [tasks/todo.md](./todo.md) — 61 个可执行任务、验收、验证命令、文件。
+4. [tasks/todo.md](./todo.md) — 62 个可执行任务（T001–T061 + U01）、验收、验证命令、文件。
 5. [docs/DEVLOG.md](../docs/DEVLOG.md) — 开发进度、踩坑、决策变化与恢复检查清单。
 6. [docs/dsh-plugin-ecosystem-analysis.md](../docs/dsh-plugin-ecosystem-analysis.md) — DSH 插件生态与扩展点依据（需要时查，不必通读）。
 
@@ -45,7 +45,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 2. T001–T015 已完成并记录验证结果；**T005 G0 与 T015 G1 均已通过（GO）**，T006 脚手架、T007 client loader、T008 host Config、T010 client shell 均已在 `vibe-dev` Web 验证，T009 contracts 由 34 个单测覆盖，T011 transport 由 26 个集成用例 + Web/隔离 Desktop 真实载体验证，T012 harness 由 89 个 Vitest 用例 + 3 个 Playwright E2E 覆盖，T013 store 由 10 个用例覆盖，T014 设置面板由 19 个聚焦用例 + 全量 114 用例覆盖并验证保存/同源/重启持久化，T015 完成干净 profile 安装与 Web/Desktop 双端复核。T016 完成 target 契约、配置校验与 adapter 注册表（21 个聚焦用例）。T017 完成 Web target adapter：Edge 启动/导航/截图/关闭 + 稳定错误映射 + loopback 限制，13 个聚焦用例（真实 Edge + fixture）。T018 完成 S8 进程生命周期 spike：启动 ~0.4 s、treekill 无孤儿、`shell:true` 孤儿风险已验证、端口冲突可读，报告 `spikes/s8/REPORT.md`。T019 完成 dev server supervisor：spawn/HTTP 就绪/日志 ring buffer/停止/tree kill/孤儿兜底与端口冲突映射；23 个聚焦用例（全假进程）、171 个全量用例、真实 Vite 手动 `pass: true`。T020 完成 screencast + 帧路由 + canvas：最新帧缓冲、30 fps deadline 限速、stream/pull 双路由、断流回退与恢复、canvas 合并绘制；28 个聚焦用例、199 个全量用例、Web/隔离 Desktop 手动均通过（Web 断流回退 25.3 fps，Desktop 流式 25.7 fps，内存无增长趋势）。T021 完成输入转发：契约严格校验 + host 比例坐标/CDP 串行派发/按钮与 modifiers + unary `preview.input` + client 透明覆盖层/单飞行合并；23 个聚焦用例、222 个全量用例、typecheck/build 通过；手动 Host/Web/隔离 Desktop 端到端最大 26.3/39.3/14.3 ms，焦点、点击、输入、滚动均达目标，Edge 全退且真实 profile 未改。T022 完成中文输入：`{kind:'text'}` 契约、`Input.insertText` + 逐字回退、隐藏 textarea 只提交组合最终文本、点击定位、粘贴回退与限制提示；39 个聚焦用例、238 个全量用例、typecheck/build 通过，Host/Web/隔离 Desktop 均 `ok:true`，提交 `你好，世界` 且无中间态请求，失败提示与恢复、粘贴均验证，端到端最大 15.7/59.6 ms（Web/Desktop），Edge 全退且真实 profile 未改。T023 完成 Console 采集与抽屉：`preview.console.list`/`clear` 一元方法、独立 CDP 会话采集 console/exception、500 条 / 64 KiB ring buffer、`seq` 跨清空单调、`redactUrl` 与 UTF-8 截断、抽屉增量轮询/过滤/清空；22 个聚焦用例、260 个全量用例、typecheck/build 通过，真实 Edge 手测 510 条后恰 500 条、clear 后 seq 不变且新事件续号，`ok:true`。T024 完成 Network 采集与抽屉：`preview.network.list`/`clear`/`body` 一元方法、独立 CDP 会话采集请求/响应、4xx/5xx 标记、header/URL 脱敏、300 条 / 256 KiB ring buffer、revision 游标让 pending 行原位更新、body 按需 64 KiB 截断；27 个聚焦用例、287 个全量用例、typecheck/build 通过；未做真实 Edge 手测。T025 完成预览工具栏与生命周期：contracts 新增 navigate/reload/viewport/targets 一元方法与 `kind` 快照；host 服务迁到 `session.ts`，1 s 健康检查发现断线即 `failed`（不自动重连），重启先释放旧句柄，reload 无实现时回退 navigate，viewport 复用配置校验并保留 DPR；Web adapter 增加 reload/setViewport/isAlive；client 新增 Toolbar、`local-url` loopback 校验与 `lifecycle`（内部 tab 切换不 stop，shell 卸载才 stop），Canvas 1 s 状态轮询 + 500 ms 帧统计，崩溃提示含 Restart/Stop；14 个聚焦用例、301 个全量用例、typecheck/build 通过，Host 真 Edge 与隔离 Desktop 手动矩阵均 `ok:true`（崩溃 101 ms 检出、停止后 4471/3820 ms 进程全退、无孤儿、真实 profile 未改），T023/T024 抽屉已在真实载体确认。T026 G2 Preview 评审 **通过（GO）**：基线 typecheck 0 error、301 用例、build host 140.5 / client 115.1 KiB；Host 真 Edge、Web（`vibe-dev` + headless Edge）与隔离 Desktop 三端均在 1280×800 实测 24.4–25.9 fps，点击/输入/滚动、Console/Network 抽屉、停止清理（1357/2940/4886 ms、无孤儿）全部通过，真实 desktop profile 哈希未变。**M1 完成；M2 完成并通过 G2。U01 预览界面精简（Layout v2）已完成**：预览页改为单行状态 + 单行地址 + 底部常驻 tab，视口输入移入设置页“预览”分组，抽屉改为覆盖式；`pnpm typecheck` 0 error、43 文件 / 319 用例、build host 140.5 / client 140.9 KiB；`vibe-dev` + headless Edge 1440×900 在右栏 320/400/500px 三档 `ok:true`（无横向溢出、舞台占面板 85.6%、常驻行 3、抽屉开合 canvas 恒 304×171、26.2 fps、点击/键入/滚动生效、停止 3086 ms 内无孤儿），真机修复“4 行网格配 3 子节点”的布局 bug 与“Stop 时抽屉轮询半拆会话得 501”的竞态。**下一项 T027 拾取 overlay 与选择器。**
 3. 每个任务完成即勾选，并在任务下记录验证结果；G0/G1 已通过；后续门禁 G2–G6 通过后才进入下一阶段。
 4. 代码与文档按任务分批提交；私有仓库公开前按 `docs/PUBLISHING.md` 清理机器路径与历史。
-5. 分支基线：M1 已以 `--no-ff` 合并入 `main`（`d1f4053`）。M2 全部在 `task/m2-target-model`，已推送到 `92ecc32`；之后 `9c19501`/`b7cde55` 及本次方向文档提交在本地（推送曾因 GitHub 连接重置失败，需重试）。G2 已通过但**尚未合并 `main`，需用户批准**；合并建议 `--no-ff` 后在 `main` 上打 `M2` 记录。不要回到 `task/m1-foundation`。
+5. 分支基线：M1 以 `--no-ff` 合并入 `main`（`d1f4053`）；**M2 + M2.5 已以 `--no-ff` 合并入 `main`（`768e129`，2026-10-28，用户批准）**，`main` 树与 `task/m2-target-model` 末端 `f64e928` 一致，合并后 `main` 验证 43 文件 / 319 用例全通过；`main` 当前 `ab3675d`，与 `origin/main` 同步。`task/m2-target-model`（`f64e928`）与 `task/m1-foundation` 远端均保留，不要再往这两个分支提交；**T027 从 `main` 新建分支**。
 
 ### UI 方向已定稿（2026-10-28）
 
@@ -60,7 +60,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 - 验证：`pnpm typecheck` 0 error、`pnpm test` 43/319、`pnpm build` host 140.5 / client 140.9 KiB；真机 `.tmp/u01-verify.mjs` → `.tmp/logs/u01-verify.json`（`ok:true`）：320/400/500px 无横向溢出、舞台 85.6%、常驻行 3、视口输入 0、抽屉开合 canvas 恒 304×171、26.2 fps、输入生效、Console 18 / Network 46 条、失败卡片 3 检查项 + 重启成功、停止 3086 ms 无孤儿；正常流程 console 0 error。
 - 真机修复：① `pageStyle` 4 个网格行值配 3 个子节点 → 舞台被压成 171px；② Stop 时 host 先释放采集器、状态仍 ready，抽屉 500 ms 轮询得 501 → `busy === 'stop'` 立即停用并关闭抽屉。
 - 遗留：位图在 320px 宽时只能占面板 22.2%（16:9 几何限制，验收按“舞台 ≥60%”记录）；真实中文 IME、外部浏览器跳转、L/S 类手测沿用 T025 结论；失败态测试必然产生 1 条 503 日志（设计性错误响应）。
-- 补充（人工验证反馈，`1aa4f91`）：删掉面板内重复的 `Vibe Studio` 标题与副标题，根网格 3→2 行，舞台多出约 56 px；`shell.subtitle` 从两语 catalog 删除。重跑 `pnpm test` 43/319 全通过。推送至 `origin/task/m2-target-model`，**未合并 main**。
+- 补充（人工验证反馈，`1aa4f91`）：删掉面板内重复的 `Vibe Studio` 标题与副标题，根网格 3→2 行，舞台多出约 56 px；`shell.subtitle` 从两语 catalog 删除。重跑 `pnpm test` 43/319 全通过。该提交当时推送到 `origin/task/m2-target-model`，随后随 `768e129` 一起进入 `main`。
 - 教训：真机手测期间别跑全局进程断言类集成测试（`edge.test.ts` 会把用户预览的 Edge 当残留）。
 - 合并：`768e129`（`--no-ff`）把 M2 + U01 合入 `main`，`main` 树与分支一致，回归 43/319；`task/m2-target-model` 分支保留。清理提交 `f64e928` 删掉 12 个无引用的 locale key，并把 SPEC §6.3 的页签/工具栏描述对齐 Layout v2。
 - 产品重点已固化：`docs/2026-10-28-界面与项目方向.md` §1/§3（初学者、画布优先、复杂度交给 agent、P1–P7 分级）已作为项目记忆写入；P2–P6 开工前必须出 SPEC 并获批。下一任务 **T027** 请从 `main` 新建分支。
@@ -70,7 +70,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 - 任务段：`tasks/todo.md` 的 T027“拾取 overlay 与选择器”：注入脚本、Shadow DOM overlay、hover/click、`Esc`、`Alt+Click`、选择器生成。
 - 验收：不触发页面原点击；选择器唯一或标注“非唯一”；10 个元素抽测通过；复用 S4 harness + integration。
 - 文件：`src/host/inspect/{inject.ts,selector.ts}`、`src/client/inspect/Picker.tsx`、tests。
-- 约束：不自动发送/批准/提交；不改 `desktop`/`web` profile；非本地目标先询问；测试不得依赖外网。
+- 约束：不自动发送标注、不自动批准；每个任务验证后自动提交到当前任务分支（用户已授权），push/merge 需批准；不改 `desktop`/`web` profile；非本地目标先询问；测试不得依赖外网。
 
 ### T026 遗留
 
