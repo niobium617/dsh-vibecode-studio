@@ -689,6 +689,18 @@
 - 设计取舍：节点/深度双上限而不是只限深度——一个 2000 键的对象同样能拖垮渲染；截断时显示计数而不是“静默省略”。被截断的图片不做内联预览，因为半个 PNG 只会显示坏图，下载按钮仍可用。CSP 拒绝没有产生控制台错误（headless Edge 不记录），所以 XSS 验收以 `sandbox` 属性 + `window.__xss` 未定义 + 面板 DOM 不含脚本三点为准。
 - 限制：下载走整段 base64 → `atob` → `Uint8Array`，上限仍由执行器 4 MiB（base64 ≤ 16 MiB 契约）决定，大文件需专门通道；图片预览只按 MIME 判断，不校验文件头；HTML 预览固定 280 px 高、无“在新标签打开”。
 
+### T041 — S7 OpenAPI spike（2026-10-29，`task/m4-api-workbench`）
+
+- 目标：用 500 端点样例测 OpenAPI 3.x 解析/映射耗时，验证远程 `$ref` 拦截、循环 `$ref`、SSRF 限制与可读错误。
+- `spikes/s7/run.ts`：零新增依赖（Node 内置 + `src/contracts`），脚本内生成 100 路径 × 5 方法 = 500 操作（327,748 B、10 tag、server 变量、allOf/自引用 schema、query/header/cookie、300 个 JSON 体）。链路拆成 parse（JSON + 结构扫描）/ bundle（远程 ref）/ map（参数/体/认证/示例）/ serialize 四段分别计时；每个映射结果用真实 `isHttpRequestSpec` 校验。远程用例只访问自起 `127.0.0.1` fixture，允许清单用例用假 fetch。
+- 实测（`pnpm tsx spikes/s7/run.ts`，36/36 PASS，原始数据 `.tmp/logs/s7-results.json`）：500 端点冷启动 **28.67 ms**（parse 12.76 / bundle 3.47 / map 12.45 / serialize 1.31），热启动中位数 **16.15 ms**（12.62–18.57）；250 / 1000 操作中位数 6.69 / 29.26 ms（约 0.03 ms/操作），1000 操作最慢 32.21 ms，验收线 5 s 余量约 170 倍。
+- 映射：500/500 契约有效；10 组 tag；体 none 200 / json 300；认证 bearer 350 / basic 50 / api-key 50 / none 50；`{id}` → `{{id}}`；server `{env}/{base}` 代入默认值；唯一警告 30 个 cookie 参数不支持。
+- SSRF：默认公网 ref `remote_ref_blocked` 且 **0 fetch**；13/13 策略矩阵（loopback 需显式开关、显式 origin 精确端口、169.254/元数据/`file:`/URL 凭据/RFC1918/阿里云元数据全拒）；loopback 1 次 fetch、同文档去重；302 → 元数据 `remote_ref_redirect` 不跟随；content-length 与 chunked 两种 2 MiB 均 `remote_ref_too_large`；坏 JSON / 404 `remote_ref_failed`。
+- 循环：纯别名环抛 `ref_cycle`（`PureA -> PureB -> PureA`），映射时体降级 `none` 并保留警告；结构环 A↔B 4/4 有效（`{"b":{}}`）；自引用数组示例 `{"id":"n1","children":[]}`。
+- 失败路径：缺失 ref、>8 MiB、非法 JSON、缺 paths、1005 操作均有稳定错误码；17/17 错误单行 ≤ 300 字符；示例数据里的 `$ref` 字符串 0 fetch 原样保留。Swagger 2.0 冒烟 3/3。
+- 报告：`spikes/s7/REPORT.md`，含依赖调研（`@apidevtools/swagger-parser` MIT、`json-schema-ref-parser` MIT、`yaml` ISC）与 T042 实现建议（解析/抓取分离、懒解引用、默认零联网、硬上限）。
+- 限制：只支持 JSON；DNS 解析后的 IP 未二次校验；未覆盖 callbacks/webhooks、OpenAPI 3.1 联合类型、本地多文件 ref。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体

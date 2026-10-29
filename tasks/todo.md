@@ -533,12 +533,21 @@
   - 手动（真实载体）：`.tmp/t040-manual.mjs` — dsh `vibe-dev` + 无头 Edge，本地服务 `/json`、`/html`（内嵌 `<script>window.__xss=1</script>`）、`/png`（1×1）、`/pdf`。结果 `.tmp/logs/t040-web.json` **`ok:true`**：JSON 默认树、4 个折叠开关、展开后 `admin` 出现；iframe `sandbox=""` + CSP 正确、`srcdoc` 含脚本但 `window.__xss` 未定义、面板文本不含 `<h1>`、raw 可见源码；图片 `naturalWidth 1`；PDF 下载 `response.pdf` 59 B 与服务端一致；0 其他控制台错误。
   - 限制：下载整段 base64 解码，尺寸仍受执行器 `maxResponseBytes`（默认 4 MiB）限制；图片只按 MIME 判断不校验文件头；HTML 预览固定 280 px 高。
 
-### - [ ] T041 S7 OpenAPI spike [P]
+### - [x] T041 S7 OpenAPI spike [P]
 
 - **目标**：500 端点、远程 ref、循环 ref、SSRF 限制、导入耗时。
 - **验收**：< 5 s；远程 ref 拦截；错误可读；报告。
 - **验证**：`pnpm tsx spikes/s7/run.ts`；`spikes/s7/REPORT.md`。
 - **文件**：`spikes/s7/{run.ts,REPORT.md}`。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 脚本：`spikes/s7/run.ts` 零新增依赖（Node 内置 + `src/contracts`），生成 100 路径 × 5 方法 = 500 操作的 OpenAPI 3.0.3 样例（327,748 B，10 tag，server 变量、allOf/自引用 schema、query/header/cookie、300 个 JSON 体），按 parse / bundle / map / serialize 分段计时，每个映射结果用真实 `isHttpRequestSpec` 校验；远程 `$ref` 只访问自起 `127.0.0.1` fixture，允许清单用假 fetch。
+  - 耗时（`pnpm tsx spikes/s7/run.ts`，36/36 检查 PASS，原始数据 `.tmp/logs/s7-results.json`）：500 端点冷启动 **28.67 ms**（parse 12.76 / bundle 3.47 / map 12.45 / serialize 1.31），热启动中位数 **16.15 ms**（min 12.62 / max 18.57）；规模 250 / 1000 操作中位数 6.69 / 29.26 ms，约 0.03 ms/操作；1000 操作最慢 32.21 ms，远低于 5 s。
+  - 映射：500/500 契约有效，0 skipped；10 个 tag 分组；体 none 200 / json 300；认证 bearer 350 / basic 50 / api-key 50 / none 50；`{id}` → `{{id}}`、server 变量代入默认值；唯一警告 `cookie_param_unsupported` 30。
+  - 远程 `$ref`/SSRF：默认策略下公网 ref `remote_ref_blocked` 且 **0 次网络调用**；13/13 策略矩阵（loopback 需显式开关、显式 origin 精确端口、169.254/元数据/`file:`/URL 凭据/RFC1918/阿里云元数据一律拒绝）；loopback fetch 1 次、同文档去重 1 次；302 → 元数据 `remote_ref_redirect` 不跟随；content-length 与 chunked 两种 2 MiB 超限均 `remote_ref_too_large`；非法 JSON / 404 可读。
+  - 循环 `$ref`：纯别名环 `PureA -> PureB -> PureA` 抛 `ref_cycle`（消息含完整链），映射时体降级 `none` 并保留警告；结构环 A↔B 4/4 端点有效（`{"b":{}}`）；自引用数组示例 `{"id":"n1","children":[]}`（25 B）。
+  - 其他失败路径：缺失 ref `ref_unresolved`、>8 MiB `document_too_large`、非法 JSON `invalid_json`、缺 paths `invalid_document`、1005 操作 `too_many_operations`；17/17 错误单行 ≤ 300 字符；示例数据里的 `$ref` 字符串 0 fetch 原样保留。
+  - Swagger 2.0 冒烟：host/basePath/schemes + body 参数 + basic auth，3/3 有效。
+  - 报告：`spikes/s7/REPORT.md` 含环境/耗时/映射/SSRF/循环/失败路径/依赖调研（swagger-parser MIT、json-schema-ref-parser MIT、yaml ISC）与 T042 实现建议。
 
 ### - [ ] T042 OpenAPI 导入
 
