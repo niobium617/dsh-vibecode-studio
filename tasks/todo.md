@@ -458,12 +458,21 @@
   - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm test` 62 文件 / 567 用例（基线 60 / 533）；`pnpm build` host 221.1 / client 210.7 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t035-{typecheck,test,build,e2e}.log`。
   - 限制：未注册 unary 方法与 UI（T038 接）；跟随重定向时跨源仍携带 Authorization（与 curl/Postman 一致，未做浏览器式剥离）；文本一律按 UTF-8 解码（不读 charset）；结果携带截断后的 base64 全量（≤16 MiB）；`fetchImpl`/`now`/`boundary` 为测试注入点，运行时不外露。
 
-### - [ ] T036 环境、变量与密钥
+### - [x] T036 环境、变量与密钥
 
 - **目标**：环境模型、`{{var}}` 解析、`ctx.credentials` 集成；UI 只读 describe。
 - **验收**：未解析变量有提示；密钥不回传客户端；单测通过。
 - **验证**：`pnpm test -- tests/unit/api-env`。
 - **文件**：`src/host/api/{environment,secrets}.ts`、`src/client/api/EnvironmentEditor.tsx`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 契约：`src/contracts/api.ts` 追加 `ApiEnvironment`/`ApiEnvironmentVariable`（值必填、`secret` 变量只能存凭证引用名）、客户端安全视图 `ApiEnvironmentView`/`ApiEnvironmentVariableView`（明文行带 `value`；secret 行只有 `configured`/`writable`/`source`）、`UnresolvedVariable{name, where, reason: 'missing'|'secret_not_configured'|'disabled'}`、`API_ENV_*` 限额，以及 `isApiEnvironmentVariableName`/`isApiEnvironmentVariable`/`isApiEnvironment`/`isApiEnvironmentView` 守卫（最后一个拒绝 secret 行携带 `value`）。
+  - 密钥接缝：`src/host/api/secrets.ts` 的 `createApiSecretStore({ credentials })` 用结构化类型镜像 DSH 的 credentials 服务（不新增依赖）；`resolve` 只在 host 侧调用，空值与缺失一律视为未配置；无 provider 时 resolve→`undefined`、describe→`{configured:false,writable:false}`、set/unset→`permission_denied{credentials_unavailable}`；provider 异常映射 `internal{credential_resolve_failed|credential_store_failed}` 且不回显值或原始错误消息。
+  - 解析：`src/host/api/environment.ts` 的 `parseApiEnvironment()`（名字格式、重名、secret 必须指向凭证名）、`resolveHttpRequest(request, { environment, secrets })` 按字段展开 url/query 行/header 名与值/JSON·text·form·multipart 元数据/auth（`url`、`query[i].value`、`headers[i].name|value`、`body.json`、`body.files[i].fileName|contentType`、`auth.token|username|password` 等），base64 文件内容不展开；单次扫描（展开出的值里再出现 `{{x}}` 不二次展开）；同一请求内密钥按引用缓存、只 resolve 一次；失败逐字段进 `unresolved` 并区分三种原因。`describeEnvironment()` 生成客户端视图（describe 抛错按未配置处理），`secretReferences()` 列出环境引用的凭证。
+  - UI：`src/client/api/EnvironmentEditor.tsx` 只读面板——明文值、密钥仅“Configured / Not configured”+“from {source}”、禁用标记、未解析列表（`{name} in {where}` + 原因）与逐行徽标；`EmptyState` 空态；中英 `api.env.*` 14 个键两侧一致。
+  - 接线：`src/host/index.ts` 服务槽新增 `apiSecrets`，`HostContext` 增加可选 `credentials`，`apply()` 用 `ctx.credentials` 构造 store（无该接缝的主机整体降级为“未配置”而不是另存密钥）。
+  - 验收对应：`tests/unit/api-env/secrets.test.ts`（6 用例：解析/描述/空值/无 provider/set·unset 透传/非法名/异常不回显）、`tests/unit/api-env/environment.test.ts`（12 用例：解析校验、跨 URL·query·header·JSON·bearer 展开、三种未解析原因与逐字段去重、单次展开、密钥同请求只 resolve 一次、multipart 元数据、describe 视图不含明文且 describe 失败按未配置）、`tests/component/api/environment-editor.test.tsx`（3 用例：明文与密钥状态、未解析框与徽标、空态与 zh-CN 文案）；`tests/unit/config.test.ts` 服务形状断言补 `apiSecrets`。
+  - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/api-env tests/component/api` 3 文件 / 21 用例通过；`pnpm test` 65 文件 / 588 用例（基线 62 / 567）；`pnpm build` host 232.1 / client 211.9 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t036-{test,build,e2e}.log`。
+  - 限制：未注册 unary 方法、面板未挂到页面（T038）；未做集合/历史持久化（T037）；`{{var}}` 单次展开、不支持嵌套或表达式；describe 失败与无 provider 都显示“未配置”，不区分原因；secret 变量只能引用凭证名，不能在环境里内联写值。
 
 ### - [ ] T037 集合与历史持久化
 

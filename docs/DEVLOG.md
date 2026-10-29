@@ -632,6 +632,17 @@
 - 设计取舍：跨源重定向保留 `Authorization`（与 curl/Postman 一致，未做浏览器式剥离）；文本一律按 UTF-8 解码，不解析 charset；结果带截断后的 base64（≤16 MiB），二进制预览/下载留给 T039/T040；`fetchImpl`/`now`/`boundary` 只作测试注入点。
 - 遗留：尚未注册 `api.http.send` 一元方法与 UI（T038 接）；`api-workbench` 模块尚无 `ApiService` 聚合（T037/T038 落位）。
 
+### T036 — 环境、变量与密钥（2026-10-29，`task/m4-api-workbench`）
+
+- 目标：环境模型与 `{{var}}` 解析、接入 `ctx.credentials`、只读 environment UI；不接 unary、不做持久化、不动 profile。
+- 契约（`src/contracts/api.ts`）：`ApiEnvironment`/`ApiEnvironmentVariable`（`secret` 变量只存凭证引用名，不存值）、客户端安全视图 `ApiEnvironmentView`/`ApiEnvironmentVariableView`（明文行带 `value`，secret 行只有 `configured`/`writable`/`source`）、`UnresolvedVariable{name, where, reason}`、`API_ENV_*` 限额；守卫 `isApiEnvironment*`，其中 `isApiEnvironmentView` 拒绝 secret 行携带 `value`，让“密钥不回传”成为类型与运行时的双重约束。
+- 密钥接缝（`src/host/api/secrets.ts`）：`createApiSecretStore({ credentials })` 以结构化类型镜像 DSH credentials 服务，不新增依赖、不引入 branded 类型；`resolve` 仅 host 使用，空/缺失视为未配置；无 provider 时 describe 报未配置、写操作 `permission_denied{credentials_unavailable}`；provider 异常映射 `internal{credential_resolve_failed|credential_store_failed}` 且不回显值或原始消息。
+- 解析（`src/host/api/environment.ts`）：`parseApiEnvironment()` 校验名字/重名/secret 必须指向凭证名；`resolveHttpRequest(request, { environment, secrets })` 按字段展开 url、query 行、header 名与值、JSON/text/form/multipart 元数据与 auth（base64 文件内容不展开），失败逐字段产出 `unresolved`（`missing | secret_not_configured | disabled`）；单次扫描，展开值里再出现 `{{x}}` 不二次展开；同一请求内密钥按引用缓存、只 resolve 一次。`describeEnvironment()` 产出客户端视图（describe 抛错按未配置），`secretReferences()` 列出引用。
+- 接线与 UI：`src/host/index.ts` 服务槽新增 `apiSecrets`，`HostContext` 增加可选 `credentials`，渲染时用 `ctx.credentials` 构造 store；`src/client/api/EnvironmentEditor.tsx` 为只读面板（明文值、密钥仅配置状态与来源、禁用标记、未解析列表与徽标、空态），`api.env.*` 中英 14 键一致。
+- 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/api-env tests/component/api` 3 文件 / 21 用例通过；`pnpm test` 65 文件 / **588 用例**（基线 62 / 567）；`pnpm build` host 232.1 / client 211.9 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t036-{test,build,e2e}.log`。
+- 设计取舍：host 侧 `resolveHttpRequest()` 可能含明文密钥，只留在 host、永不过 unary；客户端只拿 `describeEnvironment()` 的产物，并用测试断言 `JSON.stringify(view)` 不含明文。`{{var}}` 单次展开、不支持嵌套/表达式；describe 失败与无 provider 统一显示“未配置”。
+- 遗留：未注册 unary 方法、面板未挂页面（T038）；集合/历史持久化与 `.vibe` 落盘（T037）；密钥写入 UI 待 T038 决定放置位置。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -821,6 +832,7 @@ pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 - 标注存储：`src/host/inspect/annotation-store.ts`、`src/contracts/annotation.ts`、`tests/unit/annotation/annotation-store.test.ts`、`tests/unit/contracts/annotation.test.ts`。
 - Composer handoff：`src/client/inspect/handoff.ts`、`tests/component/annotation/composer-handoff.test.tsx`、`.tmp/logs/t032-{web,desktop}.json`。
 - HTTP 执行器：`src/contracts/api.ts`、`src/host/api/{request,executor}.ts`、`tests/unit/http-executor/{request,executor}.test.ts`。
+- 环境与密钥：`src/contracts/api.ts`（环境模型与安全视图）、`src/host/api/{secrets,environment}.ts`、`src/client/api/EnvironmentEditor.tsx`、`tests/unit/api-env/`、`tests/component/api/environment-editor.test.tsx`。
 - Web 预览：`src/host/targets/web/{adapter,launch}.ts`、`tests/integration/web-adapter/`、`tests/helpers/png.ts`。
 - 预览生命周期：`src/host/preview/session.ts`、`src/client/preview/{Toolbar.tsx,lifecycle.ts,local-url.ts}`、`tests/integration/preview/session-lifecycle.test.ts`、`.tmp/logs/t025-{host,desktop}.json`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。
