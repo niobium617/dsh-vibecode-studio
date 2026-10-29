@@ -54,6 +54,10 @@ export {
   toAnnotationHistoryError,
 } from './inspect/history'
 export type { AnnotationHistoryServiceOptions } from './inspect/history'
+export { createHttpExecutor, HttpExecutor } from './api/executor'
+export type { HttpExecuteOptions, HttpExecutorOptions } from './api/executor'
+export { isBlockedHost, normalizeHttpRequest } from './api/request'
+export type { NormalizedHttpRequest, NormalizeRequestOptions } from './api/request'
 export { createTargetAdapterRegistry } from './targets/registry'
 export type { TargetAdapterRegistry } from './targets/registry'
 export { validateTargetConfig } from './targets/validate'
