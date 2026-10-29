@@ -1,15 +1,19 @@
 /**
- * Response viewer, basic tier (T039).
+ * Response viewer (T039 basic tier, T040 rich bodies).
  *
  * Shows status, elapsed time, size and content type, then the body and the
- * headers. A 10 MB body must not freeze the panel, so the body is rendered one
- * page at a time (`RESPONSE_PAGE_BYTES`) and JSON is only pretty-printed while
- * it stays under `RESPONSE_PRETTY_MAX_CHARS`; anything larger shows raw text.
- * The tree/HTML/image previews are T040.
+ * headers. A 10 MB body must not freeze the panel, so raw text is rendered one
+ * page at a time (`RESPONSE_PAGE_BYTES`) and JSON is only parsed for the tree
+ * or pretty view while it stays under `RESPONSE_PRETTY_MAX_CHARS`. HTML bodies
+ * render in a sandboxed iframe, images from their base64 data, and any binary
+ * body can be downloaded.
  */
 import * as React from 'react'
-import type { HttpExecutionResult } from '../../contracts/api'
+import type { HttpExecutionResult, HttpResponseBody } from '../../contracts/api'
 import { createTranslator, type Locale } from '../i18n'
+import { HtmlPreview } from './HtmlPreview'
+import { ImagePreview, isImageContentType } from './ImagePreview'
+import { JsonTree } from './JsonTree'
 import { ResponseHeaders } from './ResponseHeaders'
 
 /** Characters of body text rendered at once; keeps a 10 MB response cheap. */
@@ -21,6 +25,57 @@ export function formatResponseBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+const EXTENSION_BY_CONTENT_TYPE: Readonly<Record<string, string>> = {
+  'application/json': '.json',
+  'application/pdf': '.pdf',
+  'application/xml': '.xml',
+  'application/zip': '.zip',
+  'image/avif': '.avif',
+  'image/bmp': '.bmp',
+  'image/gif': '.gif',
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/svg+xml': '.svg',
+  'image/webp': '.webp',
+  'image/x-icon': '.ico',
+  'text/csv': '.csv',
+  'text/html': '.html',
+  'text/plain': '.txt',
+  'text/xml': '.xml',
+}
+
+function baseContentType(contentType: string | null | undefined): string {
+  return (contentType ?? '').split(';')[0]!.trim().toLowerCase()
+}
+
+export function isHtmlContentType(contentType: string | null | undefined): boolean {
+  const base = baseContentType(contentType)
+  return base === 'text/html' || base === 'application/xhtml+xml'
+}
+
+export function responseFileExtension(contentType: string | null | undefined): string {
+  return EXTENSION_BY_CONTENT_TYPE[baseContentType(contentType)] ?? '.bin'
+}
+
+/** Save a binary body through a temporary object URL; no network involved. */
+export function downloadResponseBody(body: HttpResponseBody, baseName = 'response'): void {
+  if (!body.base64) return
+  const binary = atob(body.base64)
+  const buffer = new ArrayBuffer(binary.length)
+  const bytes = new Uint8Array(buffer)
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+  const type = body.contentType ?? 'application/octet-stream'
+  const url = URL.createObjectURL(new Blob([buffer], { type }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `${baseName}${responseFileExtension(type)}`
+  anchor.rel = 'noopener'
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 type BodyContent =
@@ -153,6 +208,12 @@ const navButtonStyle: React.CSSProperties = {
   borderColor: 'var(--dsw-border-color, rgba(127, 127, 127, 0.35))',
 }
 
+const binaryWrapStyle: React.CSSProperties = {
+  display: 'grid',
+  gap: 6,
+  justifyItems: 'start',
+}
+
 export interface ResponseViewProps {
   readonly result: HttpExecutionResult
   readonly locale?: Locale
@@ -161,7 +222,13 @@ export interface ResponseViewProps {
 }
 
 type Tab = 'body' | 'headers'
-type Mode = 'pretty' | 'raw'
+type Mode = 'tree' | 'html' | 'pretty' | 'raw'
+
+function defaultMode(content: BodyContent, htmlBody: boolean): Mode {
+  if (content.kind !== 'text') return 'raw'
+  if (htmlBody) return 'html'
+  return content.pretty ? 'tree' : 'raw'
+}
 
 export function ResponseView({
   result,
@@ -170,21 +237,31 @@ export function ResponseView({
 }: ResponseViewProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
   const content = React.useMemo(() => buildBodyContent(result), [result])
+  const contentType = result.body.contentType ?? headerValue(result.headers, 'content-type')
+  const htmlBody = content.kind === 'text' && isHtmlContentType(contentType)
   const [tab, setTab] = React.useState<Tab>('body')
-  const [mode, setMode] = React.useState<Mode>(content.kind === 'text' && content.pretty ? 'pretty' : 'raw')
+  const [mode, setMode] = React.useState<Mode>(() => defaultMode(content, htmlBody))
   const [page, setPage] = React.useState(0)
 
   React.useEffect(() => {
-    setMode(content.kind === 'text' && content.pretty ? 'pretty' : 'raw')
+    setMode(defaultMode(content, htmlBody))
     setPage(0)
-  }, [content])
+  }, [content, htmlBody])
 
-  const text = content.kind === 'text' ? (mode === 'pretty' && content.pretty ? content.pretty : content.raw) : ''
+  const showText =
+    content.kind === 'text' &&
+    (mode === 'raw' || (mode === 'pretty' && content.pretty !== null))
+  const text =
+    content.kind === 'text' && showText
+      ? mode === 'pretty' && content.pretty
+        ? content.pretty
+        : content.raw
+      : ''
   const totalPages = Math.max(1, Math.ceil(text.length / pageBytes))
   const current = Math.min(page, totalPages - 1)
   const slice = text.slice(current * pageBytes, (current + 1) * pageBytes)
   const tone = statusTone(result.status)
-  const contentType = result.body.contentType ?? headerValue(result.headers, 'content-type')
+  const localeProps = locale === undefined ? {} : { locale }
 
   return (
     <section style={rootStyle} data-vibe-response="1" aria-label="response">
@@ -238,38 +315,89 @@ export function ResponseView({
         >
           {`${t('api.response.tab.headers')} (${Object.keys(result.headers).length})`}
         </button>
-        {tab === 'body' && content.kind === 'text' && content.pretty ? (
-          <>
-            <button
-              type="button"
-              style={mode === 'pretty' ? activeTabStyle : tabButtonStyle}
-              data-vibe-response-mode="pretty"
-              onClick={() => setMode('pretty')}
-            >
-              {t('api.response.mode.pretty')}
-            </button>
-            <button
-              type="button"
-              style={mode === 'raw' ? activeTabStyle : tabButtonStyle}
-              data-vibe-response-mode="raw"
-              onClick={() => setMode('raw')}
-            >
-              {t('api.response.mode.raw')}
-            </button>
-          </>
+        {tab === 'body' && content.kind === 'text' ? (
+          htmlBody ? (
+            <>
+              <button
+                type="button"
+                style={mode === 'html' ? activeTabStyle : tabButtonStyle}
+                data-vibe-response-mode="html"
+                onClick={() => setMode('html')}
+              >
+                {t('api.response.mode.html')}
+              </button>
+              <button
+                type="button"
+                style={mode === 'raw' ? activeTabStyle : tabButtonStyle}
+                data-vibe-response-mode="raw"
+                onClick={() => setMode('raw')}
+              >
+                {t('api.response.mode.raw')}
+              </button>
+            </>
+          ) : content.pretty ? (
+            <>
+              <button
+                type="button"
+                style={mode === 'tree' ? activeTabStyle : tabButtonStyle}
+                data-vibe-response-mode="tree"
+                onClick={() => setMode('tree')}
+              >
+                {t('api.response.mode.tree')}
+              </button>
+              <button
+                type="button"
+                style={mode === 'pretty' ? activeTabStyle : tabButtonStyle}
+                data-vibe-response-mode="pretty"
+                onClick={() => setMode('pretty')}
+              >
+                {t('api.response.mode.pretty')}
+              </button>
+              <button
+                type="button"
+                style={mode === 'raw' ? activeTabStyle : tabButtonStyle}
+                data-vibe-response-mode="raw"
+                onClick={() => setMode('raw')}
+              >
+                {t('api.response.mode.raw')}
+              </button>
+            </>
+          ) : null
         ) : null}
       </div>
 
       {tab === 'headers' ? (
-        <ResponseHeaders headers={result.headers} {...(locale === undefined ? {} : { locale })} />
+        <ResponseHeaders headers={result.headers} {...localeProps} />
       ) : content.kind === 'binary' ? (
-        <div style={noteStyle} data-vibe-response-binary="1">
-          {t('api.response.binary', { bytes: formatResponseBytes(result.body.bytes) })}
+        <div style={binaryWrapStyle} data-vibe-response-binary="1">
+          {!result.body.truncated &&
+          result.body.base64 !== '' &&
+          isImageContentType(contentType) ? (
+            <ImagePreview result={result} {...localeProps} />
+          ) : (
+            <div style={noteStyle} data-vibe-response-binary-note="1">
+              {t('api.response.binary', { bytes: formatResponseBytes(result.body.bytes) })}
+            </div>
+          )}
+          {result.body.base64 ? (
+            <button
+              type="button"
+              style={navButtonStyle}
+              data-vibe-response-download="1"
+              onClick={() => downloadResponseBody(result.body)}
+            >
+              {t('api.response.download')}
+            </button>
+          ) : null}
         </div>
       ) : content.kind === 'empty' ? (
         <div style={noteStyle} data-vibe-response-empty-body="1">
           {t('api.response.emptyBody')}
         </div>
+      ) : htmlBody && mode === 'html' ? (
+        <HtmlPreview html={content.raw} {...localeProps} />
+      ) : content.pretty && mode === 'tree' ? (
+        <JsonTree text={content.raw} {...localeProps} />
       ) : (
         <>
           {content.jsonTooLarge ? (
@@ -280,7 +408,7 @@ export function ResponseView({
           <pre style={bodyStyle} data-vibe-response-body="1">
             {slice}
           </pre>
-          {totalPages > 1 ? (
+          {showText && totalPages > 1 ? (
             <div style={barStyle}>
               <button
                 type="button"

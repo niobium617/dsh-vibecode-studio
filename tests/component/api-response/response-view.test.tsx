@@ -45,15 +45,22 @@ function query(container: HTMLElement, selector: string): HTMLElement | null {
 }
 
 describe('ResponseView', () => {
-  it('shows status, time and size, and prettifies JSON by default', () => {
+  it('shows status, time and size, and renders JSON as a tree by default', () => {
     const { container } = render(<ResponseView result={result()} />)
 
     expect(query(container, '[data-vibe-response-status="1"]')?.textContent).toBe('HTTP 200 OK')
     expect(query(container, '[data-vibe-response-meta="1"]')?.textContent).toBe('12 ms · 17 B')
+    expect(query(container, '[data-vibe-json-tree="1"]')).toBeTruthy()
+    expect(query(container, '[data-vibe-response-mode="tree"]')).toBeTruthy()
+  })
+
+  it('switches from the tree to the prettified text', () => {
+    const { container } = render(<ResponseView result={result()} />)
+
+    fireEvent.click(query(container, '[data-vibe-response-mode="pretty"]')!)
     expect(query(container, '[data-vibe-response-body="1"]')?.textContent).toBe(
       '{\n  "hello": "world"\n}',
     )
-    expect(query(container, '[data-vibe-response-mode="pretty"]')).toBeTruthy()
   })
 
   it('switches to raw and keeps the original text', () => {
