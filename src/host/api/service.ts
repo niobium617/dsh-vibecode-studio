@@ -55,6 +55,7 @@ import { resolveHttpRequest } from './environment'
 import { createHttpExecutor, type HttpExecutor } from './executor'
 import type { ApiHistoryStore } from './history-store'
 import { prepareReplay as prepareReplayDraft } from './replay'
+import { redactExecutionResult } from './result-redaction'
 import type { ApiSecretStore } from './secrets'
 import { toApiStoreStudioError } from './store-files'
 import type { UnaryRegistry } from '../transport'
@@ -139,6 +140,10 @@ export class ApiService {
    * The send is logged afterwards (T044). The log stores the *unexpanded*
    * request, so placeholders survive and no resolved secret is written; a log
    * failure never fails the send itself.
+   *
+   * The outcome is the last place a resolved secret could leave the host: the
+   * final URL and every redirect hop are scrubbed before the client sees them
+   * (G4 follow-up). Assertions are evaluated against the real response first.
    */
   async send(params: unknown, signal?: AbortSignal): Promise<ApiSendOutcome> {
     if (!isRecord(params)) invalid('api.http.send expects an object', 'params')
@@ -167,7 +172,9 @@ export class ApiService {
     }
     const evaluated = assertions === undefined ? undefined : evaluateAssertions(assertions, result)
     return {
-      result,
+      // Assertions see the real response; the client only sees URLs with every
+      // resolved secret scrubbed (G4 follow-up). Bodies are target data.
+      result: redactExecutionResult(result, resolved.secretValues),
       unresolved: resolved.unresolved,
       ...(evaluated === undefined ? {} : { assertions: evaluated }),
     }

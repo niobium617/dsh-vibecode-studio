@@ -112,6 +112,15 @@ class Expander {
     this.unresolved.push({ name, where, reason })
   }
 
+  /** Every plaintext secret resolved for this request, deduplicated. */
+  resolvedSecretValues(): readonly string[] {
+    const values = new Set<string>()
+    for (const value of this.secretValues.values()) {
+      if (value !== undefined && value !== '') values.add(value)
+    }
+    return [...values]
+  }
+
   private async value(name: string, where: string): Promise<string> {
     const placeholder = `{{${name}}}`
     const variable = this.variables.get(name)
@@ -145,6 +154,12 @@ export interface ResolvedHttpRequest {
   /** Host-only: may contain resolved secrets. Never return it to the client. */
   readonly request: HttpRequestSpec
   readonly unresolved: readonly UnresolvedVariable[]
+  /**
+   * Host-only: plaintext values of every secret this request resolved. The
+   * service uses them to scrub the execution result before it crosses the
+   * unary wire; never serialize this field into a response.
+   */
+  readonly secretValues: readonly string[]
 }
 
 /**
@@ -178,7 +193,11 @@ export async function resolveHttpRequest(
     ...(body === undefined ? {} : { body }),
     ...(auth === undefined ? {} : { auth }),
   }
-  return { request: resolved, unresolved: expander.unresolved }
+  return {
+    request: resolved,
+    unresolved: expander.unresolved,
+    secretValues: expander.resolvedSecretValues(),
+  }
 }
 
 async function expandRows(

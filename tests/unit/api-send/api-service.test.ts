@@ -34,8 +34,15 @@ function fakeFetch(): { fetchImpl: typeof fetch; calls: FetchCall[] } {
   return { fetchImpl, calls }
 }
 
+const SECRET = 's3cret-token'
+const WEIRD_SECRET = 'p@ss word&=x'
+
 const credentials: CredentialProviderLike = {
-  resolve: async (ref) => (ref === 'API_TOKEN' ? { value: 's3cret-token', source: 'file' } : undefined),
+  resolve: async (ref) => {
+    if (ref === 'API_TOKEN') return { value: SECRET, source: 'file' }
+    if (ref === 'API_WEIRD') return { value: WEIRD_SECRET, source: 'file' }
+    return undefined
+  },
   describe: async () => ({ configured: true, writable: true, source: 'file' }),
   set: async () => undefined,
   unset: async () => undefined,
@@ -65,6 +72,7 @@ const ENVIRONMENT: ApiEnvironment = {
   variables: [
     { name: 'path', value: 'items' },
     { name: 'token', value: 'API_TOKEN', secret: true },
+    { name: 'weird', value: 'API_WEIRD', secret: true },
   ],
 }
 
@@ -94,6 +102,114 @@ describe('api.http.send', () => {
     expect(sent.get('authorization')).toBe('Bearer s3cret-token')
     expect(sent.get('content-type')).toBe('application/json')
     expect(call.init?.method).toBe('POST')
+  })
+
+  it('scrubs an api-key resolved into the query string from the outcome URL', async () => {
+    const { fetchImpl, calls } = fakeFetch()
+    const { registry } = setup(fetchImpl)
+    const request: HttpRequestSpec = {
+      method: 'GET',
+      url: 'https://api.example.com/items',
+      auth: { kind: 'api-key', name: 'api_key', value: '{{token}}', in: 'query' },
+    }
+
+    const result = await registry.dispatch(
+      API_HTTP_SEND_METHOD,
+      { request, environment: ENVIRONMENT },
+      context(),
+    )
+    const value = valueOf<{ result: { url: string } }>(result)
+
+    // The target still receives the secret; only the wire back is scrubbed.
+    expect(calls[0]!.url).toContain(`api_key=${SECRET}`)
+    expect(JSON.stringify(value)).not.toContain(SECRET)
+    expect(value.result.url).toContain('api_key=REDACTED')
+  })
+
+  it('scrubs a secret in a non-sensitive query key, which URL rules would keep', async () => {
+    const { fetchImpl, calls } = fakeFetch()
+    const { registry } = setup(fetchImpl)
+    const request: HttpRequestSpec = {
+      method: 'GET',
+      url: 'https://api.example.com/items',
+      query: [{ name: 'session', value: '{{token}}' }],
+    }
+
+    const result = await registry.dispatch(
+      API_HTTP_SEND_METHOD,
+      { request, environment: ENVIRONMENT },
+      context(),
+    )
+    const value = valueOf<{ result: { url: string } }>(result)
+
+    expect(calls[0]!.url).toContain(`session=${SECRET}`)
+    expect(JSON.stringify(value)).not.toContain(SECRET)
+    expect(value.result.url).toContain('session=REDACTED')
+  })
+
+  it('scrubs the secret from redirect hops and their locations', async () => {
+    const calls: FetchCall[] = []
+    const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init })
+      if (calls.length === 1) {
+        return new Response(null, {
+          status: 302,
+          headers: { location: `https://api.example.com/next?session=${SECRET}` },
+        })
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }) as typeof fetch
+    const { registry } = setup(fetchImpl)
+    const request: HttpRequestSpec = {
+      method: 'GET',
+      url: 'https://api.example.com/start',
+      query: [{ name: 'token', value: '{{token}}' }],
+    }
+
+    const result = await registry.dispatch(
+      API_HTTP_SEND_METHOD,
+      { request, environment: ENVIRONMENT },
+      context(),
+    )
+    const value = valueOf<{
+      result: {
+        url: string
+        redirects: Array<{ status: number; url: string; location: string }>
+      }
+    }>(result)
+    const hop = value.result.redirects[0]!
+
+    expect(calls[1]!.url).toContain(`session=${SECRET}`)
+    expect(hop.status).toBe(302)
+    expect(hop.url).toContain('token=REDACTED')
+    expect(hop.location).toContain('session=REDACTED')
+    expect(JSON.stringify(value)).not.toContain(SECRET)
+  })
+
+  it('scrubs the percent-encoded form of a secret', async () => {
+    const { fetchImpl, calls } = fakeFetch()
+    const { registry } = setup(fetchImpl)
+    const request: HttpRequestSpec = {
+      method: 'GET',
+      url: 'https://api.example.com/items',
+      query: [{ name: 'session', value: '{{weird}}' }],
+    }
+
+    const result = await registry.dispatch(
+      API_HTTP_SEND_METHOD,
+      { request, environment: ENVIRONMENT },
+      context(),
+    )
+    const value = valueOf<{ result: { url: string } }>(result)
+    const text = JSON.stringify(value)
+
+    expect(calls[0]!.url).toContain('p%40ss+word%26%3Dx')
+    expect(text).not.toContain('p@ss')
+    expect(text).not.toContain('p%40ss')
+    expect(value.result.url).toContain('session=REDACTED')
   })
 
   it('reports placeholders nothing could resolve and still sends them literally', async () => {
