@@ -264,6 +264,24 @@ describe('usePicker', () => {
     expect(document.querySelector('[data-vibe-pick-selector="1"]')?.textContent).toBe('#other')
   })
 
+  it('shows the first pick of a restarted session after a dismissal', async () => {
+    const fake = fakeSource()
+    fake.set({ active: true, seq: 3, pick: PICK, ts: 3 })
+    const view = render(<Harness enabled={true} source={fake.source} />)
+    await settle()
+    fireEvent.click(screen.getByRole('button', { name: 'Hide picked element' }))
+    expect(screen.queryByRole('group', { name: 'Picked element' })).toBeNull()
+
+    // The preview stops, so the next session's sequence starts again at 1.
+    view.rerender(<Harness enabled={false} source={fake.source} />)
+    await settle()
+    fake.set({ active: true, seq: 1, pick: OTHER, ts: 1 })
+    view.rerender(<Harness enabled={true} source={fake.source} />)
+    await settle()
+
+    expect(document.querySelector('[data-vibe-pick-selector="1"]')?.textContent).toBe('#other')
+  })
+
   it('reports a failed start and re-reads the Host state', async () => {
     const fake = fakeSource()
     fake.source.start = async () => {

@@ -164,6 +164,15 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 - 验证（修正后复测）：`pnpm typecheck` 0 error；`pnpm test` 60 文件 / 527 用例通过（另 2 个 `edge.test.ts`/`picker-edge.test.ts` 的“无 Playwright Edge 残留”断言失败，原因是用户正在运行的 `vibe-dev`（4317）预览 Edge，父进程为该 DSH host，属已知环境误报）；`pnpm build` host 200.6 / client 210.7 KiB；`pnpm test:e2e` 9/9；真实载体 `.tmp/logs/u02-verify.json` `ok:true`（`historyStatusAfterSend: null`、`queueStatusAfterQueueSend: null`、`historyStatusAfterQueueSend: null`、`notAutoSent: true`），console 0，截图 `u02-01-bubble.png`、`u02-02-history-status.png`、`u02-03-delete-dialog.png`；脚本 `.tmp/u02-verify.mjs` 非产品代码。
 - 分支 `task/m3-ui-refine`（由 `main` 新建），提交 `0f3b909`（首版）+ `ac717bc`（发送后两边状态解除的修正）；**未合并 `main`**、未推送。
 
+### U03 拾取注入与重开会话恢复 已完成（2026-10-29，task/m3-ui-refine）
+
+- 触发：用户实测三连反馈——`vibe-studio: element picking is unavailable on this page`、有时点击选不中、面板内停止再启动后要好一会儿（或只能刷新页面）才能选中。
+- 根因（三处，互相独立）：① `Page.addScriptToEvaluateOnNewDocument` 在页面级会话上**没有 `Page.enable` 就是空操作**（返回 identifier 但不应用到后续文档，Edge 实测）；此前只对首个文档 `Runtime.evaluate` 装过一次，所以任何 reload/导航后 `__vibePicker` 缺失 → `activate()` 失败 → “unavailable on this page”，只有重启预览才恢复。② 页面自身导航后 Host 的 `activeNow` 残留为 true，面板显示“正在拾取”但新文档的脚本是空闲的，点击无效。③ 客户端 `dismissedSeq` 跨会话残留，而 Host 的 `seq` 每会话从 0 重计，旧关闭记录挡住新会话的首次拾取。
+- 修复：`src/host/inspect/inject.ts` 加 `Page.enable`（在 `Runtime.addBinding` 前）、监听 `Page.frameNavigated` 只在顶层帧复位 `activeNow`、`activate()` 缺脚本时就地重装一次再重试；`src/client/inspect/Picker.tsx` 在 `enabled` 变 false 时清零 `dismissedSeq`。
+- 验证：`pnpm typecheck` 0 error；`pnpm test` 60 文件 / 533 用例（532 通过，1 个已知环境误报 `picker-edge.test.ts` 的 Edge 残留断言看到用户 4317 预览）；`pnpm build` host 201.1 / client 210.7 KiB；`pnpm test:e2e` 9/9；真实载体 `.tmp/logs/verify-pick-recovery.json` `ok:true`（基线 / 页面 reload / 页面导航 / 死页回活 / 停止再启动 均能拾取，0 console error）。
+- 注意：用户当前运行的 DSH（4317）需**重启**才会载入新 `lib/*`。
+- 提交 `1013714`（U03）；**未合并 `main`**、未推送。
+
 ### T026 遗留
 
 - G2 结论已写入 `tasks/todo.md` T026 段；手测脚本 `.tmp/t026-{host,web,desktop}.mjs` 与结果 `.tmp/logs/t026-*.json` 非产品代码。

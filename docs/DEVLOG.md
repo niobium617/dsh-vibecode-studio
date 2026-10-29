@@ -611,6 +611,16 @@
 - 口径修正（同日，用户实测反馈“上方队列点发送后历史队列的状态还在”）：`sendQueuedAnnotation` 成功分支由“写入成功提示”改为 `clearAnnotationStatus(annotation.id)`，两个列表同时解除；发送结果仍返回给调用方，气泡保存通知照常显示“已插入对话草稿，尚未发送。”。同步更新队列/历史组件测试与 `.tmp/u02-verify.mjs`（新增“重开 → 队列发送 → 两边状态为空”）。复测：`pnpm typecheck` 0 error；`pnpm test` 60 文件 / 527 用例通过，另 2 个 `edge.test.ts`/`picker-edge.test.ts` 的“无 Playwright Edge 残留”断言因用户正在运行的 `vibe-dev`（4317）预览 Edge 而失败（父进程为该 DSH host，属已知环境误报，与本改动无关）；`pnpm build` host 200.6 / client 210.7 KiB；`pnpm test:e2e` 9/9；真实载体 `ok:true`（`historyStatusAfterSend: null`、`queueStatusAfterQueueSend: null`、`historyStatusAfterQueueSend: null`、`notAutoSent: true`）。
 - 清理：测试写入的 `.vibe/annotations` 与空 `.vibe/` 已删除；4320/4338 无监听残留；`desktop`/`web` profile 未触碰。
 
+### U03 — 拾取注入与重开会话恢复（2026-10-29，`task/m3-ui-refine`）
+
+- 背景：用户实测三连反馈——① 出现 `vibe-studio: element picking is unavailable on this page`；② 有时点击选不中元素；③ 在面板里“停止 → 再启动”最容易复现，有时过一会儿能选中，有时长时间都不行，只能刷新整个浏览器页面。改前基线：`install()` 只发 `Runtime.enable`/`Runtime.addBinding`/`Page.addScriptToEvaluateOnNewDocument`/`Runtime.evaluate`，没有 `Page.enable`。
+- 定位（含机制验证，脚本留在 `.tmp/probe-addscript*.mjs`）：单独调用 `Page.addScriptToEvaluateOnNewDocument` 会返回 `{"identifier":"1"}`，但**不生效**；同一会话先 `Page.enable` 后，脚本在下次导航正确执行（`runImmediately: true` 只影响当前文档）。所以此前只有首个文档有 `window.__vibePicker`，任何 reload/导航（HMR 整页刷新、dev server 重启、工具栏导航、地址跳转）之后 `activate()` 都返回 false，面板便报 “unavailable on this page”；而会话启动时的 `install()` 失败被吞成 `capabilities.pick = false`，只剩 `pickStart` 把原始错误抛给用户。另外两个成因：页面自身导航后 Host 的 `activeNow` 不复位（面板显示“正在拾取”，点击无效）；客户端 `dismissedSeq` 跨会话残留，而 Host 的 `seq` 每会话从 0 重计，导致新会话的首次拾取被旧关闭记录挡住（“过一会儿才行”是因为序号刚好爬过旧值）。
+- 实现：`src/host/inspect/inject.ts` ① `install()` 在 `Runtime.addBinding` 前加 `Page.enable`；② 新增 `onFrameNavigated`，仅顶层帧复位 `activeNow`（子帧导航不影响），`teardown()` 同步 `off`；③ `activate()` 在当前文档缺脚本时先重装一次再重试启动，仍失败才抛原错误。`src/client/inspect/Picker.tsx` 在 `enabled` 变 false 时 `setDismissedSeq(0)`。
+- 验证：`pnpm typecheck` 0 error；`pnpm test` 60 文件 / **533 用例**，532 通过，1 个已知环境误报（`picker-edge.test.ts` 的“无 Playwright Edge 残留”断言看到用户 4317 预览的 Edge）；`pnpm build` host 201.1 / client 210.7 KiB；`pnpm test:e2e` 9/9。新增/更新用例：安装顺序锁到 `Runtime.enable → Page.enable → Runtime.addBinding → Page.addScriptToEvaluateOnNewDocument → Runtime.evaluate`、顶层帧 vs 子帧导航、`activate()` 重装序列（START → 脚本 → START）与无法修复时仍拒绝、dispose 解绑 `Page.frameNavigated`、组件侧“重开会话后第一次拾取可见”。
+- 真实载体（`.tmp/verify-pick-recovery.mjs` → `.tmp/logs/verify-pick-recovery.json`，一次性 `vibe-dev` 4341 + 探针服务 4323 + 死端口 4322，`ok:true`，0 console error）：基线气泡 true；页面自身 reload 后拾取态复位、新文档 `PROBE-PARSE/LOAD object`、再拾取 true；`location.href` 导航同样；不可达端口给“preview page is not reachable”，回到活页后不重启即可捡起；面板内停止再启动后首次点击直接出气泡。改前同一脚本的探针显示 reload 后 `__vibePicker` 为 `undefined`。
+- 注意：用户当前运行的 DSH（4317）载入的是旧 `lib/*`，需要重启 DSH 才会用上新包。
+- 清理：验证用的 4341/4323/4322 端口与 Edge 全部 `taskkill /T /F` 清理；未触碰 4317、`desktop`/`web` profile。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -654,6 +664,8 @@
 3. **`engines.dsh` 放在包根**：DSH app-boot 只读顶层字段。
 4. **Windows 定时器粒度约 15.6 ms**：30 fps 不能裸用 `setInterval(33)`，S1 使用 deadline scheduler。
 5. **Soak 期间不要重建 linked package**：DSH 会热重载 client，测量失效；验收前检查包 mtime，必要时标记 `packageChanged`。
+6. **`Page.addScriptToEvaluateOnNewDocument` 必须先 `Page.enable`**：在页面级 CDP 会话上单独调用它，Chromium 会返回 `{"identifier":"..."}` 却不把脚本应用到后续文档（Edge 实测，U03）。要覆盖导航后的新文档，同一会话先 `Page.enable` 再注册；`runImmediately: true` 只补当前文档，不能替代。
+7. **页面级状态要跟着 `Page.frameNavigated` 复位**：新顶层文档带的是全新的空闲脚本，Host 侧 `active`/`seq` 要同步清零；只用 `frame.parentId === undefined` 判定顶层，否则子帧刷新会把正在进行的拾取打断。
 
 ### Composer / S2
 
