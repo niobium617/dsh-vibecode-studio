@@ -72,6 +72,7 @@ describe('host transport registration', () => {
       'vibe-studio: preview methods',
       `vibe-studio: ${STREAM_PATH}`,
       `vibe-studio: ${FRAME_PATH}`,
+      'vibe-studio: api methods',
     ])
   })
 
@@ -86,6 +87,7 @@ describe('host transport registration', () => {
     expect(service.transport.has(PREVIEW_START_METHOD)).toBe(true)
     expect(service.transport.has(PREVIEW_STOP_METHOD)).toBe(true)
     expect(service.transport.has(PREVIEW_STATUS_METHOD)).toBe(true)
+    expect(service.transport.has('api.http.send')).toBe(true)
     expect(service.settings).toBeDefined()
     expect(service.preview.status().status).toBe('idle')
 

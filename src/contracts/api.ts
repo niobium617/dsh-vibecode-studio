@@ -331,6 +331,9 @@ export function isApiEnvironmentView(value: unknown): value is ApiEnvironmentVie
  * stay as `{{name}}` placeholders and are only expanded at send time.
  * ---------------------------------------------------------------------- */
 
+/** Unary method the panel uses to send one expanded request (T038). */
+export const API_HTTP_SEND_METHOD = 'api.http.send'
+
 export const API_STORE_ID_PATTERN = '[A-Za-z0-9][A-Za-z0-9._-]{0,63}'
 export const API_NAME_CHARS_MAX = 200
 export const API_COLLECTION_ITEMS_MAX = 200

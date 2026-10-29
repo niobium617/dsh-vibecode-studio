@@ -7,6 +7,7 @@
  */
 import type { ApiSecretStore, CredentialProviderLike } from './api/secrets'
 import { createApiSecretStore } from './api/secrets'
+import { ApiService, registerApiMethods } from './api/service'
 import { Config, resolveConfig, type VibeStudioConfig } from './config'
 import {
   AnnotationHistoryService,
@@ -48,7 +49,7 @@ export {
   registerTransport,
   UnaryRegistry,
 } from './transport'
-export type { UnaryCallContext, UnaryHandler } from './transport'
+export type { UnaryCallContext, UnaryDispatchResult, UnaryHandler } from './transport'
 export {
   AnnotationHistoryService,
   createAnnotationHistoryService,
@@ -94,8 +95,10 @@ export type {
   ApiHistoryListResult,
   ApiHistoryStoreOptions,
 } from './api/history-store'
-export { ApiStoreError } from './api/store-files'
+export { ApiStoreError, toApiStoreStudioError } from './api/store-files'
 export type { ApiStoreErrorCode, ApiStoreFileOptions } from './api/store-files'
+export { API_HTTP_SEND_METHOD, ApiService, registerApiMethods } from './api/service'
+export type { ApiSendOutcome, ApiServiceOptions } from './api/service'
 export { isBlockedHost, normalizeHttpRequest } from './api/request'
 export type { NormalizedHttpRequest, NormalizeRequestOptions } from './api/request'
 export { createTargetAdapterRegistry } from './targets/registry'
@@ -283,6 +286,16 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
   // T036: secrets live only in `ctx.credentials`. A host without the seam
   // reports every reference as unconfigured rather than storing values here.
   const apiSecrets = createApiSecretStore({ credentials: ctx.credentials })
+
+  // T038: the request builder sends through one unary method; expansion and
+  // execution stay host-side so resolved secrets never reach the panel.
+  const api = new ApiService({ secrets: apiSecrets })
+  const setupApi = () => registerApiMethods(registry, api)
+  if (typeof ctx.effect === 'function') {
+    ctx.effect(setupApi, 'vibe-studio: api methods')
+  } else {
+    setupApi()
+  }
 
   ctx.provide('vibeStudio', {
     config: resolved,

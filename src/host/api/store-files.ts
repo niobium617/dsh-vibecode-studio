@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto'
 import { lstat, mkdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, sep } from 'node:path'
 import { utf8Bytes } from '../../contracts/budget'
+import { studioError, type StudioError, type StudioErrorCode } from '../../contracts/errors'
 
 export type ApiStoreErrorCode =
   | 'invalid_project_path'
@@ -32,6 +33,44 @@ export class ApiStoreError extends Error {
     this.name = 'ApiStoreError'
     this.code = code
   }
+}
+
+const STUDIO_CODE_BY_STORE_CODE: Readonly<Record<ApiStoreErrorCode, StudioErrorCode>> = {
+  invalid_project_path: 'invalid_config',
+  project_missing: 'invalid_config',
+  path_outside_project: 'permission_denied',
+  invalid_id: 'invalid_input',
+  invalid_data: 'invalid_input',
+  too_large: 'invalid_input',
+  not_found: 'not_found',
+  io: 'internal',
+}
+
+// Store messages embed absolute paths, which the panel must not see.
+const STUDIO_MESSAGE_BY_STORE_CODE: Readonly<Record<ApiStoreErrorCode, string>> = {
+  invalid_project_path: 'vibe-studio: project directory is not usable',
+  project_missing: 'vibe-studio: project directory does not exist',
+  path_outside_project: 'vibe-studio: API storage is outside the project',
+  invalid_id: 'vibe-studio: invalid API store id',
+  invalid_data: 'vibe-studio: API store document is invalid',
+  too_large: 'vibe-studio: API store document is too large',
+  not_found: 'vibe-studio: API store entry not found',
+  io: 'vibe-studio: API storage failed',
+}
+
+/**
+ * T038: unary handlers map store failures onto stable StudioError codes with a
+ * path-free message. Anything that is not an `ApiStoreError` stays internal.
+ */
+export function toApiStoreStudioError(error: unknown): StudioError {
+  if (!(error instanceof ApiStoreError)) {
+    return studioError('internal', 'vibe-studio: API storage failed', { reason: 'unknown' })
+  }
+  return studioError(
+    STUDIO_CODE_BY_STORE_CODE[error.code],
+    STUDIO_MESSAGE_BY_STORE_CODE[error.code],
+    { reason: error.code },
+  )
 }
 
 /**
