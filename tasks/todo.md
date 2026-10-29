@@ -617,6 +617,13 @@
 - **验收**：抓包 → 回放 → 保存 → 重开；500 端点导入；密钥不泄漏；SPEC 相关条目通过。
 - **验证**：手动 + `pnpm test`；记录结果。
 - **文件**：无。
+- **初评结果（2026-10-30，`task/m4-api-workbench`，NO-GO，未改产品代码）**：
+  - 基线：`pnpm typecheck` 0 error；`pnpm test` 89 文件 / 795 用例通过（26.04 s）；`pnpm build` host 278.8 / client 349.4 KiB；`pnpm test:e2e` 9/9（18.6 s）。日志 `.tmp/logs/g4-{typecheck,test,build,e2e}.log`。
+  - ✅ **抓包 → 回放 → 保存 → 重开**（真实载体）：`.tmp/g4/flow.mjs` + `vibe-dev` + 无头 Edge，Host 以隔离临时项目为 cwd，不写仓库 `.vibe`；`.tmp/logs/g4-flow.json` `ok:true`。回放 GET `/api/items`、保存显示“已保存。”、重开显示“已载入保存的请求…”并提示发送前不会发出请求；3 次点击；保存/重开期间站点请求数保持 4；整页 reload 后 1 集合 / 1 请求仍在；发送 1 次得 `HTTP 200 OK`、历史 1 条；0 其他 console 错误。
+  - ⚠️ **500 端点导入**（仅模块级）：`.tmp/g4/evidence.ts`（`.tmp/logs/g4-evidence.out`）47,712 B、100 路径 × 5 方法 = 500 端点、18.27 ms、10 分组、0 跳过、逐条 `isHttpRequestSpec` 通过、整份 `isApiCollection` 通过、save→read 逐字节相等。但 repo 内没有 unary/UI 调用 `importOpenApi`，用户无法从工作台导入（对应 FR-API-08 缺口），因此不能记为闭环通过。
+  - ❌ **密钥不泄漏**：bearer/basic/header api-key 正常（响应不含密钥、历史/集合落盘不含密钥、环境视图不含密钥、字面量落盘为 `REDACTED`、历史保留 `{{token}}`），但 **query 场景泄漏**：`api-key in=query` 与普通 `{{token}}` query 变量都会把解析后的密钥拼进最终 URL，`api.http.send` 返回的 `result.url`（以及重定向 hop 的 `url`/`location`）原样带回客户端。证据：`flows.queryKey.sent.url=/query-key?api_key=g4-secret-abc123`、`flows.queryVar.sent.url=/query-var?token=g4-secret-abc123`，两者 `outcomeHasSecret:true`。根因：`src/host/api/request.ts:190` 把 auth 值 append 到 URL、`:128` append query 行，`:349` 返回拼好的 `url`；`src/host/api/executor.ts:303-304` 原样返回 `url` 与 `redirects`；`src/host/api/service.ts:170` 未脱敏就返回。与 T038“解析后的密钥不进响应”的约定冲突；现有 `tests/unit/api-send/api-service.test.ts` 只覆盖 bearer header，未覆盖 query secret。
+  - **SPEC 矩阵**：FR-API-01/02/03/09/10/12 通过；FR-API-11 按 D8 延后（手动 Cookie header 可用）；FR-API-04 部分——展开与未解析提示可用，但 `EnvironmentEditor` 从未挂载、客户端从不提交 `environment`，没有变量值来源与持久化；FR-API-05 部分——保存/重开/删除/持久化可用，无改名，`duplicate` 只在 store 层、无 unary/UI；FR-API-06 部分——搜索/重开/清空可用，N 固定 200 不可配置；FR-API-07 **未实现**（repo 无 cURL 导入/导出，MUST）；FR-API-08 部分——mapper 可用但无入口（MUST）。
+  - **结论：NO-GO**。3 项专项验收 1 项通过、1 项仅模块级、1 项失败；SPEC 有 1 个 MUST 完全缺失（FR-API-07）、4 个 MUST 部分缺失（FR-API-04/05/06/08）。待用户选择返工范围后另开任务并复评；本节保持未勾选。
 
 ---
 
