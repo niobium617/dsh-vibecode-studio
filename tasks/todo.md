@@ -474,12 +474,21 @@
   - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/api-env tests/component/api` 3 文件 / 21 用例通过；`pnpm test` 65 文件 / 588 用例（基线 62 / 567）；`pnpm build` host 232.1 / client 211.9 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t036-{test,build,e2e}.log`。
   - 限制：未注册 unary 方法、面板未挂到页面（T038）；未做集合/历史持久化（T037）；`{{var}}` 单次展开、不支持嵌套或表达式；describe 失败与无 provider 都显示“未配置”，不区分原因；secret 变量只能引用凭证名，不能在环境里内联写值。
 
-### - [ ] T037 集合与历史持久化
+### - [x] T037 集合与历史持久化
 
 - **目标**：集合/文件夹/历史 JSON；原子写；脱敏；schema 校验。
 - **验收**：保存/重开/复制/删除；历史搜索/清空；无明文密钥。
 - **验证**：`pnpm test -- tests/unit/api-store`。
 - **文件**：`src/host/api/{collection-store,history-store}.ts`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 契约：`src/contracts/api.ts` 追加集合/历史形状与守卫——`ApiSavedRequest`/`ApiCollectionFolder`（单层文件夹）/`ApiCollection`、`ApiHistoryEntry{id, at, method, url, status?, elapsedMs?, request}`、`ApiHistoryQuery`、`API_STORE_ID_PATTERN`/`API_COLLECTION_FILE_BYTES_MAX`(256 KiB)/`API_HISTORY_FILE_BYTES_MAX`(1 MiB)/`API_HISTORY_ENTRIES_MAX`(200) 等限额、`isApiStoreId`/`isApiSavedRequest`/`isApiCollectionFolder`/`isApiCollection`/`isApiHistoryEntry`/`isApiHistoryQuery`，以及 `redactHttpRequest()`（URL 凭证与敏感 query 清除、敏感 header/query/form 行置 `REDACTED`、auth 只留 kind/用户名·名、JSON body 递归脱敏、multipart 丢弃文件字节）。
+  - 公共文件层：`src/host/api/store-files.ts` 提供 `.vibe/api` 的路径封闭（realpath/junction/symlink 拒绝）、大小上限、同目录临时文件 + `rename`（EPERM/EBUSY/EACCES 有界重试）与“坏文件读作 undefined”的读法，以及 `ApiStoreError` 稳定码（`invalid_project_path|project_missing|path_outside_project|invalid_id|invalid_data|too_large|not_found|io`）。
+  - 集合：`src/host/api/collection-store.ts` 的 `ApiCollectionStore` 用 `.vibe/api/collections/<id>.json` 一集合一文件；`save` 先校验（`isApiCollection`）再 `redactCollection` 再原子写，`read`/`list`（按名排序、坏文件计入 `skipped`、文件名与内文 id 必须一致）/`remove`，`duplicate(id, {id?,name?})` 生成新集合 id 与全新嵌套 id、源文件不动、源缺失 `not_found`。
+  - 历史：`src/host/api/history-store.ts` 的 `ApiHistoryStore` 用单个有界 `.vibe/api/history.json`（`{version:1, entries}`，最新在前，200 条封顶）；`append(request, {status?, elapsedMs?, at?})` 先脱敏再写，`list({query?, limit?})` 按 method/url/status 大小写不敏感子串过滤、`total` 为截断前匹配数、`skipped` 统计非法条目，`clear()` 删文档；坏文档读作空并在下次 append 时自然重建；`now`/`nextId`/`renameFile` 可注入。
+  - 接线：`src/host/index.ts` 导出两个 store 与 `ApiStoreError`；未注册 unary 方法、未挂 UI（T038），未改服务槽与 `config.test.ts`。
+  - 验收对应：`tests/unit/api-store/` 3 文件 / 26 用例——redact（7：auth 三类、敏感行、URL、JSON/text/form/multipart、整体无明文且仍是合法 spec）、collection（10：落盘往返、按名列出与 skipped、写盘脱敏、文件字节不落盘、非法集合拒绝、超上限、复制新 id 且源不变、缺源复制、删除幂等、非法 id、`.vibe` junction 越界）、history（9：最新在前与响应字段、显式时间戳、写盘脱敏、200 条封顶、搜索与 limit、清空、坏文档自愈、坏条目跳过、非法 query/请求拒绝）。
+  - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/api-store` 3 文件 / 26 用例通过；`pnpm test` 68 文件 / 614 用例（基线 65 / 588）；`pnpm build` host 253.4 / client 211.9 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t037-{typecheck,test,build,e2e}.log`。
+  - 限制：未接 unary/UI（T038），没有“运行中请求记录自动写入”的调用方；多部件文件字节与文本型 body 的原样内容不落盘/不深度脱敏（变量 `{{name}}` 原样保留，只在发送时展开）；文件夹只支持一层。
 
 ### - [ ] T038 请求构建 UI
 

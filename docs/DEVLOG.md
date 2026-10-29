@@ -643,6 +643,17 @@
 - 设计取舍：host 侧 `resolveHttpRequest()` 可能含明文密钥，只留在 host、永不过 unary；客户端只拿 `describeEnvironment()` 的产物，并用测试断言 `JSON.stringify(view)` 不含明文。`{{var}}` 单次展开、不支持嵌套/表达式；describe 失败与无 provider 统一显示“未配置”。
 - 遗留：未注册 unary 方法、面板未挂页面（T038）；集合/历史持久化与 `.vibe` 落盘（T037）；密钥写入 UI 待 T038 决定放置位置。
 
+### T037 — 集合与历史持久化（2026-10-29，`task/m4-api-workbench`）
+
+- 目标：集合/文件夹与请求历史的 `.vibe/api` JSON 持久化、原子写、脱敏与 schema 校验；不接 unary/UI（T038）。
+- 契约（`src/contracts/api.ts`）：`ApiSavedRequest`/`ApiCollectionFolder`（仅一层文件夹）/`ApiCollection`、`ApiHistoryEntry{id, at, method, url, status?, elapsedMs?, request}`、`ApiHistoryQuery`，`API_STORE_ID_PATTERN`、`API_COLLECTION_FILE_BYTES_MAX`=256 KiB、`API_HISTORY_FILE_BYTES_MAX`=1 MiB、`API_HISTORY_ENTRIES_MAX`=200 等限额与 `isApiStoreId`/`isApiCollection`/`isApiHistoryEntry`/`isApiHistoryQuery` 守卫；`redactHttpRequest()` 是持久化的唯一入口——URL 凭证与敏感 query 参数清除、敏感 header/query/form 行置 `REDACTED`、auth 保留 kind（bearer token / basic password / api-key value 置 `REDACTED`，用户名与键名保留）、JSON body 递归脱敏、multipart 丢弃文件字节（只留 field/fileName/contentType）。
+- 文件层（`src/host/api/store-files.ts`）：`.vibe/api` 的路径封闭（realpath + junction/symlink 拒绝，越界 `path_outside_project`）、解析前大小上限、同目录临时文件 + `rename` 原子替换（EPERM/EBUSY/EACCES 有界重试）、坏文件/坏 JSON/超限读作 `undefined`；`ApiStoreError` 稳定码供 T038 映射到 `StudioError`。
+- 集合（`src/host/api/collection-store.ts`）：`.vibe/api/collections/<id>.json` 一集合一文件；`save` 先 `isApiCollection` 校验、再 `redactCollection`、再原子写；`read` 坏文件返回 `null`；`list` 按名排序、文件名 id 与内文 id 必须一致、不一致/坏文件计入 `skipped`；`remove` 幂等；`duplicate(id,{id?,name?})` 新集合 id + 全部嵌套新 id，源文件不动，源缺失 `not_found`。
+- 历史（`src/host/api/history-store.ts`）：单个有界 `.vibe/api/history.json`（`{version:1, entries}`），最新在前、200 条封顶；`append()` 先脱敏再记录（`at`/`status`/`elapsedMs` 可选，`now`/`nextId` 可注入）；`list({query?, limit?})` 按 method/url/status 子串过滤、`total` 是截断前匹配数、`skipped` 统计非法条目、默认 `limit` 50；`clear()` 删文件；坏文档读作空并在下次 append 重建。
+- 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/api-store` 3 文件 / 26 用例通过；`pnpm test` 68 文件 / **614 用例**（基线 65 / 588）；`pnpm build` host 253.4 / client 211.9 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t037-{typecheck,test,build,e2e}.log`。
+- 设计取舍：持久化入口统一走 `redactHttpRequest()`，变量保持 `{{name}}` 原样（只在发送时展开），所以落盘文件不接触已解析的密钥；文本型 body 无法按键判断敏感内容，原样保留；多部件文件字节不落盘（面板在发送前重新附加）；文件夹只支持一层以保持文件格式可校验。
+- 遗留：未注册 unary 方法、未挂 UI（T038），也还没有“发送时自动写历史”的调用方；`ApiStoreError` → `StudioError` 的映射留给 T038。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -833,6 +844,7 @@ pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 - Composer handoff：`src/client/inspect/handoff.ts`、`tests/component/annotation/composer-handoff.test.tsx`、`.tmp/logs/t032-{web,desktop}.json`。
 - HTTP 执行器：`src/contracts/api.ts`、`src/host/api/{request,executor}.ts`、`tests/unit/http-executor/{request,executor}.test.ts`。
 - 环境与密钥：`src/contracts/api.ts`（环境模型与安全视图）、`src/host/api/{secrets,environment}.ts`、`src/client/api/EnvironmentEditor.tsx`、`tests/unit/api-env/`、`tests/component/api/environment-editor.test.tsx`。
+- 集合与历史：`src/contracts/api.ts`（集合/历史模型与 `redactHttpRequest`）、`src/host/api/{store-files,collection-store,history-store}.ts`、`tests/unit/api-store/`。
 - Web 预览：`src/host/targets/web/{adapter,launch}.ts`、`tests/integration/web-adapter/`、`tests/helpers/png.ts`。
 - 预览生命周期：`src/host/preview/session.ts`、`src/client/preview/{Toolbar.tsx,lifecycle.ts,local-url.ts}`、`tests/integration/preview/session-lifecycle.test.ts`、`.tmp/logs/t025-{host,desktop}.json`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。
