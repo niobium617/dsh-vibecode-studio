@@ -504,12 +504,20 @@
   - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/api-store tests/unit/api-send tests/component/api-request` 7 文件 / 49 用例通过；`pnpm test` 72 文件 / 637 用例（基线 68 / 614）；`pnpm build` host 256.3 / client 251.4 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t038-{typecheck,test,build,e2e}.log`。
   - 限制：unary envelope 上限 64 KiB，multipart 实际可传文件约 48 KiB（契约允许 4 MiB/文件），大文件上传需后续专用通道；历史/集合尚未在发送后自动写入（T044）；T039 才有响应体查看，当前只显示状态/耗时/字节数。
 
-### - [ ] T039 响应查看 UI（基础）
+### - [x] T039 响应查看 UI（基础）
 
 - **目标**：状态/耗时/大小/headers/body；raw/文本/JSON 基础美化；大响应虚拟化。
 - **验收**：10 MB 响应不冻结；错误状态可读；组件测试通过。
 - **验证**：`pnpm test -- tests/component/api-response` + 手动。
 - **文件**：`src/client/api/{ResponseView,ResponseHeaders}.tsx`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 组件：新增 `ResponseView.tsx`（状态徽标按 2xx/3xx/4xx/5xx 着色、`{elapsed} ms · {bytes}`、content type、重定向次数、截断徽标；`body|headers` 页签；`pretty|raw` 仅在 JSON 可解析时出现；按 `RESPONSE_PAGE_BYTES = 64 KiB` 分页，>256 KiB 的 JSON 不美化并提示；二进制/空响应不渲染文本；`buildBodyContent`/`formatResponseBytes` 导出供测试与 T040 复用）；`ResponseHeaders.tsx`（逐行 `data-vibe-response-header`、空态、Host 侧脱敏说明）。
+  - 接线：`RequestBuilder` 的已发送分支改为渲染 `ResponseView`，删除 T038 的重复结果行与本地 `formatBytes`；移除已无引用的 `api.request.result.summary` / `api.request.result.truncated` 两个键，新增 17 个 `api.response.*` 键（中英同步）。
+  - 验收对应：`tests/component/api-response/response-view.test.tsx` 10 用例（200 状态/耗时/字节 + 默认美化、raw 切换、500 + 截断徽标、**10 MB 体**只渲染 65536 字符且 `Page 1 of 160` 并可前后翻页、二进制/空体说明、响应头两行 + 脱敏说明、300 KiB JSON 保持 raw 并提示、zh-CN 文案、从文本识别 JSON、字节格式化）；`tests/component/api-request` 的 T038 断言改指向 `ResponseView`。
+  - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/component/api-response tests/component/api-request` 3 文件 / 25 用例；`pnpm test` 73 文件 / 647 用例（基线 72 / 637）；`pnpm build` host 256.3 / client 263.8 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t039-{typecheck,test,build,e2e}.log`。
+  - 手动（真实载体）：`.tmp/t039-manual.mjs` — dsh `vibe-dev` + 无头 Edge，本地 echo 服务返回 10 MB 与 500。结果 `.tmp/logs/t039-web.json`：`HTTP 200 OK`、`87 ms · 4.0 MB`、截断徽标“已按大小上限截断”、DOM 仅 65536 字符、`第 1 / 64 页` 翻页耗时 1.1 ms、500 页面 `HTTP 500 Internal Server Error` + 32 B 可读、0 控制台错误。**注意**：执行器 `maxResponseBytes` 默认 4 MiB，服务端 10 MB 到面板时已截断；10 MB 视图内分页由组件测试覆盖。
+  - 修复（手动启动发现）：`apply()` 直接读 `ctx.credentials` 但 `inject` 只声明 `connection`，Cordis 拒绝未声明服务访问，导致插件在真实 carrier 中 `cannot get property "credentials" without inject` 完全不激活（单测用裸 ctx 无法覆盖）。`src/host/index.ts` 改为 `export const inject = ['connection', 'credentials']` 后启动无告警；重跑 typecheck / 647 用例 / e2e 9/9 全绿。
+  - 限制：二进制、HTML、图片预览与下载是 T040；响应体仍受执行器 `maxResponseBytes`（默认 4 MiB）截断；分页按字符切分，超长单行会跨页断开。
 
 ### - [ ] T040 富响应体（JSON 树/HTML/图片/二进制）
 

@@ -665,6 +665,17 @@
 - 设计取舍：面板只把未展开的 spec 交给 host——`EnvironmentEditor` 的密钥行本来就没有能装值的字段，展开后也不回传，明文密钥始终不进 client 状态。组件测试注入 `ApiSend`，因此断言的是真正会过 unary 的 spec，校验失败的草稿一次都不会发。
 - 限制：unary envelope 上限 64 KiB（`MAX_UNARY_BODY_BYTES`），multipart 实际可传文件约 48 KiB，与契约的 4 MiB/文件 不符，大文件需后续专用上传通道；发送后尚未自动写历史/集合（T044）；响应体查看在 T039。
 
+### T039 — 响应查看 UI（2026-10-29，`task/m4-api-workbench`）
+
+- 目标：把 `api.http.send` 的结果变成可读的响应视图——状态/耗时/大小/headers/body，raw 与基础 JSON 美化，10 MB 响应不冻结。
+- 组件（`src/client/api/ResponseView.tsx`、`ResponseHeaders.tsx`）：状态徽标按 2xx/3xx/4xx/5xx 着色；元信息 `{elapsed} ms · {bytes}`、content type、重定向次数、截断徽标；`body|headers` 页签，`pretty|raw` 只在 body 可解析为 JSON 时出现。导出纯函数 `buildBodyContent(result)`（`text`/`binary`/`empty` 三态，`HttpResponseBody.text === null` 即二进制，空体按 `bytes` 区分）与 `formatResponseBytes`，T040 可直接复用。`ResponseHeaders` 逐行渲染 `data-vibe-response-header`，空态与“敏感值已由 Host 脱敏”说明；client 不接触密钥。
+- 性能策略：不引入虚拟化依赖（项目规则：依赖最小）。body 按 `RESPONSE_PAGE_BYTES = 64 * 1024` 字符分页，`Page n of m` 前后翻页；JSON 只在 ≤ `RESPONSE_PRETTY_MAX_CHARS = 256 * 1024` 时 `JSON.parse` + 重新序列化，超出保持 raw 并显示 `api.response.jsonTooLarge` 提示。这样任何响应在 DOM 中最多一个 64 KiB 文本节点。
+- 接线：`RequestBuilder` 已发送分支改为渲染 `ResponseView`，删除 T038 的重复结果行与本地 `formatBytes`；删除随之失效的 `api.request.result.summary` / `api.request.result.truncated`，新增 17 个 `api.response.*` 键，中英同步。
+- **真实载体缺陷（手动启动才发现）**：`apply()` 读 `ctx.credentials`（T036 密钥 seam），但 `inject` 只声明了 `connection`；Cordis 对未声明的服务访问直接抛 `cannot get property "credentials" without inject`，插件在 `vibe-dev` 里完全没激活。单测用裸 ctx 调用 `apply()`，绕过了 inject 校验，所以 637 个用例全绿也发现不了。修复：`src/host/index.ts` 的 `inject = ['connection', 'credentials']`。教训：任何 `ctx.<service>` 读取都必须先出现在 `inject`；带新服务依赖时至少启动一次真实 host。
+- 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/component/api-response tests/component/api-request` 3 文件 / 25 用例；`pnpm test` **73 文件 / 647 用例**（基线 72 / 637）；`pnpm build` host 256.3 / client 263.8 KiB；`pnpm test:e2e` 9/9。手动 `.tmp/t039-manual.mjs`（dsh `vibe-dev` + 无头 Edge，本地 echo 服务）：10 MB 端点显示 `HTTP 200 OK`、`87 ms · 4.0 MB`、截断徽标、DOM 65536 字符、`第 1 / 64 页`、翻页 1.1 ms；500 端点 `HTTP 500 Internal Server Error` + 32 B 正文；0 控制台错误。证据 `.tmp/logs/t039-web.json`。
+- 设计取舍：10 MB 验收在视图层用组件测试证明（真实端点会先被执行器 `maxResponseBytes` 默认 4 MiB 截断），手动检查同时验证了截断提示不会骗人。分页按字符切，超长单行会跨页断开——比一次性塞进 DOM 更可接受。
+- 限制：二进制/HTML/图片预览与下载是 T040；响应体上限仍由执行器决定；分页无“跳到第 n 页”输入。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -857,6 +868,7 @@ pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 - 环境与密钥：`src/contracts/api.ts`（环境模型与安全视图）、`src/host/api/{secrets,environment}.ts`、`src/client/api/EnvironmentEditor.tsx`、`tests/unit/api-env/`、`tests/component/api/environment-editor.test.tsx`。
 - 集合与历史：`src/contracts/api.ts`（集合/历史模型与 `redactHttpRequest`）、`src/host/api/{store-files,collection-store,history-store}.ts`、`tests/unit/api-store/`。
 - 请求构建：`src/host/api/service.ts`、`src/client/api/{request-model.ts,RequestForm.tsx,RequestBuilder.tsx}`、`tests/unit/api-send/`、`tests/component/api-request/`。
+- 响应查看：`src/client/api/{ResponseView,ResponseHeaders}.tsx`、`tests/component/api-response/`、`.tmp/logs/t039-web.json`、`.tmp/t039-manual.mjs`。
 - Web 预览：`src/host/targets/web/{adapter,launch}.ts`、`tests/integration/web-adapter/`、`tests/helpers/png.ts`。
 - 预览生命周期：`src/host/preview/session.ts`、`src/client/preview/{Toolbar.tsx,lifecycle.ts,local-url.ts}`、`tests/integration/preview/session-lifecycle.test.ts`、`.tmp/logs/t025-{host,desktop}.json`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。
