@@ -75,6 +75,27 @@ export type {
 } from './api/secrets'
 export { createHttpExecutor, HttpExecutor } from './api/executor'
 export type { HttpExecuteOptions, HttpExecutorOptions } from './api/executor'
+export {
+  API_COLLECTION_DIR_NAME,
+  API_COLLECTION_FILE_EXT,
+  ApiCollectionStore,
+  createApiCollectionStore,
+  redactCollection,
+} from './api/collection-store'
+export type { ApiCollectionListResult } from './api/collection-store'
+export {
+  API_HISTORY_FILE_NAME,
+  API_HISTORY_VERSION,
+  ApiHistoryStore,
+  createApiHistoryStore,
+} from './api/history-store'
+export type {
+  ApiHistoryAppendDetails,
+  ApiHistoryListResult,
+  ApiHistoryStoreOptions,
+} from './api/history-store'
+export { ApiStoreError } from './api/store-files'
+export type { ApiStoreErrorCode, ApiStoreFileOptions } from './api/store-files'
 export { isBlockedHost, normalizeHttpRequest } from './api/request'
 export type { NormalizedHttpRequest, NormalizeRequestOptions } from './api/request'
 export { createTargetAdapterRegistry } from './targets/registry'

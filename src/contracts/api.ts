@@ -6,6 +6,7 @@
  * base64 and every size is a byte count. The host normalizes and executes a
  * request; the panel only builds this shape and renders the result.
  */
+import { REDACTED, isSensitiveKey, redactJsonBody, redactUrl } from './redact'
 
 export const HTTP_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const
 export type HttpMethod = (typeof HTTP_METHODS)[number]
@@ -319,4 +320,210 @@ export function isApiEnvironmentView(value: unknown): value is ApiEnvironmentVie
       return !(variable.secret === true && variable.value !== undefined)
     })
   )
+}
+
+/* -------------------------------------------------------------------------
+ * Collections and history (T037)
+ *
+ * Both are plain JSON under `.vibe/api`, written after redaction: a stored
+ * request never carries an expanded secret and never carries literal values
+ * for sensitive headers, query parameters, auth or JSON body keys. Variables
+ * stay as `{{name}}` placeholders and are only expanded at send time.
+ * ---------------------------------------------------------------------- */
+
+export const API_STORE_ID_PATTERN = '[A-Za-z0-9][A-Za-z0-9._-]{0,63}'
+export const API_NAME_CHARS_MAX = 200
+export const API_COLLECTION_ITEMS_MAX = 200
+export const API_COLLECTION_FILE_BYTES_MAX = 256 * 1024
+export const API_HISTORY_FILE_BYTES_MAX = 1024 * 1024
+export const API_HISTORY_ENTRIES_MAX = 200
+export const API_HISTORY_QUERY_CHARS_MAX = 200
+export const API_HISTORY_LIMIT_DEFAULT = 50
+
+const API_STORE_ID_RE = new RegExp(`^${API_STORE_ID_PATTERN}$`)
+
+/** True for ids usable as a file stem inside `.vibe/api`. */
+export function isApiStoreId(value: unknown): value is string {
+  return typeof value === 'string' && API_STORE_ID_RE.test(value)
+}
+
+/** One request saved in a collection or folder. */
+export interface ApiSavedRequest {
+  readonly id: string
+  readonly name: string
+  /** Stored spec; secrets were redacted on the way to disk (T037). */
+  readonly request: HttpRequestSpec
+}
+
+/** One level of folders keeps the file format trivial to validate. */
+export interface ApiCollectionFolder {
+  readonly id: string
+  readonly name: string
+  readonly requests: readonly ApiSavedRequest[]
+}
+
+export interface ApiCollection {
+  readonly id: string
+  readonly name: string
+  readonly folders?: readonly ApiCollectionFolder[]
+  /** Requests that live outside any folder. */
+  readonly requests?: readonly ApiSavedRequest[]
+}
+
+/** One sent request; the request is the stored, already-redacted copy. */
+export interface ApiHistoryEntry {
+  readonly id: string
+  /** ISO-8601 timestamp of the send. */
+  readonly at: string
+  readonly method: HttpMethod
+  /** Display URL after redaction. */
+  readonly url: string
+  /** Response status when a response came back; absent on transport errors. */
+  readonly status?: number
+  readonly elapsedMs?: number
+  readonly request: HttpRequestSpec
+}
+
+export interface ApiHistoryQuery {
+  /** Case-insensitive substring over method, URL and status. */
+  readonly query?: string
+  readonly limit?: number
+}
+
+export function isApiSavedRequest(value: unknown): value is ApiSavedRequest {
+  if (!isRecord(value)) return false
+  return (
+    isApiStoreId(value.id) &&
+    isBoundedString(value.name, 1, API_NAME_CHARS_MAX) &&
+    isHttpRequestSpec(value.request)
+  )
+}
+
+export function isApiCollectionFolder(value: unknown): value is ApiCollectionFolder {
+  if (!isRecord(value)) return false
+  return (
+    isApiStoreId(value.id) &&
+    isBoundedString(value.name, 1, API_NAME_CHARS_MAX) &&
+    Array.isArray(value.requests) &&
+    value.requests.length <= API_COLLECTION_ITEMS_MAX &&
+    value.requests.every(isApiSavedRequest)
+  )
+}
+
+export function isApiCollection(value: unknown): value is ApiCollection {
+  if (!isRecord(value)) return false
+  return (
+    isApiStoreId(value.id) &&
+    isBoundedString(value.name, 1, API_NAME_CHARS_MAX) &&
+    (value.folders === undefined ||
+      (Array.isArray(value.folders) &&
+        value.folders.length <= API_COLLECTION_ITEMS_MAX &&
+        value.folders.every(isApiCollectionFolder))) &&
+    (value.requests === undefined ||
+      (Array.isArray(value.requests) &&
+        value.requests.length <= API_COLLECTION_ITEMS_MAX &&
+        value.requests.every(isApiSavedRequest)))
+  )
+}
+
+export function isApiHistoryEntry(value: unknown): value is ApiHistoryEntry {
+  if (!isRecord(value)) return false
+  return (
+    isApiStoreId(value.id) &&
+    isBoundedString(value.at, 10, 40) &&
+    !Number.isNaN(Date.parse(value.at)) &&
+    typeof value.method === 'string' &&
+    (HTTP_METHODS as readonly string[]).includes(value.method) &&
+    isBoundedString(value.url, 0, HTTP_URL_CHARS_MAX + 512) &&
+    (value.status === undefined || isIntegerInRange(value.status, 100, 599)) &&
+    (value.elapsedMs === undefined || isIntegerInRange(value.elapsedMs, 0, 86_400_000)) &&
+    isHttpRequestSpec(value.request)
+  )
+}
+
+export function isApiHistoryQuery(value: unknown): value is ApiHistoryQuery {
+  if (!isRecord(value)) return false
+  return (
+    (value.query === undefined || isBoundedString(value.query, 0, API_HISTORY_QUERY_CHARS_MAX)) &&
+    (value.limit === undefined || isIntegerInRange(value.limit, 1, API_HISTORY_ENTRIES_MAX))
+  )
+}
+
+/** Sensitive row values become `REDACTED`; the row itself is kept visible. */
+function redactRows(
+  rows: readonly HttpKeyValue[] | undefined,
+): readonly HttpKeyValue[] | undefined {
+  if (rows === undefined) return undefined
+  return rows.map((row) => (isSensitiveKey(row.name) ? { ...row, value: REDACTED } : { ...row }))
+}
+
+/** Re-serializes a JSON body with sensitive keys masked, when it parses. */
+function redactJsonText(text: string): string {
+  try {
+    return JSON.stringify(redactJsonBody(JSON.parse(text)))
+  } catch {
+    // Not JSON despite the kind; nothing trustworthy to redact, keep the text.
+    return text
+  }
+}
+
+function redactBody(body: HttpRequestBody | undefined): HttpRequestBody | undefined {
+  if (body === undefined) return undefined
+  switch (body.kind) {
+    case 'none':
+      return { kind: 'none' }
+    case 'json':
+      return { kind: 'json', text: redactJsonText(body.text) }
+    case 'text':
+      return body.contentType === undefined
+        ? { kind: 'text', text: body.text }
+        : { kind: 'text', text: body.text, contentType: body.contentType }
+    case 'form':
+      return { kind: 'form', fields: redactRows(body.fields) ?? [] }
+    case 'multipart':
+      return {
+        kind: 'multipart',
+        fields: redactRows(body.fields) ?? [],
+        // File bytes are never persisted: they are large and not replayable
+        // from disk. The panel re-attaches the file before sending.
+        files: body.files.map((file) => ({ ...file, base64: '' })),
+      }
+  }
+}
+
+function redactAuth(auth: HttpAuth | undefined): HttpAuth | undefined {
+  if (auth === undefined) return undefined
+  switch (auth.kind) {
+    case 'none':
+      return { kind: 'none' }
+    case 'bearer':
+      return { kind: 'bearer', token: REDACTED }
+    case 'basic':
+      // The username identifies the account; the password is the secret.
+      return { kind: 'basic', username: auth.username, password: REDACTED }
+    case 'api-key':
+      return { kind: 'api-key', name: auth.name, value: REDACTED, in: auth.in }
+  }
+}
+
+/**
+ * The copy of a request that may be written to `.vibe/api`: URL credentials
+ * and sensitive query values stripped, sensitive headers/rows/auth masked,
+ * JSON body keys redacted and multipart file bytes dropped.
+ */
+export function redactHttpRequest(request: HttpRequestSpec): HttpRequestSpec {
+  return {
+    method: request.method,
+    url: redactUrl(request.url),
+    ...(request.query === undefined ? {} : { query: redactRows(request.query) ?? [] }),
+    ...(request.headers === undefined ? {} : { headers: redactRows(request.headers) ?? [] }),
+    ...(request.body === undefined ? {} : { body: redactBody(request.body) }),
+    ...(request.auth === undefined ? {} : { auth: redactAuth(request.auth) }),
+    ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+    ...(request.redirect === undefined ? {} : { redirect: request.redirect }),
+    ...(request.maxRedirects === undefined ? {} : { maxRedirects: request.maxRedirects }),
+    ...(request.maxResponseBytes === undefined
+      ? {}
+      : { maxResponseBytes: request.maxResponseBytes }),
+  }
 }
