@@ -12,7 +12,11 @@
 import { truncateChars, truncateUtf8, utf8Bytes } from '../../contracts/budget'
 import { studioError, type StudioError } from '../../contracts/errors'
 import { redactHeaders, redactUrl } from '../../contracts/redact'
-import type { NetworkEntry, NetworkOutcome } from '../../contracts/telemetry'
+import {
+  MAX_CAPTURED_REQUEST_BODY_BYTES,
+  type NetworkEntry,
+  type NetworkOutcome,
+} from '../../contracts/telemetry'
 import {
   MAX_NETWORK_BODY_BYTES,
   MAX_NETWORK_ENTRIES,
@@ -147,6 +151,9 @@ interface StoredNetwork {
   durationMs: number | null
   requestHeaders?: Readonly<Record<string, string>>
   responseHeaders?: Readonly<Record<string, string>>
+  requestBody?: string
+  requestBodyTruncated: boolean
+  requestBodyUnavailable: boolean
   failure: string | null
   bytes: number
 }
@@ -156,6 +163,10 @@ export interface NetworkRequestInput {
   readonly url: string
   readonly resourceType: string | null
   readonly requestHeaders?: Readonly<Record<string, string>>
+  /** Capped UTF-8 body; omitted for GET/HEAD and for binary payloads. */
+  readonly requestBody?: string
+  readonly requestBodyTruncated?: boolean
+  readonly requestBodyUnavailable?: boolean
   readonly startedAt: number
   readonly startedMonoMs: number | null
 }
@@ -173,6 +184,9 @@ function entryBytes(stored: StoredNetwork): number {
   let total = utf8Bytes(stored.method) + utf8Bytes(stored.url)
   if (stored.resourceType) total += utf8Bytes(stored.resourceType)
   if (stored.failure) total += utf8Bytes(stored.failure)
+  if (stored.requestBody) total += utf8Bytes(stored.requestBody)
+  if (stored.requestBodyTruncated) total += 1
+  if (stored.requestBodyUnavailable) total += 1
   for (const headers of [stored.requestHeaders, stored.responseHeaders]) {
     if (!headers) continue
     for (const [key, value] of Object.entries(headers)) {
@@ -198,7 +212,35 @@ function toEntry(stored: StoredNetwork): NetworkEntry {
     ...(stored.responseHeaders === undefined
       ? {}
       : { responseHeaders: stored.responseHeaders }),
+    ...(stored.requestBody === undefined ? {} : { requestBody: stored.requestBody }),
+    ...(stored.requestBodyTruncated ? { requestBodyTruncated: true } : {}),
+    ...(stored.requestBodyUnavailable ? { requestBodyUnavailable: true } : {}),
     ...(stored.failure === null ? {} : { failure: stored.failure }),
+  }
+}
+
+/**
+ * A redirect reuses the request id, and the final hop is what the row shows:
+ * its body replaces the earlier one. A redirect that drops the body (303, or
+ * 301/302 on POST) reports no postData and a changed method, so the old body
+ * is cleared; a 307/308 re-sends the same body, which may arrive again or not,
+ * so an absent body with an unchanged method keeps what was captured.
+ */
+function applyRequestBody(stored: StoredNetwork, input: NetworkRequestInput): void {
+  stored.requestBodyTruncated = false
+  stored.requestBodyUnavailable = false
+  if (input.requestBody !== undefined) {
+    stored.requestBody = input.requestBody
+    stored.requestBodyTruncated = input.requestBodyTruncated === true
+    return
+  }
+  if (input.requestBodyUnavailable === true) {
+    stored.requestBody = undefined
+    stored.requestBodyUnavailable = true
+    return
+  }
+  if (input.method === 'GET' || input.method === 'HEAD') {
+    stored.requestBody = undefined
   }
 }
 
@@ -243,6 +285,7 @@ export class PreviewNetworkBuffer {
       if (input.requestHeaders !== undefined) {
         existing.requestHeaders = input.requestHeaders
       }
+      applyRequestBody(existing, input)
       this.touch(existing)
       return existing.seq
     }
@@ -269,9 +312,12 @@ export class PreviewNetworkBuffer {
       ...(input.requestHeaders === undefined
         ? {}
         : { requestHeaders: input.requestHeaders }),
+      requestBodyTruncated: false,
+      requestBodyUnavailable: false,
       failure: null,
       bytes: 0,
     }
+    applyRequestBody(stored, input)
     stored.bytes = entryBytes(stored)
     this.entries.push(stored)
     this.byRequestId.set(requestId, stored)
@@ -434,11 +480,26 @@ export function createPreviewNetworkCollector(
       const wall = epochMs(event.wallTime)
       const startedAt = wall ?? now()
       const requestHeaders = normalizeNetworkHeaders(request.headers)
+      // T043: keep the body for replay, capped so one row never eats the
+      // 64 KiB unary envelope. Bodies are not redacted — replay must match.
+      const rawBody = textOf(request.postData)
+      const truncated =
+        rawBody !== null && utf8Bytes(rawBody) > MAX_CAPTURED_REQUEST_BODY_BYTES
+      const requestBody =
+        rawBody === null
+          ? undefined
+          : truncated
+            ? truncateUtf8(rawBody, MAX_CAPTURED_REQUEST_BODY_BYTES)
+            : rawBody
+      const bodyUnavailable = requestBody === undefined && request.hasPostData === true
       buffer.startRequest(requestId, {
         method: (textOf(request.method) ?? 'GET').toUpperCase(),
         url: capUrl(rawUrl),
         resourceType: textOf(event.type) ?? textOf(request.type),
         ...(requestHeaders === undefined ? {} : { requestHeaders }),
+        ...(requestBody === undefined ? {} : { requestBody }),
+        ...(requestBody !== undefined && truncated ? { requestBodyTruncated: true } : {}),
+        ...(bodyUnavailable ? { requestBodyUnavailable: true } : {}),
         startedAt,
         startedMonoMs: monotonicMs(event.timestamp),
       })

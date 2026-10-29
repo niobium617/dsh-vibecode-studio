@@ -19,9 +19,11 @@ import { createTranslator, type Locale } from '../i18n'
 import { callUnary, toStudioError } from '../transport'
 import { RequestForm } from './RequestForm'
 import { ResponseView } from './ResponseView'
+import { takePendingReplay, type PendingReplay } from './ReplayButton'
 import {
   buildRequestSpec,
   createRequestDraft,
+  draftFromRequestSpec,
   type RequestDraft,
   type RequestIssue,
 } from './request-model'
@@ -112,6 +114,23 @@ const listStyle: React.CSSProperties = {
   font: '11px/1.4 system-ui, sans-serif',
 }
 
+const noticeLineStyle: React.CSSProperties = {
+  font: '11px/1.4 system-ui, sans-serif',
+  wordBreak: 'break-word',
+}
+
+const dismissStyle: React.CSSProperties = {
+  justifySelf: 'start',
+  appearance: 'none',
+  border: '1px solid currentColor',
+  borderRadius: 4,
+  background: 'transparent',
+  color: 'inherit',
+  cursor: 'pointer',
+  font: '11px/1.4 system-ui, sans-serif',
+  padding: '1px 8px',
+}
+
 type Phase =
   | { readonly kind: 'idle' }
   | { readonly kind: 'sending' }
@@ -157,12 +176,25 @@ export function RequestBuilder({
   const [draft, setDraft] = React.useState<RequestDraft>(() => initialDraft ?? createRequestDraft())
   const [phase, setPhase] = React.useState<Phase>({ kind: 'idle' })
   const [issues, setIssues] = React.useState<readonly RequestIssue[]>([])
+  const [replay, setReplay] = React.useState<PendingReplay | null>(null)
   const controllerRef = React.useRef<AbortController | null>(null)
   const defaultSend = React.useMemo(() => createTransportSend(), [])
   const sendImpl = send ?? defaultSend
 
   React.useEffect(() => {
     return () => controllerRef.current?.abort()
+  }, [])
+
+  // T043: the replay button stores one draft before switching here. The tab
+  // switch unmounts the preview page, so this mount is the only consumer; the
+  // draft is loaded into the form and never sent on its own.
+  React.useEffect(() => {
+    const pending = takePendingReplay()
+    if (pending === null) return
+    setDraft(draftFromRequestSpec(pending.result.draft))
+    setIssues([])
+    setPhase({ kind: 'idle' })
+    setReplay(pending)
   }, [])
 
   const sending = phase.kind === 'sending'
@@ -237,6 +269,50 @@ export function RequestBuilder({
         onSubmit={handleSend}
         footer={footer}
       />
+
+      {replay === null ? null : (
+        <div style={warnBoxStyle} data-vibe-replay-notice="1">
+          <strong style={{ font: '600 11px/1.4 system-ui, sans-serif' }}>
+            {t('api.replay.notice.title')}
+          </strong>
+          <span style={noticeLineStyle}>{t('api.replay.notice.body')}</span>
+          <span style={noticeLineStyle}>
+            {t('api.replay.notice.source', {
+              method: replay.method,
+              url: replay.url,
+            })}
+          </span>
+          {replay.result.requiresConfirmation ? (
+            <span style={noticeLineStyle}>
+              {t('api.replay.notice.confirm', { method: replay.method })}
+            </span>
+          ) : null}
+          {replay.result.warnings.length > 0 ? (
+            <ul style={listStyle}>
+              {replay.result.warnings.map((warning) => (
+                <li key={warning}>
+                  {t(`api.replay.warning.${warning}`, { method: replay.method })}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {replay.result.omittedHeaders.length > 0 ? (
+            <span style={noticeLineStyle}>
+              {t('api.replay.notice.omitted', {
+                headers: replay.result.omittedHeaders.join(', '),
+              })}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            style={dismissStyle}
+            data-vibe-replay-dismiss="1"
+            onClick={() => setReplay(null)}
+          >
+            {t('api.replay.notice.dismiss')}
+          </button>
+        </div>
+      )}
 
       {issues.length > 0 ? (
         <div style={issueBoxStyle} role="alert" data-vibe-request-issues="1">

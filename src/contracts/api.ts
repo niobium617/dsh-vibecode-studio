@@ -334,6 +334,41 @@ export function isApiEnvironmentView(value: unknown): value is ApiEnvironmentVie
 /** Unary method the panel uses to send one expanded request (T038). */
 export const API_HTTP_SEND_METHOD = 'api.http.send'
 
+/* -------------------------------------------------------------------------
+ * Capture replay (T043)
+ *
+ * The preview drawer hands one captured `NetworkEntry` to the Host and gets
+ * back an editable draft. Nothing is sent here: the draft lands in the request
+ * builder and the user still has to press Send. Methods outside this set are
+ * refused without an explicit `confirm`, so "never auto-replay" is enforced by
+ * the transport rather than only by the UI.
+ * ---------------------------------------------------------------------- */
+
+export const API_REPLAY_PREPARE_METHOD = 'api.replay.prepare'
+
+export const REPLAY_SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'] as const
+
+export function requiresReplayConfirmation(method: string): boolean {
+  return !(REPLAY_SAFE_METHODS as readonly string[]).includes(method.trim().toUpperCase())
+}
+
+export type ReplayWarning =
+  | 'body_truncated'
+  | 'body_unavailable'
+  | 'body_dropped'
+  | 'url_redacted'
+  | 'headers_omitted'
+
+export interface ApiReplayResult {
+  /** Editable draft; never sent, never expanded. */
+  readonly draft: HttpRequestSpec
+  /** True for methods outside `REPLAY_SAFE_METHODS`; the Host already confirmed. */
+  readonly requiresConfirmation: boolean
+  /** Header names that could not be reproduced (redacted, runtime-owned, invalid). */
+  readonly omittedHeaders: readonly string[]
+  readonly warnings: readonly ReplayWarning[]
+}
+
 export const API_STORE_ID_PATTERN = '[A-Za-z0-9][A-Za-z0-9._-]{0,63}'
 export const API_NAME_CHARS_MAX = 200
 export const API_COLLECTION_ITEMS_MAX = 200

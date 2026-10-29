@@ -274,6 +274,80 @@ export function buildRequestSpec(draft: RequestDraft): DraftResult {
   return { ok: true, spec }
 }
 
+function draftRows(entries: readonly HttpKeyValue[] | undefined): KeyValueDraft[] {
+  if (entries === undefined || entries.length === 0) return [createKeyValue()]
+  return entries.map((entry) => ({
+    name: entry.name,
+    value: entry.value,
+    enabled: entry.enabled !== false,
+  }))
+}
+
+/**
+ * Reverse of `buildRequestSpec` for a spec that came from somewhere else
+ * (capture replay, imported collections). Values are copied as-is: an empty
+ * spare row is only added when the spec has none.
+ */
+export function draftFromRequestSpec(spec: HttpRequestSpec): RequestDraft {
+  const base = createRequestDraft()
+  const body = spec.body
+  let bodyKind: BodyKind = 'none'
+  let bodyText = ''
+  let bodyContentType = ''
+  let fields: readonly KeyValueDraft[] = base.fields
+  let files: readonly FileDraft[] = base.files
+
+  switch (body?.kind) {
+    case 'json':
+      bodyKind = 'json'
+      bodyText = body.text
+      break
+    case 'text':
+      bodyKind = 'text'
+      bodyText = body.text
+      bodyContentType = body.contentType ?? ''
+      break
+    case 'form':
+      bodyKind = 'form'
+      fields = draftRows(body.fields)
+      break
+    case 'multipart':
+      bodyKind = 'multipart'
+      fields = draftRows(body.fields)
+      files = body.files.map((file) => ({
+        field: file.field,
+        fileName: file.fileName,
+        contentType: file.contentType ?? '',
+        base64: file.base64,
+      }))
+      break
+    case 'none':
+    case undefined:
+      break
+  }
+
+  const auth = spec.auth
+  return {
+    ...base,
+    method: spec.method,
+    url: spec.url,
+    query: draftRows(spec.query),
+    headers: draftRows(spec.headers),
+    bodyKind,
+    bodyText,
+    bodyContentType,
+    fields,
+    files: [...files],
+    authKind: auth?.kind ?? 'none',
+    bearerToken: auth?.kind === 'bearer' ? auth.token : '',
+    basicUsername: auth?.kind === 'basic' ? auth.username : '',
+    basicPassword: auth?.kind === 'basic' ? auth.password : '',
+    apiKeyName: auth?.kind === 'api-key' ? auth.name : '',
+    apiKeyValue: auth?.kind === 'api-key' ? auth.value : '',
+    apiKeyIn: auth?.kind === 'api-key' ? auth.in : 'header',
+  }
+}
+
 /** Read one picked file into base64; the unary transport never sees a Buffer. */
 export function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

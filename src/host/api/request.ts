@@ -43,6 +43,8 @@ export interface NormalizeRequestOptions {
 
 const HEADER_NAME_PATTERN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/
 const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/
+const HEADER_NAME_CHARS_MAX = 128
+const HEADER_VALUE_CHARS_MAX = 8192
 
 /** Headers the runtime owns; letting callers set them produces confusing failures. */
 const FORBIDDEN_REQUEST_HEADERS: ReadonlySet<string> = new Set([
@@ -57,6 +59,16 @@ const FORBIDDEN_REQUEST_HEADERS: ReadonlySet<string> = new Set([
   'transfer-encoding',
   'upgrade',
 ])
+
+/** Shared with capture replay, which must not produce a name the executor rejects. */
+export function isValidHeaderName(name: string): boolean {
+  return name.length > 0 && name.length <= HEADER_NAME_CHARS_MAX && HEADER_NAME_PATTERN.test(name)
+}
+
+/** True for headers the executor owns and refuses to send (Host, Content-Length, …). */
+export function isForbiddenRequestHeader(name: string): boolean {
+  return FORBIDDEN_REQUEST_HEADERS.has(name.trim().toLowerCase())
+}
 
 /** Cloud metadata endpoints are never a legitimate API target. */
 const BLOCKED_HOSTNAMES: ReadonlySet<string> = new Set([
@@ -121,17 +133,16 @@ function normalizeHeaders(entries: HttpRequestSpec['headers']): Record<string, s
   const headers: Record<string, string> = {}
   for (const entry of entries ?? []) {
     if (entry.enabled === false) continue
-    if (entry.name.length > 128 || !HEADER_NAME_PATTERN.test(entry.name)) {
+    if (!isValidHeaderName(entry.name)) {
       throw invalidInput(`header name ${JSON.stringify(entry.name)} is not valid`, 'headers')
     }
     if (/[\r\n]/.test(entry.value)) {
       throw invalidInput(`header ${entry.name} must not contain line breaks`, 'headers')
     }
-    if (entry.value.length > 8192) {
+    if (entry.value.length > HEADER_VALUE_CHARS_MAX) {
       throw invalidInput(`header ${entry.name} is too long`, 'headers')
     }
-    const lower = entry.name.toLowerCase()
-    if (FORBIDDEN_REQUEST_HEADERS.has(lower)) {
+    if (isForbiddenRequestHeader(entry.name)) {
       throw invalidInput(`header ${entry.name} is managed by the executor`, 'headers')
     }
     if (hasHeader(headers, entry.name)) {
@@ -168,7 +179,7 @@ function applyAuth(
         throw invalidInput('api key name is not a valid header or query name', 'auth')
       }
       if (auth.in === 'header') {
-        if (!HEADER_NAME_PATTERN.test(auth.name) || auth.name.length > 128) {
+        if (!isValidHeaderName(auth.name)) {
           throw invalidInput('api key name is not a valid header name', 'auth')
         }
         if (hasHeader(headers, auth.name)) {

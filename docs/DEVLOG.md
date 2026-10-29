@@ -9,7 +9,7 @@
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，M1 已完成，M2 已完成）**。
 - 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）、T023 Console 采集与抽屉、T024 Network 采集与抽屉、T025 预览工具栏与生命周期、T026 G2 Preview 评审（通过）、T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 三框架源码适配、T030 标注模型与存储、T031 标注气泡与队列。
-- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），**T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 源码适配（React/Vue/Svelte）、T030 标注模型与存储、T031 标注气泡与队列、T032 Composer handoff、T033 标注历史 已完成**；**T034 G3 评审完成（GO）**：初评“≤3 步”实测 4–5 个动作，经用户批准在保存通知加“发送到对话”后为 3 个动作（点元素 → 保存 → 发送），复测四项验收全过（源码 100%、标注 4,095 B ≤ 4 KB、不自动发送），M3 完成；手动复测入口见 `docs/2026-10-29-M3手动测试手册.md`（M2 见 `docs/2026-10-28-手动测试手册.md`）。**M3.5/U02 界面优化（气泡直达发送、状态归位、删除弹窗）与 U03 拾取注入修复已完成并合并入 `main`**（合并提交 `a1c7577`，2026-10-29；依据 `界面审查/M3修改意见.docx` 与用户实测反馈）。
+- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），**T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 源码适配（React/Vue/Svelte）、T030 标注模型与存储、T031 标注气泡与队列、T032 Composer handoff、T033 标注历史 已完成**；**T034 G3 评审完成（GO）**：初评“≤3 步”实测 4–5 个动作，经用户批准在保存通知加“发送到对话”后为 3 个动作（点元素 → 保存 → 发送），复测四项验收全过（源码 100%、标注 4,095 B ≤ 4 KB、不自动发送），M3 完成；手动复测入口见 `docs/2026-10-29-M3手动测试手册.md`（M2 见 `docs/2026-10-28-手动测试手册.md`）。**M3.5/U02 界面优化（气泡直达发送、状态归位、删除弹窗）与 U03 拾取注入修复已完成并合并入 `main`**（合并提交 `a1c7577`，2026-10-29；依据 `界面审查/M3修改意见.docx` 与用户实测反馈）。**M4 API Workbench 进行中（分支 `task/m4-api-workbench`，未推送、未合并）**：T035 HTTP 执行器、T036 环境/变量/密钥、T037 集合与历史持久化、T038 请求构建 UI、T039 响应查看 UI、T040 富响应体、T041 S7 OpenAPI spike、T042 OpenAPI 导入、T043 抓包回放已完成；下一项 T044 集合/历史 UI。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
 - T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T026 已提交并推送到 `origin/task/m2-target-model`（`ebee1e5`，文档至 `92ecc32`），尚未合并入 `main`；其后 `9c19501..88a4070`（方向/手册文档、U01 实现、去重复标题）已推送到 `origin/task/m2-target-model`（`92ecc32..88a4070`，2026-10-28）；`f64e928`（清理残留 locale key 与过期布局引用）推送后，以 `--no-ff` 合并入 `main`（合并提交 `768e129`，`main` 树与分支一致），功能分支保留。手动复测入口见 `docs/2026-10-28-手动测试手册.md`；界面/产品方向见 `docs/2026-10-28-界面与项目方向.md`。S3/S4/T010/T014/T015/T020/T021/T022/T025 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
@@ -713,6 +713,17 @@
 - 契约配套：脱敏保留整值 `{{placeholder}}`（header/query/auth/JSON/URL），`new URL()` 的 `%7B%7Bname%7D%7D` 还原为 `{{name}}`；集合文件上限 256 KiB → 2 MiB；单 tag 超过 200 请求拆成 `tag`、`tag (2)` 文件夹。
 - 验证：`pnpm typecheck` 0；`pnpm exec vitest run tests/integration/openapi` 5 文件 / 36 用例；`pnpm test` 79 / 702；`pnpm build` host 257.1 / client 279.0 KiB；`pnpm test:e2e` 9/9。
 
+### T043 — 抓包回放（2026-10-29，`task/m4-api-workbench`）
+
+- 目标：把 T024 的 `NetworkEntry` 变成请求草稿（method/url/headers/body），回放与原请求一致；DELETE/PUT/PATCH 等非幂等请求必须先确认，绝不自动重放。
+- 结构：`src/host/api/replay.ts` 只做纯转换（`prepareReplay(input, { confirm })`），不持有网络能力、任何分支都不发请求；`src/host/api/service.ts` 注册 `api.replay.prepare`，只校验记录形状并透传 `confirm === true`；`src/client/api/ReplayButton.tsx` 负责确认交互；`RequestBuilder` 用模块级一次性 `takePendingReplay()` 取草稿渲染，绝不自动发送。
+- 保真规则：URL 用采集原串（不 `new URL()` 归一化）；header 过滤分四类——HTTP/2 伪头静默丢弃、运行时自有（`host`/`content-length`/`connection`/`accept-encoding` 等）、`content-encoding`、不可信值（`REDACTED`、含 CR/LF、超 `HTTP_HEADER_VALUE_CHARS_MAX`、非法名），被略去的名字进 `omittedHeaders`，同名不同大小写只留第一个；body 仅在声明 content-type 匹配 `^application/(?:[A-Za-z0-9.+-]+\+)?json\b` 且 `JSON.parse` 成功时重建为 JSON 草稿，否则原文 + 原 content-type 走 text；GET/HEAD 一律丢体；> 16 KiB 拒绝；warning 固定顺序 `body_truncated` → `body_unavailable` → `body_dropped` → `url_redacted` → `headers_omitted`。
+- 安全：`REPLAY_SAFE_METHODS = ['GET','HEAD','OPTIONS']`；其余方法未显式 `confirm: true` 时返回 `permission_denied`，`details.reason = 'confirmation_required'` 且带 `details.method`；确认后结果仍只含草稿（`requiresConfirmation: true`），发送只能由用户点“发送”。
+- 采集侧：`NetworkEntry` 新增 `requestBody`/`requestBodyTruncated`/`requestBodyUnavailable`，采集上限 `MAX_CAPTURED_REQUEST_BODY_BYTES = 16 * 1024`；重定向 hop 保留首个带体的请求，后续 hop 清空。
+- 验证：`pnpm typecheck` 0；`pnpm exec vitest run tests/integration/capture-replay` 4 文件 / 45 用例（捕获、回放、草稿往返、service 403 无 fetch）；`pnpm test` 83 / 747（基线 79/702）；`pnpm build` host 264.7 / client 295.7 KiB；`pnpm test:e2e` 9/9；日志 `.tmp/logs/t043-{full-test,build,e2e}.log`。
+- 手动：`.tmp/t043-manual.mjs` → `.tmp/logs/t043-web.json` `ok:true`。真实 `vibe-dev` + 无头 Edge，站点记录四个回放：GET 200、POST 201（`{"name":"book","price":12}` + `application/json`）、PUT 200（`plain update` + `text/plain`）、DELETE 204，method/path/body/content-type 与原请求逐项一致；POST/PUT/DELETE 均弹确认（“不是只读请求，回放可能改变 … 上的数据”），弹窗期间站点请求数不变（0 次），取消后仍为 0，GET 无弹窗直接转草稿，草稿载入后不自动发送，0 其他 console 错误。
+- 已知限制：`src/host/preview/session.ts` 在 `target.start()`（内部含 `newPage()` + `goto`）之后才启动 network 采集器，因此**首屏加载请求不入缓冲**；手测先开抽屉再点刷新触发抓包。该问题属 T024 遗留，T043 未改产品代码，建议 T044 或单独立项把采集器启动提前到导航前。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -840,6 +851,14 @@
 3. **示例数据里的 `$ref` 不是引用**：`example`/`default`/`enum`/`const`/`examples[*].value`/`x-*` 下的 `$ref` 是字面数据，扫描时切到 `example` 模式，既不解析也不抓取；`examples` 映射的条目对象保留 doc 模式（条目本身可 `$ref`），只把 `value` 当数据。这条来自 S7 spike 的 bug 修复，T042 已带进产品。
 4. **映射期错误要降级为警告**：单个参数/auth/示例的 `$ref` 坏掉不应让 500 端点导入整体失败；`mapBody`/`collectParameters`/`mapAuth` 捕获 `OpenApiError` 记 `${code}: ${message}`，只有文档级问题（JSON、版本、操作数、远程策略）才抛出。测试同时覆盖两种路径。
 
+### 抓包回放 / 采集
+
+1. **回放只做纯转换，不碰网络**：`prepareReplay` 放在 `src/host/api/replay.ts`，入参是可序列化的记录，输出草稿；执行器不在它的依赖里，测试无需假 fetch 也能证明“不自动发送”。确认策略在同一函数里短路（未确认直接 `permission_denied`），避免 UI 与 host 各写一份。
+2. **header 过滤要分级而不是一刀切**：伪头（`:` 开头）静默丢弃，运行时自有头与 `content-encoding` 记录进 `omittedHeaders`，值不可信（`REDACTED`、CR/LF、超长、非法名）也记录；同名不同大小写只留第一个。全部静默过滤会让用户以为请求被改过却查不到原因。
+3. **回放的 URL 不要重新序列化**：`new URL()` 会规范化百分号编码与点段，可能改变服务端路由；直接用采集到的 `entry.url` 原串，只有判断 query 是否需要脱敏时用 `new URL()` 作解析。
+4. **采集器启动晚于首屏导航**：`src/host/preview/session.ts` 在 `target.start()` 之后才 `start()` network 采集器，而 Web adapter 的 `start` 已 `newPage()` + `goto`，因此首屏请求不在缓冲里；reload 复用同一页面，后续请求可见。手测必须先开抽屉再刷新。修复方向是把采集器创建提前到导航前（T024 遗留，T043 未改）。
+5. **请求表单一次只渲染一个分区**：`RequestForm` 只有当前 `section` 的控件在 DOM 里（header 行只在 headers 页签、body 控件只在 body 页签）。手测脚本读草稿前要先点 `[data-vibe-section="headers"]` / `[data-vibe-section="body"]`，否则拿到空数组；文本体的 content-type 在 `bodyContentType` 而不是 header 行。
+
 ## 4. 已改变的计划假设
 
 | 决策 | 原假设 | 当前结论 | 证据 |
@@ -869,6 +888,7 @@
 - **T031 已完成**：预览页拾取后在元素旁弹气泡，保存进入侧栏队列（模块级 store，tab 带数量徽标），支持编辑/取消/发送/移除与空态；发送只在点击时发生，默认复制 `renderAnnotationText`，发送器可注入给 T032 接 composer。限制：队列不落盘（T033）、未做 `vibe-dev` 手测（G3）。
 - **T032 已完成**：`src/client/inspect/handoff.ts` 通过 `conversation.input.left` 的作用域 slot 取公开 `inputActions`，按会话保存 composer 快照；标注文本用 `captureInsertion` + `insertText` 插入草稿（已有草稿前置 `\n\n`），只有 `insertText` 明确返回 `false` 才退回 `setDraft`，抛错或无 composer 时回退剪贴板；`insertText`/`setDraft` 都不触发提交。`StudioShell` 把发送器注入 `AnnotationQueue`，状态提示区分“已插入对话草稿”与“已复制到剪贴板”。`pnpm test` 57 文件 / 466 用例、`pnpm build` host 192.8 / client 184.7 KiB；Web（`.tmp/logs/t032-web.json`）与隔离 Desktop（`.tmp/logs/t032-desktop.json`）均 `ok:true`：草稿含完整标注、面板外 0、3 s 后未自动提交、新会话为空且切回原会话草稿仍在、停止后 Edge 全退、真实 profile 未改。限制：附件未接（S2 无公开附件 API）；隔离 Desktop 载体无法新建会话，跨会话隔离以 Web + 组件测试为准。
 - **T033 已完成**：标注历史以 `.vibe/annotations` 为唯一事实源，`AnnotationHistoryService` 提供 `annotation.history.{list,get,save,remove}` 四个一元方法（列表返回摘要 + `total` + `skipped`，搜索大小写不敏感并覆盖中文）；侧栏标注页签在队列下方展示历史，可搜索、重新打开（仅入队，不发送）、两步确认删除；气泡保存与队列编辑都会写穿历史，写失败只降级提示。`pnpm test` 59 文件 / 507 用例、`pnpm build` host 199.8 / client 202.1 KiB；手动 `.tmp/logs/t033-history.json` `ok:true`：写入 2 条 → 搜到 1 条 → 重开入队未发送 → 停 Host 写入坏文件 → 重启仍 2 条且提示跳过 1 → 删除 1 条生效，面板 0 异常。限制：客户端 store 名为 `history-store.ts`（大小写冲突）；搜索全量过滤后再截断，未分页。
+- **M4 进度**：T035 执行器、T036 环境/变量/密钥、T037 集合与历史持久化、T038 请求构建 UI、T039 响应查看 UI、T040 富响应体、T041 S7 OpenAPI spike、T042 OpenAPI 导入、T043 抓包回放均已完成（`task/m4-api-workbench`，未推送、未合并）。下一项 **T044 集合/历史 UI**：把已发送请求写历史、集合保存/重开/复制接到页面；同时评估把 network 采集器启动提前到首屏导航前（T043 发现的 T024 遗留）。
 - **S2 遗留**：如果上游未来公开附件创建/释放 API，再评估直接截图附件；先复测切会话保留和失败清理。
 - **Desktop 遗留**：S2 跨会话未测到，后续需要能稳定创建第二个命名会话的测试环境。
 - **成本**：避免无必要的全仓读取和重复验收；每个任务完成即提交、记录、清理进程。
@@ -914,6 +934,7 @@ pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 - 请求构建：`src/host/api/service.ts`、`src/client/api/{request-model.ts,RequestForm.tsx,RequestBuilder.tsx}`、`tests/unit/api-send/`、`tests/component/api-request/`。
 - 响应查看：`src/client/api/{ResponseView,ResponseHeaders}.tsx`、`tests/component/api-response/`、`.tmp/logs/t039-web.json`、`.tmp/t039-manual.mjs`。
 - OpenAPI 导入：`src/host/api/openapi/{parser,resolver,mapper}.ts`、`tests/integration/openapi/`、[S7 报告](../spikes/s7/REPORT.md)。
+- 抓包回放：`src/host/api/replay.ts`、`src/client/api/ReplayButton.tsx`、`src/host/preview/network.ts`（采集体上限）、`tests/integration/capture-replay/`、`.tmp/logs/t043-web.json`、`.tmp/t043-manual.mjs`。
 - Web 预览：`src/host/targets/web/{adapter,launch}.ts`、`tests/integration/web-adapter/`、`tests/helpers/png.ts`。
 - 预览生命周期：`src/host/preview/session.ts`、`src/client/preview/{Toolbar.tsx,lifecycle.ts,local-url.ts}`、`tests/integration/preview/session-lifecycle.test.ts`、`.tmp/logs/t025-{host,desktop}.json`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。

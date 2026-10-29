@@ -97,8 +97,15 @@ export type {
 } from './api/history-store'
 export { ApiStoreError, toApiStoreStudioError } from './api/store-files'
 export type { ApiStoreErrorCode, ApiStoreFileOptions } from './api/store-files'
-export { API_HTTP_SEND_METHOD, ApiService, registerApiMethods } from './api/service'
+export {
+  API_HTTP_SEND_METHOD,
+  API_REPLAY_PREPARE_METHOD,
+  ApiService,
+  registerApiMethods,
+} from './api/service'
 export type { ApiSendOutcome, ApiServiceOptions } from './api/service'
+export { prepareReplay } from './api/replay'
+export type { ReplayPrepareOptions } from './api/replay'
 export { isBlockedHost, normalizeHttpRequest } from './api/request'
 export type { NormalizedHttpRequest, NormalizeRequestOptions } from './api/request'
 export { createTargetAdapterRegistry } from './targets/registry'

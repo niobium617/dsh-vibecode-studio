@@ -565,12 +565,20 @@
   - 上限：1001 操作 `too_many_operations`；单 tag 250 端点拆成 200 + 50 两个文件夹（`one`、`one (2)`）以满足 `API_COLLECTION_ITEMS_MAX`；集合文件上限由 256 KiB 提到 2 MiB。
   - 配套契约改动：脱敏保留整值 `{{placeholder}}`（header/query/auth/JSON/URL，URL 里 `%7B%7Bname%7D%7D` 还原为 `{{name}}`），新增 1 条单测；`tests/unit/api-store/collection-store.test.ts` 的超限样例改为 2.5 MiB。
 
-### - [ ] T043 抓包回放
+### - [x] T043 抓包回放
 
 - **目标**：`NetworkEntry` → 请求草稿；method/url/headers/body；不自动发送非幂等。
 - **验收**：回放与原请求一致；DELETE/PUT/PATCH 需确认；避免自动重放。
 - **验证**：`pnpm test -- tests/integration/capture-replay` + 手动。
 - **文件**：`src/host/api/replay.ts`、`src/client/api/ReplayButton.tsx`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 命令与结果：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/capture-replay` 4 文件 / 45 用例全通过；`pnpm test` 83 文件 / 747 用例全通过（`.tmp/logs/t043-full-test.log`）；`pnpm build` host 264.7 KiB / client 295.7 KiB（`.tmp/logs/t043-build.log`）；`pnpm test:e2e` 9/9（`.tmp/logs/t043-e2e.log`）。
+  - host：`prepareReplay(entry,{confirm})` 是纯转换，不执行任何请求（测试用假 fetch 断言 0 次调用）；URL 逐字节保留；header 跳过 HTTP/2 伪头（静默）、运行时自有头（`host`/`content-length`/…）、`content-encoding`、已脱敏值（`REDACTED`）、含 CR/LF 值、超长值与非法名，大小写不敏感去重，被略去的真实名经 `omittedHeaders` 返回；JSON 体仅在声明的 content-type 匹配 `^application/(?:[A-Za-z0-9.+-]+\+)?json\b` 且 `JSON.parse` 成功时按 json 重建，否则原文 + 原 content-type 走 text；GET/HEAD 丢弃 body 并给 `body_dropped`；超过 16 KiB 的 body 拒绝；warning 顺序固定 `body_truncated`→`body_unavailable`→`body_dropped`→`url_redacted`→`headers_omitted`。
+  - 非幂等：`REPLAY_SAFE_METHODS=['GET','HEAD','OPTIONS']`，其余（含 POST/PUT/PATCH/DELETE）未显式 `confirm:true` 时抛 `permission_denied` + `details.reason='confirmation_required'`；确认后也只返回 `requiresConfirmation:true` 的草稿，从不发送；确认值只认布尔 `true`。
+  - 采集侧（T024 增量）：`NetworkEntry.requestBody` 上限 16 KiB（超出 `requestBodyTruncated` + 尾部 `…`），`hasPostData` 无数据 → `requestBodyUnavailable`；重定向 hop 307/308 保留 body、303/改 GET 清除 body。
+  - 客户端：`ReplayButton` 对非幂等方法先弹确认框（取消/确认），载入草稿后只显示“还没有发送”提示、略去头与 warnings，必须用户点“发送”；`RequestBuilder` 消费 pending replay 并经 `draftFromRequestSpec` 往返一致（json/text/form/auth/query 行不改写）。
+  - 手动（`.tmp/t043-manual.mjs` → `.tmp/logs/t043-web.json`，`ok:true`）：真实 `vibe-dev` + 无头 Edge，站点依次发起 GET / POST(json) / PUT(text) / DELETE；四个回放的 method/path/body/content-type 在站点侧与原请求完全一致；POST/PUT/DELETE 均先出确认框（弹窗期间 0 请求），取消后保持预览且不发；GET 无弹框；草稿载入后均未自动发送，只有点“发送”才发出；0 其他 console 错误。
+  - 发现并记录（不属于 T043 范围，未改产品代码）：`src/host/preview/session.ts` 在 `target.start()` 完成导航之后才启动 network 采集器，首屏加载的请求不在缓冲里；手测改为先开抽屉再点刷新触发请求。建议在后续任务（T044 或单独立项）把采集器启动提前到导航前。
 
 ### - [ ] T044 集合/历史 UI
 

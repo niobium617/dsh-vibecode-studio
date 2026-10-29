@@ -29,6 +29,13 @@ export interface ConsoleEntry {
 
 export type NetworkOutcome = 'pending' | 'success' | 'error' | 'aborted'
 
+/**
+ * Request bodies are kept for replay (T043), which crosses the same 64 KiB
+ * unary envelope as the rest of the panel. 16 KiB leaves room for headers
+ * while still covering ordinary form and JSON payloads.
+ */
+export const MAX_CAPTURED_REQUEST_BODY_BYTES = 16 * 1024
+
 export interface NetworkEntry {
   readonly id: string
   readonly method: string
@@ -41,6 +48,16 @@ export interface NetworkEntry {
   readonly requestHeaders?: Readonly<Record<string, string>>
   readonly responseHeaders?: Readonly<Record<string, string>>
   readonly failure?: string | null
+  /**
+   * UTF-8 request body as CDP reported it, capped at
+   * `MAX_CAPTURED_REQUEST_BODY_BYTES`. Bodies are not redacted: replay has to
+   * reproduce the original bytes, and the buffer stays in Host memory.
+   */
+  readonly requestBody?: string
+  /** True when the captured body was cut at the cap above. */
+  readonly requestBodyTruncated?: boolean
+  /** CDP said a body exists but did not hand it over (too large or binary). */
+  readonly requestBodyUnavailable?: boolean
 }
 
 /** Render a one-line console summary; URLs are redacted before truncation. */

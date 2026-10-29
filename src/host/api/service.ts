@@ -9,17 +9,20 @@
  */
 import {
   API_HTTP_SEND_METHOD,
+  API_REPLAY_PREPARE_METHOD,
   isApiEnvironment,
+  type ApiReplayResult,
   type HttpExecutionResult,
   type UnresolvedVariable,
 } from '../../contracts/api'
 import { studioError } from '../../contracts/errors'
 import { resolveHttpRequest } from './environment'
 import { createHttpExecutor, type HttpExecutor } from './executor'
+import { prepareReplay as prepareReplayDraft } from './replay'
 import type { ApiSecretStore } from './secrets'
 import type { UnaryRegistry } from '../transport'
 
-export { API_HTTP_SEND_METHOD }
+export { API_HTTP_SEND_METHOD, API_REPLAY_PREPARE_METHOD }
 
 export interface ApiServiceOptions {
   readonly secrets: ApiSecretStore
@@ -70,11 +73,27 @@ export class ApiService {
     })
     return { result, unresolved: resolved.unresolved }
   }
+
+  /**
+   * Turns a captured row into a draft (T043). No execution path exists here:
+   * the answer is a spec the user still has to send from the panel.
+   */
+  prepareReplay(params: unknown): ApiReplayResult {
+    if (!isRecord(params)) invalid('api.replay.prepare expects an object', 'params')
+    return prepareReplayDraft(params.entry, { confirm: params.confirm === true })
+  }
 }
 
-/** Registers `api.http.send`; returns an idempotent unregister function. */
+/** Registers the workbench methods; returns one idempotent unregister function. */
 export function registerApiMethods(registry: UnaryRegistry, service: ApiService): () => void {
-  return registry.register(API_HTTP_SEND_METHOD, (params, context) =>
+  const unregisterSend = registry.register(API_HTTP_SEND_METHOD, (params, context) =>
     service.send(params, context.signal),
   )
+  const unregisterReplay = registry.register(API_REPLAY_PREPARE_METHOD, (params) =>
+    service.prepareReplay(params),
+  )
+  return () => {
+    unregisterSend()
+    unregisterReplay()
+  }
 }

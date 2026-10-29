@@ -19,6 +19,7 @@ import {
   type PreviewNetworkQuery,
   type PreviewNetworkSnapshot,
 } from '../../contracts/transport'
+import { ReplayButton } from '../api/ReplayButton'
 import { createTranslator, type Locale } from '../i18n'
 import { callUnary } from '../transport/client'
 
@@ -590,6 +591,30 @@ export function NetworkDrawer({
                             ) : null}
                           </>
                         )}
+                        <p style={detailHeadingStyle}>
+                          {t('preview.network.detail.requestBody')}
+                        </p>
+                        {entry.requestBody === undefined || entry.requestBody === '' ? (
+                          <p style={noteStyle}>{t('preview.network.detail.noRequestBody')}</p>
+                        ) : (
+                          <>
+                            <pre data-vibe-network-request-body="1" style={bodyStyle}>
+                              {entry.requestBody}
+                            </pre>
+                            {entry.requestBodyTruncated ? (
+                              <p style={noteStyle}>
+                                {t('preview.network.detail.requestBodyTruncated')}
+                              </p>
+                            ) : null}
+                          </>
+                        )}
+                        {entry.requestBodyUnavailable ? (
+                          <p style={noteStyle}>
+                            {t('preview.network.detail.requestBodyUnavailable')}
+                          </p>
+                        ) : null}
+
+                        <ReplayButton entry={entry} {...(locale === undefined ? {} : { locale })} />
                         {entry.failure ? <p style={noteStyle}>{entry.failure}</p> : null}
                       </div>
                     ) : null}
