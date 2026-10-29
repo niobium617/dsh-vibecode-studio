@@ -490,12 +490,19 @@
   - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/api-store` 3 文件 / 26 用例通过；`pnpm test` 68 文件 / 614 用例（基线 65 / 588）；`pnpm build` host 253.4 / client 211.9 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t037-{typecheck,test,build,e2e}.log`。
   - 限制：未接 unary/UI（T038），没有“运行中请求记录自动写入”的调用方；多部件文件字节与文本型 body 的原样内容不落盘/不深度脱敏（变量 `{{name}}` 原样保留，只在发送时展开）；文件夹只支持一层。
 
-### - [ ] T038 请求构建 UI
+### - [x] T038 请求构建 UI
 
 - **目标**：method/URL/query/headers/body/auth；发送/取消；校验与错误提示。
 - **验收**：常见 JSON/form/multipart 可发；错误可读；组件测试通过。
 - **验证**：`pnpm test -- tests/component/api-request` + 手动。
 - **文件**：`src/client/api/{RequestBuilder,RequestForm}.tsx`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 契约：`src/contracts/api.ts` 追加 `API_HTTP_SEND_METHOD = 'api.http.send'`。
+  - Host 接线：新增 `src/host/api/service.ts`（`ApiService.send` → `resolveHttpRequest`（`{{var}}` 展开、密钥一次 resolve）→ `HttpExecutor.execute`，返回 `{result, unresolved}`；参数与环境文档不合法抛 `invalid_input` + `details.field`），`registerApiMethods()` 在 `apply()` 里以 `ctx.effect(..., 'vibe-studio: api methods')` 注册，客户端中止信号直接成为执行器的 `signal`；`store-files.ts` 新增 `toApiStoreStudioError()`（`invalid_id|invalid_data|too_large → invalid_input`、`path_outside_project → permission_denied`、`not_found → not_found`、`io → internal`，消息不含本机路径，`details.reason` 保留原码）。`VibeStudioService` 服务槽未改，未改 `tests/unit/config.test.ts`。
+  - 客户端：`src/client/api/request-model.ts` 纯函数草稿模型（`buildRequestSpec` 校验 URL 绝对 http(s)、拒绝 URL 内凭证、行名缺失/header 非法/重复、JSON 体解析、auth 必填、multipart 字段名；禁用行原样保留但不过校验；`readFileAsBase64`/`fieldNameForFile`）；`RequestForm.tsx` 表单（查询/请求头/请求体/认证四个分区、JSON/text/form/multipart、文件选择）；`RequestBuilder.tsx` 容器（发送/取消、`AbortController`、卸载中止、`TransportError` → 可读标题、未解析变量提示、结果行“HTTP 200 OK · 12 ms · 4 B”）；`StudioShell` 的 API 页签改为渲染 `RequestBuilder`；`api.request.*` 中英各约 60 键。
+  - 验收对应：`tests/component/api-request/` 2 文件 / 15 用例（model 9：URL/行校验/header/JSON/auth/multipart/文件读取；builder 6：POST+query+header 生成精确 spec 与结果行、非法 URL 不发、超时可读、取消传递 signal、multipart 文件 base64、zh-CN 文案）；`tests/unit/api-send/` 1 文件 / 5 用例（host 侧展开密钥且不回传、未解析占位符仍发送、非法参数/环境、blocked host → 403 `permission_denied`、中止 → `network_error|cancelled`）；`tests/unit/api-store/store-errors.test.ts` 3 用例（映射与不泄露路径）。`tests/integration/transport/host.test.ts` 补 `'vibe-studio: api methods'` 与 `transport.has('api.http.send')`。
+  - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/api-store tests/unit/api-send tests/component/api-request` 7 文件 / 49 用例通过；`pnpm test` 72 文件 / 637 用例（基线 68 / 614）；`pnpm build` host 256.3 / client 251.4 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t038-{typecheck,test,build,e2e}.log`。
+  - 限制：unary envelope 上限 64 KiB，multipart 实际可传文件约 48 KiB（契约允许 4 MiB/文件），大文件上传需后续专用通道；历史/集合尚未在发送后自动写入（T044）；T039 才有响应体查看，当前只显示状态/耗时/字节数。
 
 ### - [ ] T039 响应查看 UI（基础）
 

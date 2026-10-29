@@ -654,6 +654,17 @@
 - 设计取舍：持久化入口统一走 `redactHttpRequest()`，变量保持 `{{name}}` 原样（只在发送时展开），所以落盘文件不接触已解析的密钥；文本型 body 无法按键判断敏感内容，原样保留；多部件文件字节不落盘（面板在发送前重新附加）；文件夹只支持一层以保持文件格式可校验。
 - 遗留：未注册 unary 方法、未挂 UI（T038），也还没有“发送时自动写历史”的调用方；`ApiStoreError` → `StudioError` 的映射留给 T038。
 
+### T038 — 请求构建 UI（2026-10-29，`task/m4-api-workbench`）
+
+- 目标：method/URL/query/headers/body/auth 的表单、发送与取消、校验与可读错误；同时补上 T035–T037 缺失的 host unary 接线。
+- 契约与 Host（`src/contracts/api.ts`、`src/host/api/service.ts`、`src/host/index.ts`）：`API_HTTP_SEND_METHOD = 'api.http.send'`；`ApiService.send` 先校验参数与环境文档（`invalid_input` + `details.field`），再 `resolveHttpRequest`（`{{var}}` 展开、每个密钥只 resolve 一次）→ `HttpExecutor.execute`，返回 `{result, unresolved}`；`registerApiMethods` 在 `apply()` 以 `ctx.effect(..., 'vibe-studio: api methods')` 注册，unary 的 `context.signal`（即 `request.signal`）直接传给执行器，客户端中止即取消 host 请求。展开与执行都留在 host，解析后的密钥不进响应。
+- `store-files.ts` 新增 `toApiStoreStudioError()`：`invalid_id|invalid_data|too_large → invalid_input`、`path_outside_project → permission_denied`、`not_found → not_found`、`io → internal`；消息用固定文案（store 原始消息含绝对路径，不外泄），`details.reason` 保留原错误码。供 T044 的集合/历史 unary 方法复用。
+- 客户端模型（`src/client/api/request-model.ts`）：纯函数 `buildRequestSpec(draft)` → `{ok:true, spec}|{ok:false, issues}`；校验 URL 缺失/非绝对 http(s)/含凭证、`query[i]`·`headers[i]` 行名缺失、header 名 token 与 CR/LF、大小写不敏感重复、JSON 体解析、bearer/api-key 必填、multipart 文件字段名；禁用行保留 `enabled:false` 但不过校验，空行丢弃。`readFileAsBase64`（`FileReader.readAsDataURL` 去前缀）、`fieldNameForFile`。
+- 客户端 UI（`RequestForm.tsx`/`RequestBuilder.tsx`）：四个分区（查询参数/请求头/请求体/认证）、body 四种 kind（JSON/text/form/multipart，multipart 支持文件选择）、auth 三种 kind；发送时创建 `AbortController`，取消/卸载中止；`TransportError` 映射为可读标题（超时/被策略拦截/网络/过大/输入无效/内部），host 消息作为明细；结果行 `HTTP {status} {statusText} · {elapsed} ms · {bytes}` 与截断标记；未解析变量单独提示。默认发送器 `createTransportSend()` 走 `callUnary`，`timeoutMs = spec.timeoutMs + 5 s`。`StudioShell` 的 API 页签改为渲染 `RequestBuilder`。
+- 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/api-store tests/unit/api-send tests/component/api-request` 7 文件 / 49 用例通过；`pnpm test` 72 文件 / **637 用例**（基线 68 / 614）；`pnpm build` host 256.3 / client 251.4 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t038-{typecheck,test,build,e2e}.log`。
+- 设计取舍：面板只把未展开的 spec 交给 host——`EnvironmentEditor` 的密钥行本来就没有能装值的字段，展开后也不回传，明文密钥始终不进 client 状态。组件测试注入 `ApiSend`，因此断言的是真正会过 unary 的 spec，校验失败的草稿一次都不会发。
+- 限制：unary envelope 上限 64 KiB（`MAX_UNARY_BODY_BYTES`），multipart 实际可传文件约 48 KiB，与契约的 4 MiB/文件 不符，大文件需后续专用上传通道；发送后尚未自动写历史/集合（T044）；响应体查看在 T039。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -845,6 +856,7 @@ pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 - HTTP 执行器：`src/contracts/api.ts`、`src/host/api/{request,executor}.ts`、`tests/unit/http-executor/{request,executor}.test.ts`。
 - 环境与密钥：`src/contracts/api.ts`（环境模型与安全视图）、`src/host/api/{secrets,environment}.ts`、`src/client/api/EnvironmentEditor.tsx`、`tests/unit/api-env/`、`tests/component/api/environment-editor.test.tsx`。
 - 集合与历史：`src/contracts/api.ts`（集合/历史模型与 `redactHttpRequest`）、`src/host/api/{store-files,collection-store,history-store}.ts`、`tests/unit/api-store/`。
+- 请求构建：`src/host/api/service.ts`、`src/client/api/{request-model.ts,RequestForm.tsx,RequestBuilder.tsx}`、`tests/unit/api-send/`、`tests/component/api-request/`。
 - Web 预览：`src/host/targets/web/{adapter,launch}.ts`、`tests/integration/web-adapter/`、`tests/helpers/png.ts`。
 - 预览生命周期：`src/host/preview/session.ts`、`src/client/preview/{Toolbar.tsx,lifecycle.ts,local-url.ts}`、`tests/integration/preview/session-lifecycle.test.ts`、`.tmp/logs/t025-{host,desktop}.json`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。
