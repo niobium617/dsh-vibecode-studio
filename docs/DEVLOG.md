@@ -9,7 +9,7 @@
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，M1 已完成，M2 已完成）**。
 - 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）、T023 Console 采集与抽屉、T024 Network 采集与抽屉、T025 预览工具栏与生命周期、T026 G2 Preview 评审（通过）、T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 三框架源码适配、T030 标注模型与存储、T031 标注气泡与队列。
-- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），**T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 源码适配（React/Vue/Svelte）、T030 标注模型与存储、T031 标注气泡与队列、T032 Composer handoff、T033 标注历史 已完成**；**T034 G3 评审完成（GO）**：初评“≤3 步”实测 4–5 个动作，经用户批准在保存通知加“发送到对话”后为 3 个动作（点元素 → 保存 → 发送），复测四项验收全过（源码 100%、标注 4,095 B ≤ 4 KB、不自动发送），M3 完成；手动复测入口见 `docs/2026-10-29-M3手动测试手册.md`（M2 见 `docs/2026-10-28-手动测试手册.md`）。**M3.5/U02 界面优化（气泡直达发送、状态归位、删除弹窗）与 U03 拾取注入修复已完成并合并入 `main`**（合并提交 `a1c7577`，2026-10-29；依据 `界面审查/M3修改意见.docx` 与用户实测反馈）。**M4 API Workbench 进行中（分支 `task/m4-api-workbench`，未推送、未合并）**：T035 HTTP 执行器、T036 环境/变量/密钥、T037 集合与历史持久化、T038 请求构建 UI、T039 响应查看 UI、T040 富响应体、T041 S7 OpenAPI spike、T042 OpenAPI 导入、T043 抓包回放已完成；下一项 T044 集合/历史 UI。
+- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），**T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 源码适配（React/Vue/Svelte）、T030 标注模型与存储、T031 标注气泡与队列、T032 Composer handoff、T033 标注历史 已完成**；**T034 G3 评审完成（GO）**：初评“≤3 步”实测 4–5 个动作，经用户批准在保存通知加“发送到对话”后为 3 个动作（点元素 → 保存 → 发送），复测四项验收全过（源码 100%、标注 4,095 B ≤ 4 KB、不自动发送），M3 完成；手动复测入口见 `docs/2026-10-29-M3手动测试手册.md`（M2 见 `docs/2026-10-28-手动测试手册.md`）。**M3.5/U02 界面优化（气泡直达发送、状态归位、删除弹窗）与 U03 拾取注入修复已完成并合并入 `main`**（合并提交 `a1c7577`，2026-10-29；依据 `界面审查/M3修改意见.docx` 与用户实测反馈）。**M4 API Workbench 进行中（分支 `task/m4-api-workbench`，未推送、未合并）**：T035 HTTP 执行器、T036 环境/变量/密钥、T037 集合与历史持久化、T038 请求构建 UI、T039 响应查看 UI、T040 富响应体、T041 S7 OpenAPI spike、T042 OpenAPI 导入、T043 抓包回放、T044 集合/历史 UI 已完成；下一项 T045 断言。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
 - T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T026 已提交并推送到 `origin/task/m2-target-model`（`ebee1e5`，文档至 `92ecc32`），尚未合并入 `main`；其后 `9c19501..88a4070`（方向/手册文档、U01 实现、去重复标题）已推送到 `origin/task/m2-target-model`（`92ecc32..88a4070`，2026-10-28）；`f64e928`（清理残留 locale key 与过期布局引用）推送后，以 `--no-ff` 合并入 `main`（合并提交 `768e129`，`main` 树与分支一致），功能分支保留。手动复测入口见 `docs/2026-10-28-手动测试手册.md`；界面/产品方向见 `docs/2026-10-28-界面与项目方向.md`。S3/S4/T010/T014/T015/T020/T021/T022/T025 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
@@ -724,6 +724,17 @@
 - 手动：`.tmp/t043-manual.mjs` → `.tmp/logs/t043-web.json` `ok:true`。真实 `vibe-dev` + 无头 Edge，站点记录四个回放：GET 200、POST 201（`{"name":"book","price":12}` + `application/json`）、PUT 200（`plain update` + `text/plain`）、DELETE 204，method/path/body/content-type 与原请求逐项一致；POST/PUT/DELETE 均弹确认（“不是只读请求，回放可能改变 … 上的数据”），弹窗期间站点请求数不变（0 次），取消后仍为 0，GET 无弹窗直接转草稿，草稿载入后不自动发送，0 其他 console 错误。
 - 已知限制：`src/host/preview/session.ts` 在 `target.start()`（内部含 `newPage()` + `goto`）之后才启动 network 采集器，因此**首屏加载请求不入缓冲**；手测先开抽屉再点刷新触发抓包。该问题属 T024 遗留，T043 未改产品代码，建议 T044 或单独立项把采集器启动提前到导航前。
 
+### T044 — 集合/历史 UI（2026-10-29，`task/m4-api-workbench`）
+
+- 目标：集合树、保存/重开、历史搜索/重放/清空、空状态；验收是“抓包 → 回放 → 保存 → 重开 ≤ 3 次点击”。
+- Host 缝：`ApiService` 新增 `api.collection.{list,get,add,remove}` 与 `api.history.{list,clear}`，全部复用 T037 的 store；`list` 只回摘要（`requestCount` 跨根与文件夹求和），集合体在展开时才读。保存走“**追加一条请求**”而不是写回整份文档——unary 请求体上限 64 KiB，500 端点的集合根本塞不进去，且整份回写会把别的 tab 的并发保存覆盖掉。上限 `API_COLLECTION_ITEMS_MAX` 在服务层判成 `invalid_input` + `details.reason='collection_full'`。
+- 脱敏：历史与集合都存**未展开**的请求（`redactHttpRequest`），`Bearer {{token}}` 会被掩码，整值就是 `{{apiKey}}` 的保留；写入失败从不影响发送本身（`recordHistory` 吞异常）。
+- 修复：`withCollections`/`withHistory` 原本把服务自己抛的 `collection_full` 交给 `toApiStoreStudioError`，后者只认 `ApiStoreError`，于是被压平成 `internal`（单测先红后绿）。现在 `isStudioError(error)` 直接透传。
+- 客户端：`CollectionTree`（摘要行、展开读、两步删除、空/错误/跳过态）、`HistoryList`（最新在前、**搜索走 Host** 而非本地过滤、两步清空、重开不重发）、`ApiWorkbench` 组合请求表 + 集合树 + 历史，`collection-store.ts` / `history-store.ts` 为模块级 store（`useSyncExternalStore` + seq 守卫 + 可注入 API + reset），保存后自动展开默认集合 `saved`，重开经 `draft-store` 的 `openDraftInBuilder` 交接。
+- 验证：`pnpm typecheck` 0；`pnpm exec vitest run tests/component/api-collections` 3 文件 / 21 用例；`pnpm exec vitest run tests/unit/api-send/api-service-stores.test.ts` 10 用例；`pnpm test` **87 文件 / 778 用例**（基线 83/747，日志 `.tmp/logs/2026-10-29-t044-test.log`）；`pnpm build` host 272.1 / client 331.7 KiB（`.tmp/logs/2026-10-29-t044-build.log`）；`pnpm test:e2e` 9/9、20.0 s（`.tmp/logs/2026-10-29-t044-e2e.log`）。
+- 手动：`.tmp/t044-manual.mjs` → `.tmp/logs/t044-web.json` `ok:true`。真实 `vibe-dev` + 无头 Edge：站点抓包后点回放（第 1 次点击）得到 `GET /api/items` 草稿并带“尚未发送”提示 → 点保存（第 2 次）写盘 `.vibe/api/collections/saved.json`，集合自动展开显示 `GET /api/items` → 点该行（第 3 次）回填表单并提示“已载入保存的请求”，三次点击期间站点请求数不变（4 → 4）；整页 reload 后集合与条目仍在（读盘）；点发送得到 `HTTP 200 OK` 并写入 1 条历史（站点记录到 1 次真实请求）；搜索 `zzz` 0 行、`items` 1 行；从历史重开不重发（提示“已从历史载入请求…保存时已去掉密钥值”）；清空历史与删除集合都先出确认框，确认后列表清空且磁盘文件消失；0 其他 console 错误。清理：DSH/Edge/站点进程已结束（端口只剩 TIME_WAIT），`.vibe/api` 无残留文件。
+- 已知限制：T024 的采集器晚启动问题未在 T044 修（手测仍先开抽屉再刷新）；保存默认落到固定集合 `saved`，暂不支持选集合或改集合名；历史无分页（Host 一次返回一页，`pageLimit` 默认 50，超出只提示条数）。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -859,6 +870,13 @@
 4. **采集器启动晚于首屏导航**：`src/host/preview/session.ts` 在 `target.start()` 之后才 `start()` network 采集器，而 Web adapter 的 `start` 已 `newPage()` + `goto`，因此首屏请求不在缓冲里；reload 复用同一页面，后续请求可见。手测必须先开抽屉再刷新。修复方向是把采集器创建提前到导航前（T024 遗留，T043 未改）。
 5. **请求表单一次只渲染一个分区**：`RequestForm` 只有当前 `section` 的控件在 DOM 里（header 行只在 headers 页签、body 控件只在 body 页签）。手测脚本读草稿前要先点 `[data-vibe-section="headers"]` / `[data-vibe-section="body"]`，否则拿到空数组；文本体的 content-type 在 `bodyContentType` 而不是 header 行。
 
+### API 集合 / 历史（T044）
+
+1. **服务的错误不要再过一遍通用映射**：`toApiStoreStudioError` 只认 `ApiStoreError`，把别的错误一律压成 `internal`。服务自己抛的 `StudioError`（如 `collection_full`）必须先 `isStudioError` 判过再透传，否则 UI 拿不到 `details.reason`，只能显示“保存失败”。
+2. **unary 64 KiB 上限决定存储接口形状**：客户端不能“读整份集合 → 加一条 → 写回”，大集合直接超限；`api.collection.add` 在 Host 侧读-改-写一条请求，客户端永远只发一个 spec。同理列表只回摘要，展开才 `get`。
+3. **组件测试要能完全绕开 Host**：`setApiCollectionApi`/`setApiHistoryApi` 注入假实现，测试不碰 `.vibe` 也不碰 transport；“回放 → 保存 → 重开”的验收直接从 `openDraftInBuilder` 交接开始数点击，用假 Host 的 `add` 调用次数证明没有额外保存。
+4. **`pnpm test -- <path>` 不过滤**：`test` 是 `vitest run`，位置参数不会缩小范围；只跑某个目录要用 `pnpm exec vitest run <path>`。
+
 ## 4. 已改变的计划假设
 
 | 决策 | 原假设 | 当前结论 | 证据 |
@@ -888,7 +906,7 @@
 - **T031 已完成**：预览页拾取后在元素旁弹气泡，保存进入侧栏队列（模块级 store，tab 带数量徽标），支持编辑/取消/发送/移除与空态；发送只在点击时发生，默认复制 `renderAnnotationText`，发送器可注入给 T032 接 composer。限制：队列不落盘（T033）、未做 `vibe-dev` 手测（G3）。
 - **T032 已完成**：`src/client/inspect/handoff.ts` 通过 `conversation.input.left` 的作用域 slot 取公开 `inputActions`，按会话保存 composer 快照；标注文本用 `captureInsertion` + `insertText` 插入草稿（已有草稿前置 `\n\n`），只有 `insertText` 明确返回 `false` 才退回 `setDraft`，抛错或无 composer 时回退剪贴板；`insertText`/`setDraft` 都不触发提交。`StudioShell` 把发送器注入 `AnnotationQueue`，状态提示区分“已插入对话草稿”与“已复制到剪贴板”。`pnpm test` 57 文件 / 466 用例、`pnpm build` host 192.8 / client 184.7 KiB；Web（`.tmp/logs/t032-web.json`）与隔离 Desktop（`.tmp/logs/t032-desktop.json`）均 `ok:true`：草稿含完整标注、面板外 0、3 s 后未自动提交、新会话为空且切回原会话草稿仍在、停止后 Edge 全退、真实 profile 未改。限制：附件未接（S2 无公开附件 API）；隔离 Desktop 载体无法新建会话，跨会话隔离以 Web + 组件测试为准。
 - **T033 已完成**：标注历史以 `.vibe/annotations` 为唯一事实源，`AnnotationHistoryService` 提供 `annotation.history.{list,get,save,remove}` 四个一元方法（列表返回摘要 + `total` + `skipped`，搜索大小写不敏感并覆盖中文）；侧栏标注页签在队列下方展示历史，可搜索、重新打开（仅入队，不发送）、两步确认删除；气泡保存与队列编辑都会写穿历史，写失败只降级提示。`pnpm test` 59 文件 / 507 用例、`pnpm build` host 199.8 / client 202.1 KiB；手动 `.tmp/logs/t033-history.json` `ok:true`：写入 2 条 → 搜到 1 条 → 重开入队未发送 → 停 Host 写入坏文件 → 重启仍 2 条且提示跳过 1 → 删除 1 条生效，面板 0 异常。限制：客户端 store 名为 `history-store.ts`（大小写冲突）；搜索全量过滤后再截断，未分页。
-- **M4 进度**：T035 执行器、T036 环境/变量/密钥、T037 集合与历史持久化、T038 请求构建 UI、T039 响应查看 UI、T040 富响应体、T041 S7 OpenAPI spike、T042 OpenAPI 导入、T043 抓包回放均已完成（`task/m4-api-workbench`，未推送、未合并）。下一项 **T044 集合/历史 UI**：把已发送请求写历史、集合保存/重开/复制接到页面；同时评估把 network 采集器启动提前到首屏导航前（T043 发现的 T024 遗留）。
+- **M4 进度**：T035 执行器、T036 环境/变量/密钥、T037 集合与历史持久化、T038 请求构建 UI、T039 响应查看 UI、T040 富响应体、T041 S7 OpenAPI spike、T042 OpenAPI 导入、T043 抓包回放、T044 集合/历史 UI 均已完成（`task/m4-api-workbench`，未推送、未合并）。下一项 **T045 断言**：状态码/header/JSONPath/耗时四类断言，pass/fail 与可读错误，明确不执行任意 JS；之后 T046 G4 评审。network 采集器晚启动（T024 遗留）仍未处理，建议随 G4 或单独立项修。
 - **S2 遗留**：如果上游未来公开附件创建/释放 API，再评估直接截图附件；先复测切会话保留和失败清理。
 - **Desktop 遗留**：S2 跨会话未测到，后续需要能稳定创建第二个命名会话的测试环境。
 - **成本**：避免无必要的全仓读取和重复验收；每个任务完成即提交、记录、清理进程。
@@ -935,6 +953,7 @@ pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 - 响应查看：`src/client/api/{ResponseView,ResponseHeaders}.tsx`、`tests/component/api-response/`、`.tmp/logs/t039-web.json`、`.tmp/t039-manual.mjs`。
 - OpenAPI 导入：`src/host/api/openapi/{parser,resolver,mapper}.ts`、`tests/integration/openapi/`、[S7 报告](../spikes/s7/REPORT.md)。
 - 抓包回放：`src/host/api/replay.ts`、`src/client/api/ReplayButton.tsx`、`src/host/preview/network.ts`（采集体上限）、`tests/integration/capture-replay/`、`.tmp/logs/t043-web.json`、`.tmp/t043-manual.mjs`。
+- 集合/历史 UI：`src/host/api/service.ts`（collection/history 方法）、`src/client/api/{ApiWorkbench,CollectionTree,HistoryList}.tsx`、`src/client/api/{collection-store,history-store,draft-store}.ts`、`tests/component/api-collections/`、`tests/unit/api-send/api-service-stores.test.ts`、`.tmp/logs/t044-web.json`、`.tmp/t044-manual.mjs`。
 - Web 预览：`src/host/targets/web/{adapter,launch}.ts`、`tests/integration/web-adapter/`、`tests/helpers/png.ts`。
 - 预览生命周期：`src/host/preview/session.ts`、`src/client/preview/{Toolbar.tsx,lifecycle.ts,local-url.ts}`、`tests/integration/preview/session-lifecycle.test.ts`、`.tmp/logs/t025-{host,desktop}.json`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。

@@ -5,6 +5,8 @@
  * T011 adds the authenticated `/api/vibe` transport (health + unary methods);
  * later preview features register methods on the same registry.
  */
+import { createApiCollectionStore } from './api/collection-store'
+import { createApiHistoryStore } from './api/history-store'
 import type { ApiSecretStore, CredentialProviderLike } from './api/secrets'
 import { createApiSecretStore } from './api/secrets'
 import { ApiService, registerApiMethods } from './api/service'
@@ -98,10 +100,17 @@ export type {
 export { ApiStoreError, toApiStoreStudioError } from './api/store-files'
 export type { ApiStoreErrorCode, ApiStoreFileOptions } from './api/store-files'
 export {
+  API_COLLECTION_ADD_METHOD,
+  API_COLLECTION_GET_METHOD,
+  API_COLLECTION_LIST_METHOD,
+  API_COLLECTION_REMOVE_METHOD,
+  API_HISTORY_CLEAR_METHOD,
+  API_HISTORY_LIST_METHOD,
   API_HTTP_SEND_METHOD,
   API_REPLAY_PREPARE_METHOD,
   ApiService,
   registerApiMethods,
+  summarizeCollection,
 } from './api/service'
 export type { ApiSendOutcome, ApiServiceOptions } from './api/service'
 export { prepareReplay } from './api/replay'
@@ -298,7 +307,15 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
 
   // T038: the request builder sends through one unary method; expansion and
   // execution stay host-side so resolved secrets never reach the panel.
-  const api = new ApiService({ secrets: apiSecrets })
+  // T044: collections and history live beside it under `.vibe/api`; the panel
+  // saves through `api.collection.add` and reads one page of history at a time.
+  const apiCollections = createApiCollectionStore(process.cwd())
+  const apiHistory = createApiHistoryStore(process.cwd())
+  const api = new ApiService({
+    secrets: apiSecrets,
+    collections: apiCollections,
+    history: apiHistory,
+  })
   const setupApi = () => registerApiMethods(registry, api)
   if (typeof ctx.effect === 'function') {
     ctx.effect(setupApi, 'vibe-studio: api methods')

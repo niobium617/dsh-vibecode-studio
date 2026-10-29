@@ -19,7 +19,7 @@ import { createTranslator, type Locale } from '../i18n'
 import { callUnary, toStudioError } from '../transport'
 import { RequestForm } from './RequestForm'
 import { ResponseView } from './ResponseView'
-import { takePendingReplay, type PendingReplay } from './ReplayButton'
+import { registerDraftTarget, type PendingDraft } from './draft-store'
 import {
   buildRequestSpec,
   createRequestDraft,
@@ -89,6 +89,19 @@ const statusStyle: React.CSSProperties = {
   opacity: 0.75,
 }
 
+const saveErrorStyle: React.CSSProperties = {
+  font: '11px/1.4 system-ui, sans-serif',
+  color: 'var(--dsw-color-danger, #c62828)',
+}
+
+const loadBoxStyle: React.CSSProperties = {
+  display: 'grid',
+  gap: 4,
+  padding: 10,
+  borderRadius: 6,
+  border: '1px solid var(--dsw-border-color, rgba(127, 127, 127, 0.35))',
+}
+
 const boxStyle: React.CSSProperties = {
   display: 'grid',
   gap: 4,
@@ -138,9 +151,22 @@ type Phase =
   | { readonly kind: 'failed'; readonly error: StudioError }
   | { readonly kind: 'cancelled' }
 
+/** Persists the current request; rejects so the button can report failure. */
+export type ApiSave = (spec: HttpRequestSpec) => Promise<void>
+
+type SaveState =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'saving' }
+  | { readonly kind: 'saved' }
+  | { readonly kind: 'error'; readonly error: StudioError }
+
 export interface RequestBuilderProps {
   readonly initialDraft?: RequestDraft
   readonly send?: ApiSend
+  /** When provided, the footer grows a Save button (T044). */
+  readonly save?: ApiSave
+  /** Runs after a send settles, so the history list can refresh. */
+  readonly onSent?: () => void
   readonly locale?: Locale
 }
 
@@ -167,16 +193,30 @@ function describeFailure(
   return { title: t('api.request.error.internal'), detail }
 }
 
+function describeSaveFailure(
+  error: StudioError,
+  t: ReturnType<typeof createTranslator>,
+): string {
+  if (error.code === 'invalid_input') {
+    if (error.details?.reason === 'collection_full') return t('api.collections.full')
+    if (typeof error.details?.limitBytes === 'number') return t('api.request.error.tooLarge')
+  }
+  return t('api.request.saveFailed')
+}
+
 export function RequestBuilder({
   initialDraft,
   send,
+  save,
+  onSent,
   locale,
 }: RequestBuilderProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
   const [draft, setDraft] = React.useState<RequestDraft>(() => initialDraft ?? createRequestDraft())
   const [phase, setPhase] = React.useState<Phase>({ kind: 'idle' })
   const [issues, setIssues] = React.useState<readonly RequestIssue[]>([])
-  const [replay, setReplay] = React.useState<PendingReplay | null>(null)
+  const [pending, setPending] = React.useState<PendingDraft | null>(null)
+  const [saveState, setSaveState] = React.useState<SaveState>({ kind: 'idle' })
   const controllerRef = React.useRef<AbortController | null>(null)
   const defaultSend = React.useMemo(() => createTransportSend(), [])
   const sendImpl = send ?? defaultSend
@@ -185,20 +225,26 @@ export function RequestBuilder({
     return () => controllerRef.current?.abort()
   }, [])
 
-  // T043: the replay button stores one draft before switching here. The tab
-  // switch unmounts the preview page, so this mount is the only consumer; the
-  // draft is loaded into the form and never sent on its own.
-  React.useEffect(() => {
-    const pending = takePendingReplay()
-    if (pending === null) return
-    setDraft(draftFromRequestSpec(pending.result.draft))
-    setIssues([])
-    setPhase({ kind: 'idle' })
-    setReplay(pending)
-  }, [])
+  // T044: replay, the collection tree and the history list all hand a draft
+  // over through one store. Registering also drains a draft that arrived while
+  // the builder was unmounted (the T043 tab-switch case); a draft is loaded
+  // into the form and never sent on its own.
+  React.useEffect(
+    () =>
+      registerDraftTarget((next) => {
+        setDraft(draftFromRequestSpec(next.spec))
+        setIssues([])
+        setPhase({ kind: 'idle' })
+        setSaveState({ kind: 'idle' })
+        setPending(next)
+      }),
+    [],
+  )
 
   const sending = phase.kind === 'sending'
+  const saving = saveState.kind === 'saving'
   const failure = phase.kind === 'failed' ? describeFailure(phase.error, t) : null
+  const replayNotice = pending?.replay ?? null
 
   const handleSend = React.useCallback((): void => {
     if (sending) return
@@ -216,6 +262,7 @@ export function RequestBuilder({
       .then((outcome) => {
         if (controller.signal.aborted) return
         setPhase({ kind: 'sent', outcome })
+        onSent?.()
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) {
@@ -223,11 +270,27 @@ export function RequestBuilder({
           return
         }
         setPhase({ kind: 'failed', error: toStudioError(error) })
+        onSent?.()
       })
       .finally(() => {
         if (controllerRef.current === controller) controllerRef.current = null
       })
-  }, [draft, sendImpl, sending])
+  }, [draft, onSent, sendImpl, sending])
+
+  const handleSave = React.useCallback((): void => {
+    if (save === undefined || saving) return
+    const built = buildRequestSpec(draft)
+    if (!built.ok) {
+      setIssues(built.issues)
+      setPhase({ kind: 'idle' })
+      return
+    }
+    setIssues([])
+    setSaveState({ kind: 'saving' })
+    void save(built.spec)
+      .then(() => setSaveState({ kind: 'saved' }))
+      .catch((error: unknown) => setSaveState({ kind: 'error', error: toStudioError(error) }))
+  }, [draft, save, saving])
 
   const handleCancel = React.useCallback((): void => {
     controllerRef.current?.abort()
@@ -249,6 +312,17 @@ export function RequestBuilder({
           {t('api.request.cancel')}
         </button>
       ) : null}
+      {save === undefined ? null : (
+        <button
+          type="button"
+          style={secondaryButtonStyle}
+          data-vibe-save="1"
+          disabled={sending || saving}
+          onClick={handleSave}
+        >
+          {saving ? t('api.request.saving') : t('api.request.save')}
+        </button>
+      )}
       <span style={statusStyle} role="status" data-vibe-request-status="1">
         {phase.kind === 'sending'
           ? t('api.request.sending')
@@ -256,6 +330,16 @@ export function RequestBuilder({
             ? t('api.request.cancelled')
             : ''}
       </span>
+      {saveState.kind === 'saved' ? (
+        <span style={statusStyle} role="status" data-vibe-save-status="1">
+          {t('api.request.saved')}
+        </span>
+      ) : null}
+      {saveState.kind === 'error' ? (
+        <span role="alert" style={saveErrorStyle} data-vibe-save-error="1">
+          {describeSaveFailure(saveState.error, t)}
+        </span>
+      ) : null}
     </div>
   )
 
@@ -270,7 +354,7 @@ export function RequestBuilder({
         footer={footer}
       />
 
-      {replay === null ? null : (
+      {replayNotice !== null ? (
         <div style={warnBoxStyle} data-vibe-replay-notice="1">
           <strong style={{ font: '600 11px/1.4 system-ui, sans-serif' }}>
             {t('api.replay.notice.title')}
@@ -278,28 +362,28 @@ export function RequestBuilder({
           <span style={noticeLineStyle}>{t('api.replay.notice.body')}</span>
           <span style={noticeLineStyle}>
             {t('api.replay.notice.source', {
-              method: replay.method,
-              url: replay.url,
+              method: replayNotice.method,
+              url: replayNotice.url,
             })}
           </span>
-          {replay.result.requiresConfirmation ? (
+          {replayNotice.result.requiresConfirmation ? (
             <span style={noticeLineStyle}>
-              {t('api.replay.notice.confirm', { method: replay.method })}
+              {t('api.replay.notice.confirm', { method: replayNotice.method })}
             </span>
           ) : null}
-          {replay.result.warnings.length > 0 ? (
+          {replayNotice.result.warnings.length > 0 ? (
             <ul style={listStyle}>
-              {replay.result.warnings.map((warning) => (
+              {replayNotice.result.warnings.map((warning) => (
                 <li key={warning}>
-                  {t(`api.replay.warning.${warning}`, { method: replay.method })}
+                  {t(`api.replay.warning.${warning}`, { method: replayNotice.method })}
                 </li>
               ))}
             </ul>
           ) : null}
-          {replay.result.omittedHeaders.length > 0 ? (
+          {replayNotice.result.omittedHeaders.length > 0 ? (
             <span style={noticeLineStyle}>
               {t('api.replay.notice.omitted', {
-                headers: replay.result.omittedHeaders.join(', '),
+                headers: replayNotice.result.omittedHeaders.join(', '),
               })}
             </span>
           ) : null}
@@ -307,7 +391,23 @@ export function RequestBuilder({
             type="button"
             style={dismissStyle}
             data-vibe-replay-dismiss="1"
-            onClick={() => setReplay(null)}
+            onClick={() => setPending(null)}
+          >
+            {t('api.replay.notice.dismiss')}
+          </button>
+        </div>
+      ) : pending === null ? null : (
+        <div style={loadBoxStyle} data-vibe-load-notice="1">
+          <span style={noticeLineStyle}>
+            {pending.source === 'history'
+              ? t('api.request.loaded.history')
+              : t('api.request.loaded.saved')}
+          </span>
+          <button
+            type="button"
+            style={dismissStyle}
+            data-vibe-load-dismiss="1"
+            onClick={() => setPending(null)}
           >
             {t('api.replay.notice.dismiss')}
           </button>

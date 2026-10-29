@@ -580,12 +580,21 @@
   - 手动（`.tmp/t043-manual.mjs` → `.tmp/logs/t043-web.json`，`ok:true`）：真实 `vibe-dev` + 无头 Edge，站点依次发起 GET / POST(json) / PUT(text) / DELETE；四个回放的 method/path/body/content-type 在站点侧与原请求完全一致；POST/PUT/DELETE 均先出确认框（弹窗期间 0 请求），取消后保持预览且不发；GET 无弹框；草稿载入后均未自动发送，只有点“发送”才发出；0 其他 console 错误。
   - 发现并记录（不属于 T043 范围，未改产品代码）：`src/host/preview/session.ts` 在 `target.start()` 完成导航之后才启动 network 采集器，首屏加载的请求不在缓冲里；手测改为先开抽屉再点刷新触发请求。建议在后续任务（T044 或单独立项）把采集器启动提前到导航前。
 
-### - [ ] T044 集合/历史 UI
+### - [x] T044 集合/历史 UI
 
 - **目标**：集合树、保存/重开、历史搜索/重放/清空；空状态。
 - **验收**：抓包 → 回放 → 保存 → 重开 ≤ 3 次点击；组件测试。
 - **验证**：`pnpm test -- tests/component/api-collections` + 手动。
 - **文件**：`src/client/api/{CollectionTree,HistoryList}.tsx`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 命令与结果：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/component/api-collections` 3 文件 / 21 用例全通过；`pnpm exec vitest run tests/unit/api-send/api-service-stores.test.ts` 10 用例全通过；`pnpm test` 87 文件 / 778 用例全通过（基线 83/747，`.tmp/logs/2026-10-29-t044-test.log`）；`pnpm build` host 272.1 KiB / client 331.7 KiB（`.tmp/logs/2026-10-29-t044-build.log`）；`pnpm test:e2e` 9/9、20.0 s（`.tmp/logs/2026-10-29-t044-e2e.log`）。
+  - host：新增 `api.collection.{list,get,add,remove}` 与 `api.history.{list,clear}`；`list` 只回摘要（`requestCount` 含文件夹）/`skipped`，展开才 `get`；`add` 在 Host 侧读-改-写**一条**请求（unary 体 64 KiB 装不下整份大集合），首次保存用 `collectionName` 建集合，超过 `API_COLLECTION_ITEMS_MAX` 抛 `invalid_input` + `details.reason='collection_full'`；`get` 缺失 → `not_found`；`remove` 回 `{removed}`；`history.list` 支持 `query`（Host 侧过滤、最新在前、`limit` 默认 50），`history.clear` 回 `{cleared}` 并删除文件；发送失败也记一条无 status/elapsedMs 的历史，写历史失败不影响发送结果。
+  - 脱敏：历史与集合存**未展开**的请求；`authorization: Bearer plain-token` → `REDACTED`，`x-api-key: {{apiKey}}` 与普通 header 保留。
+  - 修复：`withCollections`/`withHistory` 原先把服务自己抛的 `StudioError` 交给 `toApiStoreStudioError`，被压平成 `internal`（单测先红后绿）；现在 `isStudioError` 命中直接透传。
+  - 客户端：`CollectionTree`（摘要行 + 计数、展开读、两步删除、空/错误/重试/跳过态、中文标签）、`HistoryList`（最新在前、Host 侧搜索与“清空搜索”、两步清空、打开不回填即不发送、中文标签）、`ApiWorkbench` 组合表单/集合/历史；保存后自动展开默认集合 `saved` 并高亮新行。
+  - 组件测试：`api-collections/` 用注入的假 Host（不碰 `.vibe`、不碰 transport）；workbench 验收从 `openDraftInBuilder`（T043 回放点击）起数点击，Save 调用参数为 `{collectionId:'saved',collectionName:'Saved requests',name:'GET /items',request}`，重开只回填 1 次 `add`、0 次发送；另有保存失败与 `collection_full` 两条错误路径。
+  - 手动（`.tmp/t044-manual.mjs` → `.tmp/logs/t044-web.json`，`ok:true`）：真实 `vibe-dev` + 无头 Edge；回放（第 1 击）→ 保存（第 2 击，写 `.vibe/api/collections/saved.json`、集合自动展开）→ 点新行（第 3 击，提示“已载入保存的请求”），三次点击期间站点请求数 4 → 4；整页 reload 后集合与条目仍在；点发送得 `HTTP 200 OK` 并写入 1 条历史；搜索 `zzz` 0 行 / `items` 1 行；从历史重开不重发；清空历史与删除集合均先确认、确认后列表与磁盘文件都清空；0 其他 console 错误；DSH/Edge/站点进程已清理。
+  - 未做（范围外）：T024 采集器晚于首屏导航的问题未修（手测仍先开抽屉再刷新）；保存固定落到 `saved` 集合，暂不支持选集合/改名；历史无分页，超出只提示“还有 N 条”。
 
 ### - [ ] T045 断言（P1）
 

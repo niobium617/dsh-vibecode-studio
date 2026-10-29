@@ -369,6 +369,67 @@ export interface ApiReplayResult {
   readonly warnings: readonly ReplayWarning[]
 }
 
+/* -------------------------------------------------------------------------
+ * Collections and history (T044)
+ *
+ * The panel never touches `.vibe/api` directly. Saving appends one request
+ * host-side (`api.collection.add`) instead of writing the whole document back:
+ * an imported collection can be far larger than the 64 KiB unary envelope, and
+ * a request is the only thing a save actually changes. Listing reads summaries
+ * so the tree stays small; expanding one collection reads that file alone.
+ * ---------------------------------------------------------------------- */
+
+export const API_COLLECTION_LIST_METHOD = 'api.collection.list'
+export const API_COLLECTION_GET_METHOD = 'api.collection.get'
+export const API_COLLECTION_ADD_METHOD = 'api.collection.add'
+export const API_COLLECTION_REMOVE_METHOD = 'api.collection.remove'
+export const API_HISTORY_LIST_METHOD = 'api.history.list'
+export const API_HISTORY_CLEAR_METHOD = 'api.history.clear'
+
+/** One row of the collection tree; bodies stay on disk until opened. */
+export interface ApiCollectionSummary {
+  readonly id: string
+  readonly name: string
+  readonly requestCount: number
+  readonly folderCount: number
+}
+
+export interface ApiCollectionSummaries {
+  readonly collections: readonly ApiCollectionSummary[]
+  readonly skipped: number
+}
+
+/** Appends one request; the collection is created when it does not exist yet. */
+export interface ApiCollectionAddParams {
+  readonly collectionId: string
+  /** Used only when the collection is created. */
+  readonly collectionName?: string
+  readonly name: string
+  readonly request: HttpRequestSpec
+}
+
+export interface ApiCollectionAddResult {
+  readonly collectionId: string
+  readonly requestId: string
+  readonly requestCount: number
+}
+
+export interface ApiCollectionRemoveResult {
+  readonly removed: boolean
+}
+
+/** Newest-first page of the send log. */
+export interface ApiHistoryPage {
+  readonly entries: readonly ApiHistoryEntry[]
+  /** Matches before `limit` was applied. */
+  readonly total: number
+  readonly skipped: number
+}
+
+export interface ApiHistoryClearResult {
+  readonly cleared: boolean
+}
+
 export const API_STORE_ID_PATTERN = '[A-Za-z0-9][A-Za-z0-9._-]{0,63}'
 export const API_NAME_CHARS_MAX = 200
 export const API_COLLECTION_ITEMS_MAX = 200

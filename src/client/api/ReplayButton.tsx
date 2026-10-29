@@ -17,32 +17,7 @@ import type { NetworkEntry } from '../../contracts/telemetry'
 import { createTranslator, type Locale } from '../i18n'
 import { callUnary, toStudioError } from '../transport'
 import { setActiveTab } from '../shell/store'
-
-export interface PendingReplay {
-  readonly entryId: string
-  readonly method: string
-  readonly url: string
-  readonly result: ApiReplayResult
-}
-
-let pendingReplay: PendingReplay | null = null
-
-/** Stores the draft the builder consumes after the tab switch. */
-export function setPendingReplay(value: PendingReplay): void {
-  pendingReplay = value
-}
-
-/** Returns the pending draft once; a second call sees nothing to load. */
-export function takePendingReplay(): PendingReplay | null {
-  const value = pendingReplay
-  pendingReplay = null
-  return value
-}
-
-/** Test helper between cases. */
-export function resetReplayStore(): void {
-  pendingReplay = null
-}
+import { openDraftInBuilder } from './draft-store'
 
 /**
  * Only the fields replay reads. Response data would waste the 64 KiB unary
@@ -210,7 +185,11 @@ export function ReplayButton({
       try {
         const result = await prepareImpl(entry, confirm)
         if (!mounted.current) return
-        setPendingReplay({ entryId: entry.id, method, url: entry.url, result })
+        openDraftInBuilder({
+          spec: result.draft,
+          source: 'replay',
+          replay: { entryId: entry.id, method, url: entry.url, result },
+        })
         setConfirming(false)
         if (openWorkbench === undefined) setActiveTab('api')
         else openWorkbench()
