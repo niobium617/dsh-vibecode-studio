@@ -611,7 +611,7 @@
   - 手动（`.tmp/t045-manual.mjs` → `.tmp/logs/t045-web.json`，`ok:true`）：真实 `vibe-dev` + 无头 Edge；对本地站点加四类检查（status 200 / header content-type contains json / `$.items[0].id` equals item-1 / duration ≤5000）→ 一次发送，站点只收到 1 次请求，四行全 pass、汇总“通过 4/4”；把 status 改成 201 再发 → 该行 fail 且文案“期望状态码 201，实际 200。”，其余三行仍 pass；期望值填 `abc` 再点发送 → 不发请求并显示“状态码须为三位数字（100–599）”；0 其他 console 错误；DSH/Edge/站点进程已清理。
   - 未做（范围外）：断言不随请求进入集合/历史（`HttpRequestSpec` 未扩展）；JSONPath 无通配/递归/filter；单条无“跳过”开关。
 
-### - [ ] T046 G4 API 评审 [GATE]
+### - [x] T046 G4 API 评审 [GATE]
 
 - **目标**：验证 API 工作台闭环与安全。
 - **验收**：抓包 → 回放 → 保存 → 重开；500 端点导入；密钥不泄漏；SPEC 相关条目通过。
@@ -631,7 +631,7 @@
   - [x] **R4 FR-API-04 环境编辑与持久化**：新增 `src/host/api/environment-store.ts`（`.vibe/api/environments`，一环境一文件，原子写 + 2 MiB 上限 + 项目内校验，坏/外来文件计入 `skipped` 而非抛错）与四个 unary `api.env.list/get/save/remove`（save 校验名字长度、`{{}}` 变量语法、重复名、密钥行必须是凭据名；id 由名字 slug 生成，占用则 `-2`…`-99`，不覆盖）；`api.http.send` 新增 `environmentId`，Host 侧读取文档再展开，文档与凭据引用不过线，与内联 `environment` 互斥（同时给出 → `invalid_input`，未知 id → `not_found`）；读取只回 `ApiEnvironmentDetail{document, view}`，view 中密钥仅 `configured/writable/source`。client 新增模块级 `environment-store.ts`，`EnvironmentPanel` 持有草稿并挂到 `ApiWorkbench`，`EnvironmentEditor` 增加编辑模式（选择器/新建/名字/增删行/密钥引用/保存/删除/状态），只读模式保留 T036 行为；`RequestBuilder` 有选中环境时把 `environmentId` 传给发送。验证：`pnpm typecheck` 0；`pnpm test` 97 文件 / **868 用例通过**（`api-service-environments.test.ts` 12、`environment-store.test.ts` 7、`environment-panel.test.tsx` 8）；`pnpm build` host 345.5 / client 422.3 KiB。
   - [x] **R5 FR-API-05 集合改名/复制**：store 新增 `rename`（原地改名，id 与所有请求/文件夹 id 不变，空白名以 `invalid_data` 拒绝）；新增 unary `api.collection.rename`（`{id,name}`，名字 trim + 200 字符上限 + 空名 `invalid_input`，未知 id `not_found`）与 `api.collection.duplicate`（沿用 store `duplicate`，嵌套 id 全部新生成、源不变；名字默认 `<原名> copy`，id 由名字 slug 生成，占用则 `-2`…`-99`，绝不覆盖），两者都返回 `{collection: 摘要}`。UI 集合行新增“重命名”“复制”：重命名行内输入（Enter 保存 / Esc 取消，空名禁用保存，失败行内提示且保留原名），复制后自动刷新并展开副本。验证：`pnpm typecheck` 0；`pnpm test` 98 文件 / **882 用例通过**（`api-service-collections.test.ts` 6、`collection-store.test.ts` +2、`collection-tree.test.tsx` +5）；`pnpm build` host 348.9 / client 427.7 KiB。
   - [x] **R6 FR-API-06 历史 N 可配置**：client `history-store` 新增 `limit`（默认 50，`setApiHistoryLimit` 夹到 1..200，改后保留搜索词重载，重置回 50），`queryOf` 始终携带 `limit` 调 `api.history.list`；`HistoryList` 头部新增 50/100/200 选择器（`data-vibe-send-history-limit`，i18n `api.history.limitLabel`），换大后“还有 N 条未显示”消失。Host 侧校验与默认值原已支持。验证：`pnpm typecheck` 0；`pnpm test` 98 文件 / **885 用例通过**（`history-list.test.tsx` +3：默认 50 且保留搜索、提到 200 后 60 行全显示、500 夹到 200）；`pnpm build` host 348.9 / client 429.6 KiB。
-  - [ ] **R7 G4 复评**：重跑四类基线 + 真实载体闭环/导入/密钥证据；更新本段、HANDOFF、DEVLOG；通过后勾选 T046。
+  - [x] **R7 G4 复评（GO）**：四类基线全绿——`pnpm typecheck` 0；`pnpm test` 98 文件 / **885 用例通过**（37.6 s）；`pnpm build` host 348.9 / client 429.6 KiB（gzip host 78.5 / client 86.2 KiB）；`pnpm test:e2e` **9/9**（16.5 s）。证据脚本扩展后 `.tmp/logs/g4-evidence-r7.out` `ok:true`：500 端点 **12.14 ms**；三条密钥 flow `outcomeHasSecret:false`；R4 存储环境发送 `storedSendReachedServerWithSecret:true` 且 `storedSendHasSecret:false`、环境文件无密钥、双来源 `field:environmentId`、未知 id `not_found`；R5 改名保 id、复制 `g4-literal-renamed-copy` 换新嵌套 id 且源不变；R6 `limit:2`/`limit:200` 均按页返回（总数 4）；R8 服务层导入 500 端点，二次导入 `g4-big-api-2`→`g4-big-api-3` 不覆盖。真实载体 `.tmp/g4/flow.mjs`（`.tmp/logs/g4-flow.json`，旧结果备份 `g4-flow-r6-backup.json`）`ok:true`：3 击回放→保存→重开，保存/重开期间站点请求数保持 4，reload 后 1 集合/1 请求，发送 1 次 `HTTP 200 OK` + 历史 1 条，0 其他 console 错误。SPEC 矩阵：FR-API-01/02/03/04/05/06/07/08/09/10/12 通过，FR-API-11 按 D8 延后。结论：**GO**；T046 已勾选；未推送、未合并，等待用户批准后再推送/合并。
 
 ---
 
