@@ -213,7 +213,9 @@ export type {
 } from './targets/process/logs'
 
 export const name = 'dsh-vibecode-studio'
-export const inject = ['connection']
+// `credentials` is read in `apply` for the API secret seam (T036); Cordis throws
+// on undeclared service access, so it must be in the inject map.
+export const inject = ['connection', 'credentials']
 
 /** The service this plugin exposes to later host modules (T011+). */
 export interface VibeStudioService {

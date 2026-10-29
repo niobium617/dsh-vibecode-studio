@@ -2,10 +2,9 @@
  * Request builder container (T038).
  *
  * Holds the draft, turns it into a wire spec on send, and shows what happened:
- * validation issues before the wire, the stable error code afterwards. The
- * response viewer is T039 — this component only summarises status, time and
- * size so a send is visibly complete. Transport is injectable so the component
- * tests never touch the network.
+ * validation issues before the wire, the stable error code afterwards, then the
+ * response itself (T039 `ResponseView`). Transport is injectable so the
+ * component tests never touch the network.
  */
 import * as React from 'react'
 import {
@@ -19,6 +18,7 @@ import type { StudioError } from '../../contracts/errors'
 import { createTranslator, type Locale } from '../i18n'
 import { callUnary, toStudioError } from '../transport'
 import { RequestForm } from './RequestForm'
+import { ResponseView } from './ResponseView'
 import {
   buildRequestSpec,
   createRequestDraft,
@@ -106,12 +106,6 @@ const warnBoxStyle: React.CSSProperties = {
   color: 'var(--dsw-color-warning, #b26a00)',
 }
 
-const resultBoxStyle: React.CSSProperties = {
-  ...boxStyle,
-  border: '1px solid var(--dsw-border-color, rgba(127, 127, 127, 0.3))',
-  font: '12px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace',
-}
-
 const listStyle: React.CSSProperties = {
   margin: 0,
   paddingLeft: 18,
@@ -129,12 +123,6 @@ export interface RequestBuilderProps {
   readonly initialDraft?: RequestDraft
   readonly send?: ApiSend
   readonly locale?: Locale
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function issueKey(issue: RequestIssue): string {
@@ -276,15 +264,10 @@ export function RequestBuilder({
 
       {phase.kind === 'sent' ? (
         <>
-          <div style={resultBoxStyle} role="status" data-vibe-request-result="1">
-            {t('api.request.result.summary', {
-              status: phase.outcome.result.status,
-              statusText: phase.outcome.result.statusText,
-              elapsed: phase.outcome.result.elapsedMs,
-              bytes: formatBytes(phase.outcome.result.body.bytes),
-            })}
-            {phase.outcome.result.body.truncated ? ` ${t('api.request.result.truncated')}` : ''}
-          </div>
+          <ResponseView
+            result={phase.outcome.result}
+            {...(locale === undefined ? {} : { locale })}
+          />
           {phase.outcome.unresolved.length > 0 ? (
             <div style={warnBoxStyle} data-vibe-request-unresolved="1">
               <strong style={{ font: '600 11px/1.4 system-ui, sans-serif' }}>

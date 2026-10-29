@@ -76,9 +76,12 @@ describe('RequestBuilder', () => {
       headers: [{ name: 'x-trace', value: 'abc' }],
     })
     await waitFor(() =>
-      expect(container.querySelector('[data-vibe-request-result="1"]')?.textContent).toContain(
-        'HTTP 200 OK · 12 ms · 4 B',
+      expect(container.querySelector('[data-vibe-response-status="1"]')?.textContent).toBe(
+        'HTTP 200 OK',
       ),
+    )
+    expect(container.querySelector('[data-vibe-response-meta="1"]')?.textContent).toBe(
+      '12 ms · 4 B',
     )
   })
 
