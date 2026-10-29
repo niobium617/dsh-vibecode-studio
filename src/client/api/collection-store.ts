@@ -223,6 +223,21 @@ export async function saveRequestToCollection(
   return result
 }
 
+/**
+ * Refreshes the tree and shows a collection that just appeared (an OpenAPI
+ * import). Unlike `toggleCollection` it never collapses an open collection.
+ */
+export async function revealCollection(id: string): Promise<void> {
+  await loadCollections()
+  if (!state.expanded.includes(id)) {
+    state = { ...state, expanded: [...state.expanded, id] }
+    emit()
+  }
+  if (state.details[id] === undefined && state.detailStatus[id] === undefined) {
+    await loadCollectionDetail(id)
+  }
+}
+
 /** Deletes one collection and forgets its cached document. */
 export async function removeCollection(id: string): Promise<boolean> {
   const result = await api.remove(id)

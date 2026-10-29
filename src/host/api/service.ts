@@ -25,6 +25,7 @@ import {
   API_HISTORY_LIST_METHOD,
   API_HTTP_SEND_METHOD,
   API_NAME_CHARS_MAX,
+  API_OPENAPI_IMPORT_METHOD,
   API_REPLAY_PREPARE_METHOD,
   isApiAssertion,
   isApiHistoryQuery,
@@ -42,6 +43,7 @@ import {
   type ApiHistoryClearResult,
   type ApiHistoryPage,
   type ApiHistoryQuery,
+  type ApiOpenApiImportResult,
   type ApiReplayResult,
   type ApiSavedRequest,
   type HttpExecutionResult,
@@ -50,10 +52,13 @@ import {
 } from '../../contracts/api'
 import { evaluateAssertions } from './assertions'
 import { isStudioError, studioError } from '../../contracts/errors'
+import { MAX_UNARY_BODY_BYTES } from '../../contracts/transport'
 import type { ApiCollectionStore } from './collection-store'
 import { resolveHttpRequest } from './environment'
 import { createHttpExecutor, type HttpExecutor } from './executor'
 import type { ApiHistoryStore } from './history-store'
+import { importOpenApi as importOpenApiDocument, type OpenApiImportResult } from './openapi/mapper'
+import { OpenApiError } from './openapi/parser'
 import { prepareReplay as prepareReplayDraft } from './replay'
 import { redactExecutionResult } from './result-redaction'
 import type { ApiSecretStore } from './secrets'
@@ -68,6 +73,7 @@ export {
   API_HISTORY_CLEAR_METHOD,
   API_HISTORY_LIST_METHOD,
   API_HTTP_SEND_METHOD,
+  API_OPENAPI_IMPORT_METHOD,
   API_REPLAY_PREPARE_METHOD,
 }
 
@@ -271,6 +277,60 @@ export class ApiService {
     return { removed }
   }
 
+  /**
+   * Parses an OpenAPI 3.x / Swagger 2.0 document into a collection (FR-API-08).
+   *
+   * Everything that touches the document runs host-side: the panel sends text,
+   * never a path and never a URL. The default remote policy allows no origin,
+   * so a document's `$ref`s cannot make the Host fetch anything; only when a
+   * caller explicitly allows an origin can `remoteDocumentCount` be non-zero.
+   * Saving goes through `ApiCollectionStore.save`, which re-validates and
+   * redacts every stored request.
+   *
+   * An import never overwrites an existing collection: if the document slug is
+   * taken, a `-2`, `-3`, … suffix is allocated, so re-importing a document does
+   * not discard edits made to the previous collection.
+   */
+  async importOpenApi(params: unknown): Promise<ApiOpenApiImportResult> {
+    if (!isRecord(params)) invalid('api.openapi.import expects an object', 'params')
+    const text = params.text
+    if (typeof text !== 'string' || text.trim() === '') {
+      invalid('text must be the document JSON', 'text')
+    }
+    if (Buffer.byteLength(text, 'utf8') >= MAX_UNARY_BODY_BYTES) {
+      throw studioError('invalid_input', 'the document is too large for one import call', {
+        reason: 'document_too_large',
+        limitBytes: MAX_UNARY_BODY_BYTES,
+      })
+    }
+    const requestedName = typeof params.name === 'string' ? params.name.trim() : ''
+    if (requestedName.length > API_NAME_CHARS_MAX) invalid('name is not usable', 'name')
+
+    let imported: OpenApiImportResult
+    try {
+      imported = await importOpenApiDocument(text, requestedName === '' ? {} : { name: requestedName })
+    } catch (error) {
+      throw toOpenApiImportError(error)
+    }
+
+    return this.withCollections(async (store) => {
+      const savedId = await freeCollectionId(store, imported.collection.id)
+      const collection: ApiCollection =
+        savedId === imported.collection.id ? imported.collection : { ...imported.collection, id: savedId }
+      await store.save(collection)
+      return {
+        collection: summarizeCollection(collection),
+        version: imported.version,
+        title: imported.title,
+        endpointCount: imported.endpoints.length,
+        groupCount: imported.groups.length,
+        skipped: imported.skipped,
+        warnings: summarizeImportWarnings(imported.warnings),
+        remoteDocumentCount: imported.remoteDocuments.length,
+      }
+    })
+  }
+
   /** Newest-first send log, filtered host-side so the panel gets one page. */
   async listHistory(params?: unknown): Promise<ApiHistoryPage> {
     let query: ApiHistoryQuery | undefined
@@ -363,6 +423,53 @@ function collectionIdOf(params: unknown, method: string): string {
   return id
 }
 
+/**
+ * `pets` taken → `pets-2`, `pets-3`, … The id pattern caps the stem at 64
+ * characters, so the suffix is carved out of the base rather than appended
+ * blindly. Refusing after 99 attempts keeps a runaway loop from hammering the
+ * disk; at that point the user has ~100 collections with the same title.
+ */
+async function freeCollectionId(store: ApiCollectionStore, base: string): Promise<string> {
+  if ((await store.read(base)) === null) return base
+  for (let suffix = 2; suffix <= 99; suffix += 1) {
+    const marker = `-${suffix}`
+    const candidate = `${base.slice(0, 64 - marker.length)}${marker}`
+    if ((await store.read(candidate)) === null) return candidate
+  }
+  throw studioError('invalid_input', 'too many collections share this title; rename or remove some first', {
+    reason: 'collection_exists',
+  })
+}
+
+/** Import failures are typed by the parser; the client localises known reasons. */
+function toOpenApiImportError(error: unknown): never {
+  if (error instanceof OpenApiError) {
+    const blocked = error.code === 'remote_ref_blocked' || error.code === 'remote_ref_redirect'
+    throw studioError(blocked ? 'permission_denied' : 'invalid_input', error.message, {
+      reason: error.code,
+      ...(error.pointer === undefined ? {} : { pointer: error.pointer }),
+    })
+  }
+  throw error
+}
+
+const IMPORT_WARNINGS_MAX = 20
+const IMPORT_WARNING_CHARS_MAX = 200
+
+/** Warnings are code-shaped, but the list still gets a cheap bound. */
+function summarizeImportWarnings(warnings: readonly string[]): readonly string[] {
+  const kept: string[] = []
+  const seen = new Set<string>()
+  for (const warning of warnings) {
+    const text = warning.replace(/[\r\n]+/g, ' ').trim().slice(0, IMPORT_WARNING_CHARS_MAX)
+    if (text === '' || seen.has(text)) continue
+    seen.add(text)
+    kept.push(text)
+    if (kept.length >= IMPORT_WARNINGS_MAX) break
+  }
+  return kept
+}
+
 /** Registers the workbench methods; returns one idempotent unregister function. */
 export function registerApiMethods(registry: UnaryRegistry, service: ApiService): () => void {
   const unregister = [
@@ -376,6 +483,7 @@ export function registerApiMethods(registry: UnaryRegistry, service: ApiService)
     registry.register(API_COLLECTION_REMOVE_METHOD, (params) => service.removeCollection(params)),
     registry.register(API_HISTORY_LIST_METHOD, (params) => service.listHistory(params)),
     registry.register(API_HISTORY_CLEAR_METHOD, () => service.clearHistory()),
+    registry.register(API_OPENAPI_IMPORT_METHOD, (params) => service.importOpenApi(params)),
   ]
   return () => {
     for (const dispose of unregister) dispose()

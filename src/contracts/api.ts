@@ -385,6 +385,15 @@ export const API_COLLECTION_ADD_METHOD = 'api.collection.add'
 export const API_COLLECTION_REMOVE_METHOD = 'api.collection.remove'
 export const API_HISTORY_LIST_METHOD = 'api.history.list'
 export const API_HISTORY_CLEAR_METHOD = 'api.history.clear'
+/**
+ * Parses an OpenAPI 3.x / Swagger 2.0 document host-side and saves the result
+ * as a new collection (T046 R3, FR-API-08).
+ *
+ * The document travels as text inside one unary envelope, so it is bounded by
+ * `MAX_UNARY_BODY_BYTES` rather than by the importer's own 8 MiB cap. The panel
+ * measures the exact envelope before sending; the Host re-checks the text.
+ */
+export const API_OPENAPI_IMPORT_METHOD = 'api.openapi.import'
 
 /** One row of the collection tree; bodies stay on disk until opened. */
 export interface ApiCollectionSummary {
@@ -416,6 +425,49 @@ export interface ApiCollectionAddResult {
 
 export interface ApiCollectionRemoveResult {
   readonly removed: boolean
+}
+
+export interface ApiOpenApiImportParams {
+  /** The document text (JSON; OpenAPI 3.x or Swagger 2.0). */
+  readonly text: string
+  /** Collection name; defaults to `info.title`. */
+  readonly name?: string
+}
+
+/**
+ * Stable `details.reason` values for a refused import. The importer's own codes
+ * (`OpenApiErrorCode`) pass through unchanged; `collection_full` and
+ * `file_too_large` come from the collection store.
+ */
+export type ApiOpenApiImportFailure =
+  | 'invalid_json'
+  | 'invalid_document'
+  | 'document_too_large'
+  | 'too_many_operations'
+  | 'ref_unresolved'
+  | 'ref_cycle'
+  | 'remote_ref_blocked'
+  | 'remote_ref_redirect'
+  | 'remote_ref_too_large'
+  | 'remote_ref_failed'
+  | 'collection_full'
+  | 'collection_exists'
+  | 'file_too_large'
+
+/** What the panel needs to confirm the import; the tree re-reads summaries. */
+export interface ApiOpenApiImportResult {
+  /** The collection as saved (its id may differ from the document slug). */
+  readonly collection: ApiCollectionSummary
+  readonly version: '2' | '3'
+  readonly title: string
+  readonly endpointCount: number
+  readonly groupCount: number
+  /** Operations the importer could not express as a request. */
+  readonly skipped: number
+  /** Document-level notes (server, security, dropped bodies), truncated. */
+  readonly warnings: readonly string[]
+  /** Remote documents fetched into the bundle; 0 under the default policy. */
+  readonly remoteDocumentCount: number
 }
 
 /** Newest-first page of the send log. */

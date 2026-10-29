@@ -107,6 +107,7 @@ export {
   API_HISTORY_CLEAR_METHOD,
   API_HISTORY_LIST_METHOD,
   API_HTTP_SEND_METHOD,
+  API_OPENAPI_IMPORT_METHOD,
   API_REPLAY_PREPARE_METHOD,
   ApiService,
   registerApiMethods,
@@ -115,6 +116,21 @@ export {
 export type { ApiSendOutcome, ApiServiceOptions } from './api/service'
 export { prepareReplay } from './api/replay'
 export type { ReplayPrepareOptions } from './api/replay'
+export {
+  importOpenApi,
+  OPENAPI_IMPORT_BODY_BUDGET_BYTES,
+} from './api/openapi/mapper'
+export type {
+  OpenApiEndpoint,
+  OpenApiImportOptions,
+  OpenApiImportResult,
+} from './api/openapi/mapper'
+export {
+  OPENAPI_MAX_DOCUMENT_BYTES,
+  OPENAPI_MAX_OPERATIONS,
+  OpenApiError,
+} from './api/openapi/parser'
+export type { OpenApiErrorCode, OpenApiVersion } from './api/openapi/parser'
 export { evaluateAssertions, findHeader, formatAssertionValue, parseJsonPath } from './api/assertions'
 export type { JsonPathSegment } from './api/assertions'
 export { isBlockedHost, normalizeHttpRequest } from './api/request'
