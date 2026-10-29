@@ -26,3 +26,6 @@ coverage/
 
 # Studio state written into the host project directory at runtime
 .vibe/
+
+# User-provided UI review material; kept on disk, never committed
+界面审查/

@@ -4,7 +4,8 @@
  * The picked element's box is in viewport pixels; the preview draws the frame
  * into a letterboxed box inside the stage, so the bubble is anchored by scaling
  * the box into the stage and clamping it there. Saving only adds the annotation
- * to the queue — the composer handoff is T032, so nothing here sends anything.
+ * to the queue; "Send to chat" (U02) additionally saves the annotation to the
+ * history and opens the composer handoff, but never submits the message.
  */
 import * as React from 'react'
 import type { ElementBox, ElementContext } from '../../contracts/inspect'
@@ -115,20 +116,25 @@ const inputStyle: React.CSSProperties = {
 
 const actionsStyle: React.CSSProperties = {
   display: 'flex',
-  gap: 6,
+  flexWrap: 'wrap',
+  gap: 4,
 }
 
 const actionBaseStyle: React.CSSProperties = {
-  font: 'inherit',
-  padding: '3px 8px',
+  flex: '1 1 auto',
+  padding: '3px 6px',
   borderRadius: 4,
   border: '1px solid var(--dsw-border-color, rgba(127, 127, 127, 0.4))',
   background: 'transparent',
   color: 'inherit',
   cursor: 'pointer',
+  font: '11px/1.4 system-ui, sans-serif',
+  whiteSpace: 'nowrap',
+  textAlign: 'center',
 }
 
-const saveStyle: React.CSSProperties = {
+/** "Send to chat" is the shortcut the review asked for, so it is the accent. */
+const sendStyle: React.CSSProperties = {
   ...actionBaseStyle,
   borderColor: 'var(--dsw-accent-color, #3b82f6)',
   background: 'rgba(59, 130, 246, 0.18)',
@@ -152,19 +158,27 @@ export interface AnnotationBubbleProps {
   readonly placement: BubblePlacement
   /** Receives the trimmed comment; the caller adds it to the queue. */
   onSave(comment: string): void
+  /**
+   * Receives the trimmed comment and sends it straight to the conversation;
+   * the caller still saves it to the history first (U02).
+   */
+  onSend(comment: string): void
   onCancel(): void
 }
 
+type SubmitMode = 'save' | 'send'
+
 /**
  * The comment editor shown next to the picked element. The flow is pick → type
- * → save, so the textarea takes focus and the primary button is the only one
- * styled as an action.
+ * → save/send: save queues the draft, send also hands it to the composer. The
+ * textarea takes focus and only the send button is styled as an action.
  */
 export function AnnotationBubble({
   locale,
   element,
   placement,
   onSave,
+  onSend,
   onCancel,
 }: AnnotationBubbleProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
@@ -172,12 +186,13 @@ export function AnnotationBubble({
   const [warned, setWarned] = React.useState(false)
   const commentText = comment.trim()
 
-  const submit = (): void => {
+  const submit = (mode: SubmitMode): void => {
     if (commentText.length === 0) {
       setWarned(true)
       return
     }
-    onSave(commentText)
+    if (mode === 'send') onSend(commentText)
+    else onSave(commentText)
   }
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -188,7 +203,8 @@ export function AnnotationBubble({
     }
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault()
-      submit()
+      // Ctrl/Cmd+Enter keeps the old shortcut: queue the draft, never send it.
+      submit('save')
     }
   }
 
@@ -221,8 +237,21 @@ export function AnnotationBubble({
         onKeyDown={onKeyDown}
       />
       <div style={actionsStyle}>
-        <button type="button" data-vibe-annotation-save="1" style={saveStyle} onClick={submit}>
+        <button
+          type="button"
+          data-vibe-annotation-save="1"
+          style={actionBaseStyle}
+          onClick={() => submit('save')}
+        >
           {t('annotation.bubble.save')}
+        </button>
+        <button
+          type="button"
+          data-vibe-bubble-send="1"
+          style={sendStyle}
+          onClick={() => submit('send')}
+        >
+          {t('annotation.bubble.send')}
         </button>
         <button
           type="button"

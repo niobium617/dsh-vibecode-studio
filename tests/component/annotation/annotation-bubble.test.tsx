@@ -92,6 +92,7 @@ describe('AnnotationBubble', () => {
         element={ELEMENT}
         placement={{ left: 12, top: 34, side: 'below' }}
         onSave={() => {}}
+        onSend={() => {}}
         onCancel={() => {}}
       />,
     )
@@ -118,6 +119,7 @@ describe('AnnotationBubble', () => {
         element={ELEMENT}
         placement={{ left: 0, top: 0, side: 'below' }}
         onSave={onSave}
+        onSend={() => {}}
         onCancel={() => {}}
       />,
     )
@@ -139,6 +141,7 @@ describe('AnnotationBubble', () => {
         element={ELEMENT}
         placement={{ left: 0, top: 0, side: 'below' }}
         onSave={onSave}
+        onSend={() => {}}
         onCancel={() => {}}
       />,
     )
@@ -162,6 +165,7 @@ describe('AnnotationBubble', () => {
         element={ELEMENT}
         placement={{ left: 0, top: 0, side: 'below' }}
         onSave={onSave}
+        onSend={() => {}}
         onCancel={onCancel}
       />,
     )
@@ -184,6 +188,7 @@ describe('AnnotationBubble', () => {
         element={ELEMENT}
         placement={{ left: 0, top: 0, side: 'below' }}
         onSave={onSave}
+        onSend={() => {}}
         onCancel={onCancel}
       />,
     )
@@ -194,6 +199,74 @@ describe('AnnotationBubble', () => {
     expect(onSave).not.toHaveBeenCalled()
   })
 
+  it('orders the actions as Add to queue / Send to chat / Cancel (U02)', () => {
+    render(
+      <AnnotationBubble
+        locale="en"
+        element={ELEMENT}
+        placement={{ left: 0, top: 0, side: 'below' }}
+        onSave={() => {}}
+        onSend={() => {}}
+        onCancel={() => {}}
+      />,
+    )
+
+    const actions = screen.getByRole('button', { name: 'Add to queue' }).parentElement
+    const labels = Array.from(actions?.querySelectorAll('button') ?? []).map(
+      (button) => button.textContent,
+    )
+    expect(labels).toEqual(['Add to queue', 'Send to chat', 'Cancel'])
+    // Distinct from the queue's send button so selectors stay unambiguous.
+    expect(
+      screen.getByRole('button', { name: 'Send to chat' }).getAttribute('data-vibe-bubble-send'),
+    ).toBe('1')
+  })
+
+  it('sends the trimmed comment without queueing it a second time', () => {
+    const onSave = vi.fn()
+    const onSend = vi.fn()
+    render(
+      <AnnotationBubble
+        locale="en"
+        element={ELEMENT}
+        placement={{ left: 0, top: 0, side: 'below' }}
+        onSave={onSave}
+        onSend={onSend}
+        onCancel={() => {}}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send to chat' }))
+    expect(onSend).not.toHaveBeenCalled()
+    expect(screen.getByRole('status').textContent).toBe('Write a comment first.')
+
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '  Ship it  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send to chat' }))
+    expect(onSend).toHaveBeenCalledWith('Ship it')
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it('keeps Ctrl+Enter as queueing rather than sending', () => {
+    const onSave = vi.fn()
+    const onSend = vi.fn()
+    render(
+      <AnnotationBubble
+        locale="en"
+        element={ELEMENT}
+        placement={{ left: 0, top: 0, side: 'below' }}
+        onSave={onSave}
+        onSend={onSend}
+        onCancel={() => {}}
+      />,
+    )
+
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'Queue me' } })
+    fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true })
+    expect(onSave).toHaveBeenCalledWith('Queue me')
+    expect(onSend).not.toHaveBeenCalled()
+  })
+
   it('speaks Chinese when the panel locale is zh-CN', () => {
     render(
       <AnnotationBubble
@@ -201,10 +274,12 @@ describe('AnnotationBubble', () => {
         element={ELEMENT}
         placement={{ left: 0, top: 0, side: 'below' }}
         onSave={() => {}}
+        onSend={() => {}}
         onCancel={() => {}}
       />,
     )
     expect(screen.getByRole('group', { name: '标注这个元素' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '加入标注队列' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '发送到对话' })).toBeTruthy()
   })
 })

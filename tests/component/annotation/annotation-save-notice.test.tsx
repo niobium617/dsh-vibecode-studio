@@ -15,6 +15,7 @@ import {
   createElementAnnotation,
 } from '../../../src/client/inspect/AnnotationQueue'
 import { renderAnnotationText, type Annotation } from '../../../src/contracts/annotation'
+import { clearAllAnnotationStatuses } from '../../../src/client/inspect/annotation-status'
 import { ANNOTATION_BUDGET_BYTES, utf8Bytes } from '../../../src/contracts/budget'
 import type { ElementContext } from '../../../src/contracts/inspect'
 
@@ -51,11 +52,13 @@ function noticeText(): string {
 
 beforeEach(() => {
   clearAnnotationQueue()
+  clearAllAnnotationStatuses()
 })
 
 afterEach(() => {
   cleanup()
   clearAnnotationQueue()
+  clearAllAnnotationStatuses()
   vi.restoreAllMocks()
 })
 
@@ -206,6 +209,73 @@ describe('AnnotationSaveNotice', () => {
 
     expect(noticeText()).toBe('Added to the queue, but could not save it to history.')
     expect(screen.getByRole('button', { name: 'Send to chat' })).toBeTruthy()
+  })
+
+  it('reports a direct send from the bubble without offering another one (U02)', async () => {
+    const annotation = add('Sent already')
+    render(
+      <AnnotationSaveNotice
+        locale="en"
+        annotation={annotation}
+        persisted
+        onViewQueue={() => {}}
+        send={vi.fn(async () => {})}
+        sent
+        initialMessage="Inserted into the chat draft — nothing was sent."
+      />,
+    )
+
+    expect(noticeText()).toBe('Inserted into the chat draft — nothing was sent.')
+    expect(screen.queryByRole('button', { name: 'Send to chat' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'View queue' })).toBeTruthy()
+  })
+
+  it('picks up a direct send that resolves after the notice mounts', () => {
+    const annotation = add('Slow direct send')
+    const send = vi.fn(async () => {})
+    const view = render(
+      <AnnotationSaveNotice
+        locale="en"
+        annotation={annotation}
+        persisted
+        onViewQueue={() => {}}
+        send={send}
+      />,
+    )
+
+    expect(noticeText()).toBe('Added to the annotation queue')
+    view.rerender(
+      <AnnotationSaveNotice
+        locale="en"
+        annotation={annotation}
+        persisted
+        onViewQueue={() => {}}
+        send={send}
+        sent
+        initialMessage="Inserted into the chat draft — nothing was sent."
+      />,
+    )
+
+    expect(noticeText()).toBe('Inserted into the chat draft — nothing was sent.')
+    expect(screen.queryByRole('button', { name: 'Send to chat' })).toBeNull()
+  })
+
+  it('keeps the retry button when a direct send failed', () => {
+    const annotation = add('Direct send failed')
+    render(
+      <AnnotationSaveNotice
+        locale="en"
+        annotation={annotation}
+        persisted
+        onViewQueue={() => {}}
+        send={vi.fn(async () => {})}
+        initialMessage="Could not send this annotation. Try again."
+      />,
+    )
+
+    expect(noticeText()).toBe('Could not send this annotation. Try again.')
+    expect(screen.getByRole('button', { name: 'Send to chat' })).toBeTruthy()
+    expect(annotationQueueSnapshot()).toHaveLength(1)
   })
 
   it('renders in Chinese', () => {

@@ -23,13 +23,17 @@ function fakePage(options: { evaluateValue?: unknown; failOn?: string } = {}) {
   const sent: Sent[] = []
   let detached = false
   let evaluateValue: unknown = options.evaluateValue ?? true
+  let evaluateQueue: unknown[] | undefined
 
   const session = {
     async send(method: string, params?: Record<string, unknown>): Promise<unknown> {
       sent.push({ method, params })
       if (options.failOn === method) throw new Error(`cdp refused ${method}`)
       if (method === 'Page.addScriptToEvaluateOnNewDocument') return { identifier: 'script-1' }
-      if (method === 'Runtime.evaluate') return { result: { value: evaluateValue } }
+      if (method === 'Runtime.evaluate') {
+        const queued = evaluateQueue?.shift()
+        return { result: { value: queued === undefined ? evaluateValue : queued } }
+      }
       return {}
     },
     on(event: string, listener: (params: unknown) => void): void {
@@ -59,13 +63,19 @@ function fakePage(options: { evaluateValue?: unknown; failOn?: string } = {}) {
     get detached() {
       return detached
     },
-    listenerCount: () => listeners.get('Runtime.bindingCalled')?.size ?? 0,
+    listenerCount: (event = 'Runtime.bindingCalled') => listeners.get(event)?.size ?? 0,
     emit(payload: unknown): void {
       const params = { name: PICK_BINDING_NAME, payload }
       for (const listener of listeners.get('Runtime.bindingCalled') ?? []) listener(params)
     },
+    emitFrame(frame: Record<string, unknown>): void {
+      for (const listener of listeners.get('Page.frameNavigated') ?? []) listener({ frame })
+    },
     setEvaluateValue(value: unknown): void {
       evaluateValue = value
+    },
+    setEvaluateValues(values: unknown[]): void {
+      evaluateQueue = [...values]
     },
   }
 }
@@ -185,16 +195,18 @@ describe('createPreviewPicker', () => {
 
     expect(fake.methods()).toEqual([
       'Runtime.enable',
+      'Page.enable',
       'Runtime.addBinding',
       'Page.addScriptToEvaluateOnNewDocument',
       'Runtime.evaluate',
     ])
     expect(fake.sent[0]!.params).toBeUndefined()
-    expect(fake.sent[1]!.params).toEqual({ name: PICK_BINDING_NAME })
-    const script = String(fake.sent[2]!.params!.source)
+    expect(fake.sent[2]!.params).toEqual({ name: PICK_BINDING_NAME })
+    const script = String(fake.sent[3]!.params!.source)
     expect(script).toContain('__vibeInstall')
     expect(script).toContain('__vibe-picker-host')
     expect(fake.listenerCount()).toBe(1)
+    expect(fake.listenerCount('Page.frameNavigated')).toBe(1)
   })
 
   it('rejects install when the page cannot host the script, and detaches', async () => {
@@ -205,6 +217,51 @@ describe('createPreviewPicker', () => {
     expect(fake.listenerCount()).toBe(0)
     // A second install retries instead of reporting a broken success.
     await expect(picker.install()).rejects.toMatchObject({ code: 'unsupported' })
+  })
+
+  it('drops the active flag when the top document navigates, not on subframes', async () => {
+    const fake = fakePage()
+    const picker = createPreviewPicker({ page: fake.page })
+    await picker.install()
+    await picker.activate()
+    expect(picker.active).toBe(true)
+
+    // A subframe reload leaves the top document's picker running.
+    fake.emitFrame({ id: 'child', parentId: 'top' })
+    expect(picker.active).toBe(true)
+
+    // The new top document carries a fresh, idle picker.
+    fake.emitFrame({ id: 'top' })
+    expect(picker.active).toBe(false)
+    expect(picker.snapshot()).toMatchObject({ active: false })
+  })
+
+  it('reinstalls in the current document when activation finds no script', async () => {
+    const fake = fakePage()
+    const picker = createPreviewPicker({ page: fake.page })
+    await picker.install()
+
+    fake.setEvaluateValues([false, true, true])
+    await picker.activate()
+    expect(picker.active).toBe(true)
+
+    const evaluations = fake.sent.filter((entry) => entry.method === 'Runtime.evaluate')
+    const start = String(evaluations.at(-3)!.params!.expression)
+    const reinstall = String(evaluations.at(-2)!.params!.expression)
+    const retry = String(evaluations.at(-1)!.params!.expression)
+    expect(start).toContain('__vibePicker')
+    expect(reinstall).toContain('__vibeInstall')
+    expect(retry).toContain('__vibePicker')
+  })
+
+  it('still rejects when the current document cannot be repaired', async () => {
+    const fake = fakePage()
+    const picker = createPreviewPicker({ page: fake.page })
+    await picker.install()
+
+    fake.setEvaluateValues([false, true, false])
+    await expect(picker.activate()).rejects.toMatchObject({ code: 'unsupported' })
+    expect(picker.active).toBe(false)
   })
 
   it('separates a repeated pick from no new event with seq', async () => {
@@ -287,6 +344,7 @@ describe('createPreviewPicker', () => {
     expect(String(fake.sent.at(-2)!.params!.identifier)).toBe('script-1')
     expect(fake.detached).toBe(true)
     expect(fake.listenerCount()).toBe(0)
+    expect(fake.listenerCount('Page.frameNavigated')).toBe(0)
 
     const before = fake.sent.length
     await picker.dispose()

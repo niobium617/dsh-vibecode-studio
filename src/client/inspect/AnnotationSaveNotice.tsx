@@ -24,6 +24,13 @@ export interface AnnotationSaveNoticeProps {
   readonly onViewQueue: () => void
   /** Injectable handoff; the shell passes the composer sender. */
   readonly send?: AnnotationSender
+  /**
+   * True when the bubble's "Send to chat" already handed the annotation over;
+   * the notice then reports that outcome instead of offering a second send.
+   */
+  readonly sent?: boolean
+  /** The message of that direct send (success text or failure reason). */
+  readonly initialMessage?: string
 }
 
 type NoticeSend =
@@ -63,9 +70,22 @@ export function AnnotationSaveNotice({
   persisted,
   onViewQueue,
   send = clipboardSender,
+  sent: alreadySent = false,
+  initialMessage,
 }: AnnotationSaveNoticeProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
   const [state, setState] = React.useState<NoticeSend>({ status: 'idle' })
+
+  // A direct send from the bubble resolves after this notice mounts, so the
+  // outcome arrives as a prop rather than through handleSend below.
+  React.useEffect(() => {
+    if (initialMessage === undefined) return
+    setState((current) =>
+      current.status === 'done' && current.message === initialMessage
+        ? current
+        : { status: 'done', ok: alreadySent, message: initialMessage },
+    )
+  }, [alreadySent, initialMessage])
 
   const sending = state.status === 'pending'
   const sent = state.status === 'done' && state.ok

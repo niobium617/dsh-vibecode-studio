@@ -96,6 +96,10 @@ export function usePicker({
   React.useEffect(() => {
     if (!enabled) {
       apply(null)
+      // A stopped session comes back with a fresh Host sequence. A dismissal
+      // left over from the previous one would hide its first picks, so the
+      // user would click and see nothing until seq climbed past the old value.
+      setDismissedSeq(0)
       return
     }
     let cancelled = false

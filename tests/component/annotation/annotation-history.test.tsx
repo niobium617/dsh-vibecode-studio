@@ -7,12 +7,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import {
+  AnnotationQueue,
   addAnnotationToQueue,
   annotationQueueSnapshot,
   clearAnnotationQueue,
   createElementAnnotation,
 } from '../../../src/client/inspect/AnnotationQueue'
 import { AnnotationHistory } from '../../../src/client/inspect/History'
+import {
+  clearAllAnnotationStatuses,
+  getAnnotationStatus,
+} from '../../../src/client/inspect/annotation-status'
 import { setAnnotationHistoryApi, type AnnotationHistoryApi } from '../../../src/client/inspect/history-store'
 import {
   toAnnotationHistoryEntry,
@@ -104,6 +109,7 @@ async function findComment(text: string): Promise<HTMLElement> {
 
 beforeEach(() => {
   clearAnnotationQueue()
+  clearAllAnnotationStatuses()
 })
 
 describe('AnnotationHistory list', () => {
@@ -219,61 +225,165 @@ describe('AnnotationHistory reopen', () => {
   })
 })
 
+describe('AnnotationHistory notices (U02)', () => {
+  it('shows the reopen notice inside the card, right of Delete', async () => {
+    const fake = createFake([make('Notice me', 'ann-notice')])
+    mount(fake)
+    await findComment('Notice me')
+
+    fireEvent.click(screen.getByText('Reopen'))
+
+    const notice = await screen.findByText('Reopened in the queue above. Nothing was sent.')
+    const item = document.querySelector('[data-vibe-history-item="ann-notice"]')
+    expect(item?.contains(notice)).toBe(true)
+    expect(notice.getAttribute('data-vibe-history-status')).toBe('success')
+    const del = item?.querySelector('[data-vibe-history-delete="1"]')
+    expect(del?.parentElement).toBe(notice.parentElement)
+    expect(
+      del!.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('releases the reopen notice in both lists after sending from the queue', async () => {
+    const stored = make('Sync me', 'ann-sync')
+    const fake = createFake([stored])
+    setAnnotationHistoryApi(fake.api)
+    const send = vi.fn(async () => 'Inserted into the chat draft — nothing was sent.')
+    render(
+      <>
+        <AnnotationQueue locale="en" send={send} />
+        <AnnotationHistory locale="en" />
+      </>,
+    )
+    await findComment('Sync me')
+
+    fireEvent.click(screen.getByText('Reopen'))
+    // The notice is shared, so both the queued card and the history card show it.
+    expect(
+      await screen.findAllByText('Reopened in the queue above. Nothing was sent.'),
+    ).toHaveLength(2)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send to chat' }))
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Reopened in the queue above. Nothing was sent.'),
+      ).toBeNull()
+    })
+    // Sent: no notice is left in either list, not even the send result.
+    expect(document.querySelector('[data-vibe-annotation-status]')).toBeNull()
+    expect(document.querySelector('[data-vibe-history-status]')).toBeNull()
+    expect(annotationQueueSnapshot()).toEqual([])
+    expect(getAnnotationStatus('ann-sync')).toBeNull()
+  })
+
+  it('clears the history notice when the queued draft is removed', async () => {
+    const fake = createFake([make('Unsync me', 'ann-unsync')])
+    setAnnotationHistoryApi(fake.api)
+    render(
+      <>
+        <AnnotationQueue locale="en" />
+        <AnnotationHistory locale="en" />
+      </>,
+    )
+    await findComment('Unsync me')
+
+    fireEvent.click(screen.getByText('Reopen'))
+    expect(
+      await screen.findAllByText('Reopened in the queue above. Nothing was sent.'),
+    ).toHaveLength(2)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Reopened in the queue above. Nothing was sent.'),
+      ).toBeNull()
+    })
+    expect(getAnnotationStatus('ann-unsync')).toBeNull()
+    expect(document.querySelector('[data-vibe-history-status]')).toBeNull()
+  })
+})
+
 describe('AnnotationHistory delete', () => {
-  it('asks for a second click, then deletes and refreshes', async () => {
+  it('confirms in a dialog, deletes and leaves no notice behind', async () => {
     const fake = createFake([make('Delete me', 'ann-delete')])
     mount(fake)
     await findComment('Delete me')
 
     fireEvent.click(screen.getByText('Delete'))
-    expect(screen.getByText('Confirm delete')).toBeDefined()
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('Delete this annotation?')).toBeDefined()
+    expect(within(dialog).getByText('Confirm delete')).toBeDefined()
     expect(fake.remove).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByText('Confirm delete'))
+    fireEvent.click(within(dialog).getByText('Confirm delete'))
 
-    expect(await screen.findByText('Annotation deleted.')).toBeDefined()
-    expect(fake.remove).toHaveBeenCalledWith('ann-delete')
     expect(await screen.findByText('No saved annotations yet')).toBeDefined()
+    expect(fake.remove).toHaveBeenCalledWith('ann-delete')
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.queryByText('Delete me')).toBeNull()
+    // The old "Annotation deleted." line under the list is gone for good.
+    expect(document.querySelector('[data-vibe-history-status]')).toBeNull()
   })
 
-  it('cancels the confirmation without deleting', async () => {
+  it('cancels the dialog without deleting', async () => {
     const fake = createFake([make('Keep me', 'ann-keep')])
     mount(fake)
     await findComment('Keep me')
 
     fireEvent.click(screen.getByText('Delete'))
-    fireEvent.click(screen.getByText('Cancel'))
+    fireEvent.click(within(screen.getByRole('dialog')).getByText('Cancel'))
 
-    expect(screen.queryByText('Confirm delete')).toBeNull()
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.getByText('Keep me')).toBeDefined()
     expect(fake.remove).not.toHaveBeenCalled()
   })
 
-  it('reports an annotation that was already gone', async () => {
+  it('closes the dialog on Escape without deleting', async () => {
+    const fake = createFake([make('Escape me', 'ann-esc')])
+    mount(fake)
+    await findComment('Escape me')
+
+    fireEvent.click(screen.getByText('Delete'))
+    expect(screen.getByRole('dialog')).toBeDefined()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(fake.remove).not.toHaveBeenCalled()
+    expect(screen.getByText('Escape me')).toBeDefined()
+  })
+
+  it('closes the dialog when the file was already gone', async () => {
     const fake = createFake([make('Race me', 'ann-race')])
     fake.remove.mockResolvedValueOnce({ id: 'ann-race', removed: false })
     mount(fake)
     await findComment('Race me')
 
     fireEvent.click(screen.getByText('Delete'))
-    fireEvent.click(screen.getByText('Confirm delete'))
+    fireEvent.click(within(screen.getByRole('dialog')).getByText('Confirm delete'))
 
-    expect(await screen.findByText('That annotation was already gone.')).toBeDefined()
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 
-  it('reports a failed delete and keeps the entry', async () => {
+  it('reports a failed delete inside the dialog and keeps the entry', async () => {
     const fake = createFake([make('Locked', 'ann-locked')])
     fake.remove.mockRejectedValueOnce(new Error('vibe-studio: cannot delete'))
     mount(fake)
     await findComment('Locked')
 
     fireEvent.click(screen.getByText('Delete'))
-    fireEvent.click(screen.getByText('Confirm delete'))
+    fireEvent.click(within(screen.getByRole('dialog')).getByText('Confirm delete'))
 
-    expect(await screen.findByText('Could not delete this annotation.')).toBeDefined()
+    const dialog = screen.getByRole('dialog')
+    expect(await within(dialog).findByRole('alert')).toHaveProperty(
+      'textContent',
+      'Could not delete this annotation.',
+    )
+    expect(within(dialog).getByText('Confirm delete')).toBeDefined()
     expect(screen.getByText('Locked')).toBeDefined()
-    expect(screen.getByRole('alert')).toBeDefined()
   })
 
   it('keeps the panel independent from the queue contents', async () => {

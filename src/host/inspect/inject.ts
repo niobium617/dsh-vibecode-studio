@@ -481,6 +481,18 @@ export function createPreviewPicker(options: PreviewPickerOptions): PreviewPicke
   let pick: ElementContext | null = null
   let ts: number | null = null
 
+  /**
+   * A new top-level document carries a freshly injected, idle picker, so the
+   * Host must stop reporting picking as active. Without this the panel keeps
+   * the overlay hint on after a page-driven reload and every click is a no-op.
+   * Subframe navigations leave the top document's picker alone.
+   */
+  function onFrameNavigated(event: unknown): void {
+    if (!installed || !isRecord(event) || !isRecord(event.frame)) return
+    if (event.frame.parentId !== undefined) return
+    activeNow = false
+  }
+
   function onBinding(event: unknown): void {
     if (!installed || !isRecord(event)) return
     if (event.name !== bindingName || typeof event.payload !== 'string') return
@@ -560,6 +572,11 @@ export function createPreviewPicker(options: PreviewPickerOptions): PreviewPicke
       // Already removed with the session.
     }
     try {
+      current.off?.('Page.frameNavigated', onFrameNavigated)
+    } catch {
+      // Already removed with the session.
+    }
+    try {
       await current.detach()
     } catch {
       // Already detached.
@@ -574,9 +591,16 @@ export function createPreviewPicker(options: PreviewPickerOptions): PreviewPicke
       // bindings are delivered as `Runtime.bindingCalled` events, and CDP only
       // forwards domain events to sessions that enabled the domain.
       await created.send('Runtime.enable')
+      // `Page.addScriptToEvaluateOnNewDocument` alone is accepted and returns
+      // an identifier, but Chromium never applies it to later documents unless
+      // the Page domain is enabled on this session (verified against Edge).
+      // Without this the picker dies on the first page-driven reload while the
+      // panel still shows picking as active.
+      await created.send('Page.enable')
       await created.send('Runtime.addBinding', { name: bindingName })
       bound = true
       created.on('Runtime.bindingCalled', onBinding)
+      created.on('Page.frameNavigated', onFrameNavigated)
       const added = (await created.send('Page.addScriptToEvaluateOnNewDocument', {
         source: script,
       })) as { identifier?: unknown } | undefined
@@ -608,6 +632,14 @@ export function createPreviewPicker(options: PreviewPickerOptions): PreviewPicke
       })
     }
     if (await evaluate(START_EXPRESSION)) {
+      activeNow = true
+      return
+    }
+    // A document that replaced the installed one can be missing the script
+    // (an error page, or a navigation that committed mid-install). One
+    // explicit install in the current document repairs it before failing.
+    const repaired = await evaluate(script)
+    if (repaired && (await evaluate(START_EXPRESSION))) {
       activeNow = true
       return
     }
