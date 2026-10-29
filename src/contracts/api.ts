@@ -550,6 +550,96 @@ export function isApiHistoryQuery(value: unknown): value is ApiHistoryQuery {
   )
 }
 
+/* -------------------------------------------------------------------------
+ * Assertions (T045)
+ *
+ * Declarative checks over a response, not a script: the panel composes a
+ * small JSON document and the Host evaluates it with fixed rules. No `eval`,
+ * no `Function`, and JSONPath is a deliberately small subset (dot keys,
+ * bracketed keys, numeric indexes) so a stored assertion can never run code.
+ * ---------------------------------------------------------------------- */
+
+export const API_ASSERTION_KINDS = ['status', 'header', 'json', 'duration'] as const
+export type ApiAssertionKind = (typeof API_ASSERTION_KINDS)[number]
+
+export const API_ASSERTION_MATCHES = ['equals', 'contains'] as const
+export type ApiAssertionMatch = (typeof API_ASSERTION_MATCHES)[number]
+
+export const API_ASSERTIONS_MAX = 50
+export const API_ASSERTION_PATH_CHARS_MAX = 200
+export const API_ASSERTION_VALUE_CHARS_MAX = 1000
+/** Actual values are clipped so one huge JSON node cannot balloon the answer. */
+export const API_ASSERTION_ACTUAL_CHARS_MAX = 500
+
+export type ApiAssertion =
+  | { readonly kind: 'status'; readonly expected: number }
+  | {
+      readonly kind: 'header'
+      readonly name: string
+      readonly expected: string
+      readonly match?: ApiAssertionMatch
+    }
+  | {
+      readonly kind: 'json'
+      /** `$` root plus `.key`, `['key']` and `[0]` steps; no wildcards or filters. */
+      readonly path: string
+      readonly expected: string
+      readonly match?: ApiAssertionMatch
+    }
+  | { readonly kind: 'duration'; readonly maxMs: number }
+
+/** Why an assertion failed; the panel localizes each reason. */
+export type ApiAssertionFailure =
+  | 'status_mismatch'
+  | 'header_missing'
+  | 'body_not_json'
+  | 'path_syntax'
+  | 'path_missing'
+  | 'value_mismatch'
+  | 'duration_exceeded'
+
+export interface ApiAssertionResult {
+  /** Position in the submitted list. */
+  readonly index: number
+  readonly passed: boolean
+  /** Resolved value, already formatted and clipped; null when unresolved. */
+  readonly actual: string | null
+  /** Absent when `passed` is true. */
+  readonly failure?: ApiAssertionFailure
+}
+
+function isApiAssertionMatch(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (typeof value === 'string' && (API_ASSERTION_MATCHES as readonly string[]).includes(value))
+  )
+}
+
+export function isApiAssertion(value: unknown): value is ApiAssertion {
+  if (!isRecord(value)) return false
+  switch (value.kind) {
+    case 'status':
+      return isIntegerInRange(value.expected, 100, 599)
+    case 'duration':
+      return isIntegerInRange(value.maxMs, 0, HTTP_TIMEOUT_MAX_MS)
+    case 'header':
+      return (
+        isBoundedString(value.name, 1, 256) &&
+        value.name.trim() !== '' &&
+        isBoundedString(value.expected, 0, API_ASSERTION_VALUE_CHARS_MAX) &&
+        isApiAssertionMatch(value.match)
+      )
+    case 'json':
+      return (
+        isBoundedString(value.path, 1, API_ASSERTION_PATH_CHARS_MAX) &&
+        isBoundedString(value.expected, 0, API_ASSERTION_VALUE_CHARS_MAX) &&
+        isApiAssertionMatch(value.match)
+      )
+    default:
+      return false
+  }
+}
+
 /**
  * Sensitive row values become `REDACTED`; the row itself is kept visible. A
  * value that is only a `{{placeholder}}` is kept so imported requests still

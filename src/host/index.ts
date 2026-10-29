@@ -115,6 +115,8 @@ export {
 export type { ApiSendOutcome, ApiServiceOptions } from './api/service'
 export { prepareReplay } from './api/replay'
 export type { ReplayPrepareOptions } from './api/replay'
+export { evaluateAssertions, findHeader, formatAssertionValue, parseJsonPath } from './api/assertions'
+export type { JsonPathSegment } from './api/assertions'
 export { isBlockedHost, normalizeHttpRequest } from './api/request'
 export type { NormalizedHttpRequest, NormalizeRequestOptions } from './api/request'
 export { createTargetAdapterRegistry } from './targets/registry'

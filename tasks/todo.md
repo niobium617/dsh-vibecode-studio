@@ -596,12 +596,20 @@
   - 手动（`.tmp/t044-manual.mjs` → `.tmp/logs/t044-web.json`，`ok:true`）：真实 `vibe-dev` + 无头 Edge；回放（第 1 击）→ 保存（第 2 击，写 `.vibe/api/collections/saved.json`、集合自动展开）→ 点新行（第 3 击，提示“已载入保存的请求”），三次点击期间站点请求数 4 → 4；整页 reload 后集合与条目仍在；点发送得 `HTTP 200 OK` 并写入 1 条历史；搜索 `zzz` 0 行 / `items` 1 行；从历史重开不重发；清空历史与删除集合均先确认、确认后列表与磁盘文件都清空；0 其他 console 错误；DSH/Edge/站点进程已清理。
   - 未做（范围外）：T024 采集器晚于首屏导航的问题未修（手测仍先开抽屉再刷新）；保存固定落到 `saved` 集合，暂不支持选集合/改名；历史无分页，超出只提示“还有 N 条”。
 
-### - [ ] T045 断言（P1）
+### - [x] T045 断言（P1）
 
 - **目标**：状态码/header/JSONPath/耗时；pass/fail；不执行任意 JS。
 - **验收**：四类断言可用；错误可读；单测通过。
 - **验证**：`pnpm test -- tests/unit/assertions`。
 - **文件**：`src/host/api/assertions.ts`、`src/client/api/AssertionsEditor.tsx`、tests。
+- **验证结果（2026-10-30，`task/m4-api-workbench`）**：
+  - 命令与结果：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/assertions tests/component/api-request/assertions-editor.test.tsx` 2 文件 / 17 用例全通过（`.tmp/logs/2026-10-30-t045-focused.log`）；`pnpm test` 89 文件 / 795 用例全通过（基线 87/778，`.tmp/logs/2026-10-30-t045-test.log`）；`pnpm build` host 278.8 KiB / client 349.4 KiB（`.tmp/logs/2026-10-30-t045-build.log`）；`pnpm test:e2e` 9/9、51.5 s。
+  - 契约：`ApiAssertion` 四种形状——status 100–599；header name 1–256 + equals/contains；json path 1–200 + equals/contains；duration maxMs 0–`HTTP_TIMEOUT_MAX_MS`；`API_ASSERTIONS_MAX=50`、期望值 ≤1000 字符、回显实际值 ≤500 字符；`isApiAssertion` 拒绝未知 kind 与越界值。
+  - host：`evaluateAssertions` 是纯函数（无 `eval`/`Function`）；JSONPath 只支持 `$` + `.key` + `['k']`/`["k"]`（支持 `\` 转义）+ `[n]`，其余一律 `path_syntax`；header 名大小写不敏感；比较文本化（字符串原样、null/number/boolean 字面量、对象/数组紧凑 JSON）。`api.http.send` 新增可选 `assertions`：先校验（坏列表 → `invalid_input` + `details.field='assertions'`，不发请求），发送后按序求值，`ApiSendOutcome.assertions` 与输入等长；未提交时不返回该字段。
+  - 可读失败：`status_mismatch` / `header_missing` / `body_not_json` / `path_syntax` / `path_missing` / `value_mismatch` / `duration_exceeded`；坏路径只让该条失败，不中断其余检查。
+  - 客户端：`AssertionsEditor` 用草稿行（数值先存文本），`buildAssertions` 预校验（`status_invalid`/`duration_invalid`/`name_empty`/`path_invalid`/`value_too_long`/`too_many`），任一行有问题就**不发送**；每行显示 pass/fail + 实际值，顶部汇总“通过 x/y”；改任意行即清除旧结论；载入回放/集合/历史草稿时保留检查、清除结论；有空状态与 50 条上限。
+  - 手动（`.tmp/t045-manual.mjs` → `.tmp/logs/t045-web.json`，`ok:true`）：真实 `vibe-dev` + 无头 Edge；对本地站点加四类检查（status 200 / header content-type contains json / `$.items[0].id` equals item-1 / duration ≤5000）→ 一次发送，站点只收到 1 次请求，四行全 pass、汇总“通过 4/4”；把 status 改成 201 再发 → 该行 fail 且文案“期望状态码 201，实际 200。”，其余三行仍 pass；期望值填 `abc` 再点发送 → 不发请求并显示“状态码须为三位数字（100–599）”；0 其他 console 错误；DSH/Edge/站点进程已清理。
+  - 未做（范围外）：断言不随请求进入集合/历史（`HttpRequestSpec` 未扩展）；JSONPath 无通配/递归/filter；单条无“跳过”开关。
 
 ### - [ ] T046 G4 API 评审 [GATE]
 

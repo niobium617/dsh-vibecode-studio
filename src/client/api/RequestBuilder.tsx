@@ -10,6 +10,8 @@ import * as React from 'react'
 import {
   API_HTTP_SEND_METHOD,
   HTTP_TIMEOUT_DEFAULT_MS,
+  type ApiAssertion,
+  type ApiAssertionResult,
   type HttpExecutionResult,
   type HttpRequestSpec,
   type UnresolvedVariable,
@@ -17,6 +19,12 @@ import {
 import type { StudioError } from '../../contracts/errors'
 import { createTranslator, type Locale } from '../i18n'
 import { callUnary, toStudioError } from '../transport'
+import {
+  AssertionsEditor,
+  buildAssertions,
+  type AssertionDraft,
+  type AssertionIssue,
+} from './AssertionsEditor'
 import { RequestForm } from './RequestForm'
 import { ResponseView } from './ResponseView'
 import { registerDraftTarget, type PendingDraft } from './draft-store'
@@ -31,10 +39,14 @@ import {
 export interface ApiSendOutcome {
   readonly result: HttpExecutionResult
   readonly unresolved: readonly UnresolvedVariable[]
+  /** Only present when the send carried assertions (T045). */
+  readonly assertions?: readonly ApiAssertionResult[]
 }
 
 export interface ApiSendOptions {
   readonly signal?: AbortSignal
+  /** Declarative checks evaluated host-side after the response (T045). */
+  readonly assertions?: readonly ApiAssertion[]
 }
 
 export type ApiSend = (spec: HttpRequestSpec, options?: ApiSendOptions) => Promise<ApiSendOutcome>
@@ -44,7 +56,10 @@ export function createTransportSend(): ApiSend {
   return (spec, options = {}) =>
     callUnary<ApiSendOutcome>(
       API_HTTP_SEND_METHOD,
-      { request: spec },
+      {
+        request: spec,
+        ...(options.assertions === undefined ? {} : { assertions: options.assertions }),
+      },
       {
         ...(options.signal === undefined ? {} : { signal: options.signal }),
         timeoutMs: (spec.timeoutMs ?? HTTP_TIMEOUT_DEFAULT_MS) + 5_000,
@@ -215,6 +230,13 @@ export function RequestBuilder({
   const [draft, setDraft] = React.useState<RequestDraft>(() => initialDraft ?? createRequestDraft())
   const [phase, setPhase] = React.useState<Phase>({ kind: 'idle' })
   const [issues, setIssues] = React.useState<readonly RequestIssue[]>([])
+  // T045: checks live beside the draft; results belong to one send, so editing
+  // a row drops them rather than leaving a pass/fail badge on a changed rule.
+  const [assertionDrafts, setAssertionDrafts] = React.useState<readonly AssertionDraft[]>([])
+  const [assertionIssues, setAssertionIssues] = React.useState<readonly AssertionIssue[]>([])
+  const [assertionResults, setAssertionResults] = React.useState<
+    readonly ApiAssertionResult[] | null
+  >(null)
   const [pending, setPending] = React.useState<PendingDraft | null>(null)
   const [saveState, setSaveState] = React.useState<SaveState>({ kind: 'idle' })
   const controllerRef = React.useRef<AbortController | null>(null)
@@ -234,6 +256,10 @@ export function RequestBuilder({
       registerDraftTarget((next) => {
         setDraft(draftFromRequestSpec(next.spec))
         setIssues([])
+        // Checks are kept (the same API is often re-tested) but their verdicts
+        // came from the previous request, so they go.
+        setAssertionResults(null)
+        setAssertionIssues([])
         setPhase({ kind: 'idle' })
         setSaveState({ kind: 'idle' })
         setPending(next)
@@ -249,19 +275,30 @@ export function RequestBuilder({
   const handleSend = React.useCallback((): void => {
     if (sending) return
     const built = buildRequestSpec(draft)
-    if (!built.ok) {
-      setIssues(built.issues)
+    // A row that failed validation blocks the send: a typo must not turn a
+    // check off silently.
+    const checks = buildAssertions(assertionDrafts)
+    if (!built.ok || checks.issues.length > 0) {
+      setIssues(built.ok ? [] : built.issues)
+      setAssertionIssues(checks.issues)
       setPhase({ kind: 'idle' })
       return
     }
+    const assertions = checks.assertions ?? []
     setIssues([])
+    setAssertionIssues([])
+    setAssertionResults(null)
     const controller = new AbortController()
     controllerRef.current = controller
     setPhase({ kind: 'sending' })
-    void sendImpl(built.spec, { signal: controller.signal })
+    void sendImpl(built.spec, {
+      signal: controller.signal,
+      ...(assertions.length === 0 ? {} : { assertions }),
+    })
       .then((outcome) => {
         if (controller.signal.aborted) return
         setPhase({ kind: 'sent', outcome })
+        setAssertionResults(outcome.assertions ?? null)
         onSent?.()
       })
       .catch((error: unknown) => {
@@ -275,7 +312,13 @@ export function RequestBuilder({
       .finally(() => {
         if (controllerRef.current === controller) controllerRef.current = null
       })
-  }, [draft, onSent, sendImpl, sending])
+  }, [assertionDrafts, draft, onSent, sendImpl, sending])
+
+  const handleAssertionsChange = React.useCallback((next: readonly AssertionDraft[]): void => {
+    setAssertionDrafts(next)
+    setAssertionIssues([])
+    setAssertionResults(null)
+  }, [])
 
   const handleSave = React.useCallback((): void => {
     if (save === undefined || saving) return
@@ -352,6 +395,15 @@ export function RequestBuilder({
         locale={locale}
         onSubmit={handleSend}
         footer={footer}
+      />
+
+      <AssertionsEditor
+        drafts={assertionDrafts}
+        onChange={handleAssertionsChange}
+        {...(assertionResults === null ? {} : { results: assertionResults })}
+        issues={assertionIssues}
+        disabled={sending}
+        {...(locale === undefined ? {} : { locale })}
       />
 
       {replayNotice !== null ? (

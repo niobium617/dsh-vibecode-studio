@@ -15,6 +15,7 @@
  */
 import { randomUUID } from 'node:crypto'
 import {
+  API_ASSERTIONS_MAX,
   API_COLLECTION_ADD_METHOD,
   API_COLLECTION_GET_METHOD,
   API_COLLECTION_LIST_METHOD,
@@ -25,10 +26,13 @@ import {
   API_HTTP_SEND_METHOD,
   API_NAME_CHARS_MAX,
   API_REPLAY_PREPARE_METHOD,
+  isApiAssertion,
   isApiHistoryQuery,
   isApiEnvironment,
   isApiStoreId,
   isHttpRequestSpec,
+  type ApiAssertion,
+  type ApiAssertionResult,
   type ApiCollection,
   type ApiCollectionAddParams,
   type ApiCollectionAddResult,
@@ -44,6 +48,7 @@ import {
   type HttpRequestSpec,
   type UnresolvedVariable,
 } from '../../contracts/api'
+import { evaluateAssertions } from './assertions'
 import { isStudioError, studioError } from '../../contracts/errors'
 import type { ApiCollectionStore } from './collection-store'
 import { resolveHttpRequest } from './environment'
@@ -79,6 +84,8 @@ export interface ApiSendOutcome {
   readonly result: HttpExecutionResult
   /** Placeholders that stayed literal because nothing resolved them. */
   readonly unresolved: readonly UnresolvedVariable[]
+  /** Present only when the caller submitted assertions (T045). */
+  readonly assertions?: readonly ApiAssertionResult[]
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -125,6 +132,10 @@ export class ApiService {
    * response even for 4xx/5xx; validation, policy and transport failures
    * reject with a `StudioError` the client can read.
    *
+   * Optional declarative assertions (T045) are validated with the rest of the
+   * input — so a malformed list never reaches the wire — and evaluated against
+   * the finished response. No user code is executed.
+   *
    * The send is logged afterwards (T044). The log stores the *unexpanded*
    * request, so placeholders survive and no resolved secret is written; a log
    * failure never fails the send itself.
@@ -135,6 +146,7 @@ export class ApiService {
     if (environment !== undefined && !isApiEnvironment(environment)) {
       invalid('environment is not a valid environment document', 'environment')
     }
+    const assertions = parseAssertions(params.assertions)
     const raw = params.request
     const resolved = await resolveHttpRequest(raw, {
       secrets: this.secrets,
@@ -153,7 +165,12 @@ export class ApiService {
     if (spec !== null) {
       await this.recordHistory(spec, { status: result.status, elapsedMs: result.elapsedMs })
     }
-    return { result, unresolved: resolved.unresolved }
+    const evaluated = assertions === undefined ? undefined : evaluateAssertions(assertions, result)
+    return {
+      result,
+      unresolved: resolved.unresolved,
+      ...(evaluated === undefined ? {} : { assertions: evaluated }),
+    }
   }
 
   /**
@@ -320,6 +337,16 @@ export class ApiService {
       throw toApiStoreStudioError(error)
     }
   }
+}
+
+/** Absent means "no checks"; anything else must be a short list of known shapes. */
+function parseAssertions(value: unknown): readonly ApiAssertion[] | undefined {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value) || value.length > API_ASSERTIONS_MAX) {
+    invalid(`assertions must be a list of at most ${API_ASSERTIONS_MAX} entries`, 'assertions')
+  }
+  if (!value.every(isApiAssertion)) invalid('assertions contains an unusable entry', 'assertions')
+  return value
 }
 
 function collectionIdOf(params: unknown, method: string): string {
