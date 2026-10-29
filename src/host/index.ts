@@ -5,6 +5,8 @@
  * T011 adds the authenticated `/api/vibe` transport (health + unary methods);
  * later preview features register methods on the same registry.
  */
+import type { ApiSecretStore, CredentialProviderLike } from './api/secrets'
+import { createApiSecretStore } from './api/secrets'
 import { Config, resolveConfig, type VibeStudioConfig } from './config'
 import {
   AnnotationHistoryService,
@@ -54,6 +56,23 @@ export {
   toAnnotationHistoryError,
 } from './inspect/history'
 export type { AnnotationHistoryServiceOptions } from './inspect/history'
+export {
+  describeEnvironment,
+  parseApiEnvironment,
+  resolveHttpRequest,
+  secretReferences,
+} from './api/environment'
+export type {
+  ResolveHttpRequestOptions,
+  ResolvedHttpRequest,
+} from './api/environment'
+export { createApiSecretStore, CREDENTIAL_NAME_PATTERN, isCredentialName } from './api/secrets'
+export type {
+  ApiSecretStore,
+  ApiSecretStoreOptions,
+  CredentialDescription,
+  CredentialProviderLike,
+} from './api/secrets'
 export { createHttpExecutor, HttpExecutor } from './api/executor'
 export type { HttpExecuteOptions, HttpExecutorOptions } from './api/executor'
 export { isBlockedHost, normalizeHttpRequest } from './api/request'
@@ -185,11 +204,15 @@ export interface VibeStudioService {
   readonly preview: PreviewService
   /** Persisted annotation history under `.vibe/annotations` (T033). */
   readonly annotationHistory: AnnotationHistoryService
+  /** Credential seam for API environments (T036); never returns secret values. */
+  readonly apiSecrets: ApiSecretStore
 }
 
 /** Minimal Cordis surface used at this stage. */
 export interface HostContext extends TransportHostContext {
   provide(name: string, value: unknown): void
+  /** DSH's `ctx.credentials`; absent in bare test hosts. */
+  readonly credentials?: CredentialProviderLike
 }
 
 export function apply(ctx: HostContext, config: VibeStudioConfig = new Config()): void {
@@ -236,6 +259,10 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
   }
   registerPreviewRoutes(ctx, preview)
 
+  // T036: secrets live only in `ctx.credentials`. A host without the seam
+  // reports every reference as unconfigured rather than storing values here.
+  const apiSecrets = createApiSecretStore({ credentials: ctx.credentials })
+
   ctx.provide('vibeStudio', {
     config: resolved,
     transport: registry,
@@ -243,5 +270,6 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
     targets,
     preview,
     annotationHistory,
+    apiSecrets,
   } satisfies VibeStudioService)
 }

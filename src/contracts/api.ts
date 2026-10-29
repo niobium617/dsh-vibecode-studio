@@ -220,3 +220,103 @@ export function isHttpRequestSpec(value: unknown): value is HttpRequestSpec {
       isIntegerInRange(value.maxResponseBytes, HTTP_RESPONSE_BYTES_MIN, HTTP_RESPONSE_BYTES_MAX))
   )
 }
+
+/** Placeholder names: `{{baseUrl}}`, `{{token}}`; no spaces or braces inside. */
+export const API_ENV_NAME_PATTERN = '[A-Za-z_][A-Za-z0-9_.-]*'
+export const API_ENV_VARS_MAX = 200
+export const API_ENV_VALUE_CHARS_MAX = 8192
+
+/**
+ * One environment variable. A secret carries the *name* of a credential
+ * reference in `value`; the value itself only ever lives in `ctx.credentials`
+ * and never crosses the wire.
+ */
+export interface ApiEnvironmentVariable {
+  readonly name: string
+  readonly value: string
+  readonly secret?: boolean
+  readonly enabled?: boolean
+}
+
+export interface ApiEnvironment {
+  readonly id?: string
+  readonly name?: string
+  readonly variables: readonly ApiEnvironmentVariable[]
+}
+
+/** One variable as a configuration surface may show it — never a secret value. */
+export interface ApiEnvironmentVariableView {
+  readonly name: string
+  readonly secret: boolean
+  readonly enabled: boolean
+  /** Plain variables only; absent for secrets. */
+  readonly value?: string
+  /** Secrets only: whether the reference currently resolves at all. */
+  readonly configured?: boolean
+  /** Secrets only: whether the active provider can write the reference. */
+  readonly writable?: boolean
+  /** Secrets only: supplying source layer, when configured. */
+  readonly source?: string
+}
+
+export interface ApiEnvironmentView {
+  readonly name?: string
+  readonly variables: readonly ApiEnvironmentVariableView[]
+}
+
+/** A `{{name}}` that could not be resolved while expanding a request. */
+export interface UnresolvedVariable {
+  readonly name: string
+  /** Where it was found: `url`, `header:X-Key`, `query:q`, `body`, `auth`… */
+  readonly where: string
+  /** `missing` when no variable matches; `secret_not_configured` for secrets. */
+  readonly reason: 'missing' | 'secret_not_configured' | 'disabled'
+}
+
+const ENV_NAME_RE = new RegExp(`^${API_ENV_NAME_PATTERN}$`)
+
+/** True when `name` fits the `{{...}}` grammar used by environments. */
+export function isApiEnvironmentVariableName(name: string): boolean {
+  return ENV_NAME_RE.test(name)
+}
+
+export function isApiEnvironmentVariable(value: unknown): value is ApiEnvironmentVariable {
+  if (!isRecord(value)) return false
+  return (
+    typeof value.name === 'string' &&
+    isApiEnvironmentVariableName(value.name) &&
+    isBoundedString(value.value, 0, API_ENV_VALUE_CHARS_MAX) &&
+    (value.secret === undefined || typeof value.secret === 'boolean') &&
+    (value.enabled === undefined || typeof value.enabled === 'boolean')
+  )
+}
+
+export function isApiEnvironment(value: unknown): value is ApiEnvironment {
+  if (!isRecord(value)) return false
+  return (
+    (value.id === undefined || isBoundedString(value.id, 1, 256)) &&
+    (value.name === undefined || isBoundedString(value.name, 1, 256)) &&
+    Array.isArray(value.variables) &&
+    value.variables.length <= API_ENV_VARS_MAX &&
+    value.variables.every(isApiEnvironmentVariable)
+  )
+}
+
+export function isApiEnvironmentView(value: unknown): value is ApiEnvironmentView {
+  if (!isRecord(value)) return false
+  return (
+    (value.name === undefined || typeof value.name === 'string') &&
+    Array.isArray(value.variables) &&
+    value.variables.every((variable) => {
+      if (!isRecord(variable)) return false
+      if (typeof variable.name !== 'string' || typeof variable.secret !== 'boolean') return false
+      if (typeof variable.enabled !== 'boolean') return false
+      if (variable.value !== undefined && typeof variable.value !== 'string') return false
+      if (variable.configured !== undefined && typeof variable.configured !== 'boolean') return false
+      if (variable.writable !== undefined && typeof variable.writable !== 'boolean') return false
+      if (variable.source !== undefined && typeof variable.source !== 'string') return false
+      // A secret row must not carry a value, even an empty one.
+      return !(variable.secret === true && variable.value !== undefined)
+    })
+  )
+}
