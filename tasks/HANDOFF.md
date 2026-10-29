@@ -2,7 +2,7 @@
 
 > 更新时间：2026-10-29
 > 用途：清理/切换对话后，新会话从这里恢复，不依赖旧聊天记录。
-> 当前阶段：**Phase 4 实现（M0/G0 已通过，M1 已通过 G1，M2 已通过 G2）**；T001–T026、**U01 预览界面精简（Layout v2）** 已合并入 `main`（`768e129`）；**T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 源码适配、T030 标注模型与存储、T031 标注气泡与队列、T032 Composer handoff、T033 标注历史 已完成**（分支 `task/m3-inspect`，已合并入 `main`）；**T034 G3 评审完成（GO）**：初评 4 项中 3 项通过，“≤3 步”实测 4–5 个动作；经用户批准返工，保存通知新增“发送到对话”后，点元素 → 保存 → 发送 = 3 个动作直达 composer（另需先开启拾取），复测四项验收全过（源码 100%、标注 4,095 B ≤ 4 KB、不自动发送），G3 GO。
+> 当前阶段：**Phase 4 实现（M0/G0 已通过，M1 已通过 G1，M2 已通过 G2）**；T001–T026、**U01 预览界面精简（Layout v2）** 已合并入 `main`（`768e129`）；**T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 源码适配、T030 标注模型与存储、T031 标注气泡与队列、T032 Composer handoff、T033 标注历史 已完成**（分支 `task/m3-inspect`，已合并入 `main`）；**T034 G3 评审完成（GO）**：初评 4 项中 3 项通过，“≤3 步”实测 4–5 个动作；经用户批准返工，保存通知新增“发送到对话”后，点元素 → 保存 → 发送 = 3 个动作直达 composer（另需先开启拾取），复测四项验收全过（源码 100%、标注 4,095 B ≤ 4 KB、不自动发送），G3 GO。M3 已合并入 `main`；随后按 `界面审查/M3修改意见.docx` 完成 **M3.5/U02 界面优化**（气泡直达发送、状态内联可解除、删除改弹窗），在分支 `task/m3-ui-refine` 上，未合并。
 
 ---
 
@@ -156,6 +156,14 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 - 回归（分支末端 `830fd0a`，与合并后的 `main` 树一致）：`pnpm typecheck` 0 error；`pnpm test` 60 文件 / 517 用例；`pnpm build` host 200.6 / client 204.1 KiB；`pnpm test:e2e` 9/9。首跑全量有 1 失败：`picker-edge.test.ts` 的“无 Playwright Edge 残留”断言在测试窗口内看到 10 个 Edge 进程（当时机器上有用户的预览/浏览器未退出），5 s 等待内未消失；单文件复跑与全量复跑均通过，属已知环境误报，非产品缺陷。日志 `.tmp/logs/merge-*.log`。
 - 合并：`task/m3-inspect`（`830fd0a`）以 `--no-ff` 合并入 `main`（`eae874a`）并推送（`fcabc0a..eae874a`）；分支保留。未开始 M4/T035。
 
+### U02 / M3.5 已完成（2026-10-29，task/m3-ui-refine）
+
+- 依据：`界面审查/M3修改意见.docx`（用户本地审查材料，未入库、不提交）。三条要求：①气泡在“加入标注队列”与“取消”之间加“发送到对话”；②底部状态提示不会消失/无法区分，删除改为弹窗提示；③状态提示移到每张卡片“移除/删除”右侧，并在两个队列间同步解除。
+- 结果：`AnnotationBubble` 三按钮序列 加入队列 / 发送到对话 / 取消（`data-vibe-bubble-send`，蓝色强调）；新增 `src/client/inspect/annotation-status.ts`（按标注 id 的模块级状态表 + `useSyncExternalStore`），`sendQueuedAnnotation` 成功/失败都写状态，`handleRemove`/编辑保存/历史删除清除状态；队列卡片与历史卡片都在“移除/删除”右侧内联显示同一状态；直接发送会先落盘历史再插入 composer 草稿（从不自动提交）；`History` 删除改为 `role="dialog"` 弹窗（Esc / 遮罩 / 取消退出，失败文本留在弹窗内，成功不留底部提示）。
+- 口径：第 3 条“发送到对话后解除两个队列中的状态”按“旧提示解除、历史卡片改为显示新的‘已插入对话草稿，尚未发送。’”实现；`annotation.history.deleted`/`gone` 两个 key 删除，两语均 185 key。
+- 验证：`pnpm typecheck` 0 error；`pnpm test` 60 文件 / 529 用例；`pnpm build` host 200.6 / client 210.7 KiB；`pnpm test:e2e` 9/9；真实载体（`vibe-dev` + headless Edge）`.tmp/logs/u02-verify.json` `ok:true`，console 0，截图 `u02-01-bubble.png`、`u02-02-history-status.png`、`u02-03-delete-dialog.png`；脚本 `.tmp/u02-verify.mjs` 非产品代码。
+- 分支 `task/m3-ui-refine`（由 `main` 新建），**未合并 `main`**、未推送（本地提交见 §10）。
+
 ### T026 遗留
 
 - G2 结论已写入 `tasks/todo.md` T026 段；手测脚本 `.tmp/t026-{host,web,desktop}.mjs` 与结果 `.tmp/logs/t026-*.json` 非产品代码。
@@ -281,6 +289,7 @@ dsh --profile vibe-dev --dump-config
 
 ## 10. 本次退出状态（2026-10-29）
 
+- **U02 / M3.5 完成（2026-10-29）**：按 `界面审查/M3修改意见.docx` 改界面逻辑——气泡新增“发送到对话”（先落历史再进 composer 草稿，不自动提交）、新增 `src/client/inspect/annotation-status.ts` 让状态按标注 id 在队列与历史卡片“移除/删除”右侧内联显示并跨列表同步解除、历史删除改为 `role="dialog"` 弹窗（Esc/遮罩/取消退出）。`pnpm typecheck` 0 error；`pnpm test` 60 文件 / 529 用例（`.tmp/logs/u02-test.log`）；`pnpm build` host 200.6 / client 210.7 KiB（`.tmp/logs/u02-build.log`）；`pnpm test:e2e` 9/9；真实载体 `.tmp/logs/u02-verify.json` `ok:true`（console 0，截图 `.tmp/logs/u02-0{1,2,3}-*.png`）。分支 `task/m3-ui-refine`，未推送、未合并到 `main`。详见 §4 U02 段。
 - **T033 完成**：新增 `src/host/inspect/history.ts`（`annotation.history.{list,get,save,remove}` 四个一元方法；列表复用 `.vibe/annotations` store，坏文件计入 `skipped`，Host 端先过滤再 `limit`）、`src/client/inspect/history-store.ts` + `History.tsx`（列表/搜索/两步删除/重开入队/空态与错误重试，模块级 store），接 `Canvas.tsx`（气泡保存落盘，失败只提示）、`AnnotationQueue.tsx`（可选 `persist` 注入）、`StudioShell.tsx`，契约与两语各 +23 key。`pnpm typecheck` 0 error；`pnpm test` 59 文件 / 507 用例（`.tmp/logs/t033-test.log`）；`pnpm build` host 199.8 / client 202.1 KiB（`.tmp/logs/t033-build.log`）；手动 Web 重启验证 `.tmp/logs/t033-history.json` `ok:true`（重启后仍在、坏文件跳过、两步删除生效、composer 未被自动写入）。提交 `67adef7` + 文档提交；分支 `task/m3-inspect` 未推送、未合并。遗留见 §4 T033 段。
 - **T032 完成**：新增 `src/client/inspect/handoff.ts`（会话级 composer 桥：`conversation.input.left` 作用域 slot → 公开 `inputActions`；`captureInsertion` + `insertText`、只有 `false` 才 `setDraft`、抛错/无 composer 回退剪贴板、从不 submit）与 `tests/component/annotation/composer-handoff.test.tsx`（20 用例）；`src/client/index.ts` 注册 slot、`StudioShell.tsx` 注入发送器、两语各 +1 key。`pnpm typecheck` 0 error；`pnpm exec vitest run tests/component/annotation` 4 文件 / 52 用例；`pnpm test` 57 文件 / 466 用例（`.tmp/logs/t032-test.log`）；`pnpm build` host 192.8 / client 184.7 KiB（`.tmp/logs/t032-build.log`）；手动 Web（`.tmp/logs/t032-web.json`）与隔离 Desktop（`.tmp/logs/t032-desktop.json`）均 `ok:true`。提交 `61cac79` + 文档提交；分支 `task/m3-inspect` 未推送、未合并。遗留见 §4 T032 段。
 - **T031 完成**：新增 `src/client/inspect/{AnnotationBubble,AnnotationQueue}.tsx` 与 `tests/component/annotation/`（3 文件 / 32 用例），接入 `Canvas.tsx`/`StudioShell.tsx`，两语各 +20 key；发送只在点击时发生，默认复制 `renderAnnotationText`，发送器可注入给 T032。`pnpm typecheck` 0 error；`pnpm exec vitest run tests/component/annotation` 32/32；`pnpm test` 56 文件 / 446 用例（`.tmp/logs/t031-test.log`）；`pnpm build` host 192.8 / client 179.4 KiB（`.tmp/logs/t031-build.log`）。提交 `f6bab7d` + 文档提交；分支 `task/m3-inspect` 未推送、未合并。遗留见 §4 T031 段。

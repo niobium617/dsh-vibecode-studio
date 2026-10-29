@@ -22,6 +22,11 @@ import type { ElementContext } from '../../contracts/inspect'
 import { createTranslator, type Locale } from '../i18n'
 import { EmptyState } from '../shell/StateViews'
 import { ANNOTATION_COMMENT_MAX_CHARS } from './AnnotationBubble'
+import {
+  clearAnnotationStatus,
+  setAnnotationStatus,
+  useAnnotationStatuses,
+} from './annotation-status'
 
 /**
  * A sender receives the stored annotation and its rendered text (≤ 4 KB) and
@@ -154,8 +159,10 @@ export interface AnnotationSendResult {
 
 /**
  * Sends one queued annotation and drops it only after the handoff resolves, so
- * a failed send never loses the comment. Shared by the queue list and the
- * preview save notice (T034) so both follow the same rule.
+ * a failed send never loses the comment. Shared by the queue list, the preview
+ * save notice (T034) and the bubble's direct send (U02) so all follow the same
+ * rule. The per-annotation notice is written here too: whichever list shows
+ * that id next (the history card after a successful send) renders the outcome.
  */
 export async function sendQueuedAnnotation(
   annotation: Annotation,
@@ -163,13 +170,13 @@ export async function sendQueuedAnnotation(
   messages: AnnotationSendMessages,
 ): Promise<AnnotationSendResult> {
   try {
-    const message = await send(annotation, renderAnnotationText(annotation))
+    const raw = await send(annotation, renderAnnotationText(annotation))
+    const message = typeof raw === 'string' && raw.length > 0 ? raw : messages.sent
     removeQueuedAnnotation(annotation.id)
-    return {
-      ok: true,
-      message: typeof message === 'string' && message.length > 0 ? message : messages.sent,
-    }
+    setAnnotationStatus(annotation.id, { kind: 'success', message })
+    return { ok: true, message }
   } catch {
+    setAnnotationStatus(annotation.id, { kind: 'error', message: messages.failed })
     return { ok: false, message: messages.failed }
   }
 }
@@ -230,7 +237,18 @@ const commentStyle: React.CSSProperties = {
 
 const actionsStyle: React.CSSProperties = {
   display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
   gap: 6,
+}
+
+/** Sits to the right of Remove so the notice stays attached to its annotation. */
+const inlineStatusStyle: React.CSSProperties = {
+  flex: '1 1 auto',
+  minWidth: 0,
+  marginLeft: 'auto',
+  textAlign: 'right',
+  font: '10px/1.4 system-ui, sans-serif',
 }
 
 const actionBaseStyle: React.CSSProperties = {
@@ -295,11 +313,6 @@ function formatTime(iso: string): string {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-interface QueueFeedback {
-  readonly kind: 'success' | 'error'
-  readonly message: string
-}
-
 export interface AnnotationQueueProps {
   readonly locale?: Locale
   /** Injectable handoff; defaults to the clipboard fallback until T032. */
@@ -323,11 +336,11 @@ export function AnnotationQueue({
 }: AnnotationQueueProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
   const queue = useAnnotationQueue()
+  const statuses = useAnnotationStatuses()
   const [editingId, setEditingId] = React.useState<string | null>(null)
   const [draft, setDraft] = React.useState('')
   const [editWarned, setEditWarned] = React.useState(false)
   const [pendingId, setPendingId] = React.useState<string | null>(null)
-  const [feedback, setFeedback] = React.useState<QueueFeedback | null>(null)
 
   const startEdit = (annotation: Annotation): void => {
     setEditingId(annotation.id)
@@ -344,12 +357,13 @@ export function AnnotationQueue({
     if (!updateQueuedAnnotation(id, draft)) return
     setEditingId(null)
     setEditWarned(false)
+    // An edit replaces the previous notice (a failed send, for example).
+    clearAnnotationStatus(id)
     if (!persist || !current) return
     const updated: Annotation = { ...current, comment: draft.trim() }
-    setFeedback(null)
     void persist(updated).then((saved) => {
       if (!saved) {
-        setFeedback({ kind: 'error', message: t('annotation.history.saveFailed') })
+        setAnnotationStatus(id, { kind: 'error', message: t('annotation.history.saveFailed') })
       }
     })
   }
@@ -357,16 +371,20 @@ export function AnnotationQueue({
   const handleSend = async (annotation: Annotation): Promise<void> => {
     if (pendingId !== null) return
     setPendingId(annotation.id)
-    setFeedback(null)
     try {
-      const result = await sendQueuedAnnotation(annotation, send, {
+      await sendQueuedAnnotation(annotation, send, {
         sent: t('annotation.item.sent'),
         failed: t('annotation.item.sendFailed'),
       })
-      setFeedback({ kind: result.ok ? 'success' : 'error', message: result.message })
     } finally {
       setPendingId(null)
     }
+  }
+
+  const handleRemove = (id: string): void => {
+    removeQueuedAnnotation(id)
+    // Also clears "reopened in the queue above" on the matching history card.
+    clearAnnotationStatus(id)
   }
 
   return (
@@ -386,6 +404,7 @@ export function AnnotationQueue({
             : null
           const editing = editingId === annotation.id
           const pending = pendingId === annotation.id
+          const status = statuses.get(annotation.id) ?? null
           return (
             <li key={annotation.id} data-vibe-annotation-item={annotation.id} style={itemStyle}>
               <div style={headerStyle}>
@@ -475,10 +494,25 @@ export function AnnotationQueue({
                       data-vibe-annotation-remove="1"
                       style={actionBaseStyle}
                       disabled={pendingId !== null}
-                      onClick={() => removeQueuedAnnotation(annotation.id)}
+                      onClick={() => handleRemove(annotation.id)}
                     >
                       {t('annotation.item.remove')}
                     </button>
+                    {status === null ? null : (
+                      <span
+                        data-vibe-annotation-status={status.kind}
+                        role={status.kind === 'error' ? 'alert' : 'status'}
+                        style={{
+                          ...inlineStatusStyle,
+                          color:
+                            status.kind === 'error'
+                              ? 'var(--dsw-danger-color, #d14343)'
+                              : 'var(--dsw-success-color, #2ea043)',
+                        }}
+                      >
+                        {status.message}
+                      </span>
+                    )}
                   </div>
                 </>
               )}
@@ -486,15 +520,6 @@ export function AnnotationQueue({
           )
         })}
         </ol>
-      )}
-      {feedback === null ? null : (
-        <p
-          data-vibe-annotation-status={feedback.kind}
-          role={feedback.kind === 'error' ? 'alert' : 'status'}
-          style={feedbackStyle(feedback.kind)}
-        >
-          {feedback.message}
-        </p>
       )}
       {queue.length === 0 ? null : (
         <p data-vibe-annotation-hint="1" style={footerStyle}>

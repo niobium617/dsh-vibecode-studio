@@ -16,6 +16,11 @@ import {
   searchAnnotationHistory,
   useAnnotationHistory,
 } from './history-store'
+import {
+  clearAnnotationStatus,
+  setAnnotationStatus,
+  useAnnotationStatuses,
+} from './annotation-status'
 
 const sectionStyle: React.CSSProperties = {
   display: 'grid',
@@ -108,7 +113,53 @@ const metaStyle: React.CSSProperties = {
 
 const actionsStyle: React.CSSProperties = {
   display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
   gap: 6,
+}
+
+/** Sits to the right of Delete so the notice stays attached to its annotation. */
+const inlineStatusStyle: React.CSSProperties = {
+  flex: '1 1 auto',
+  minWidth: 0,
+  marginLeft: 'auto',
+  textAlign: 'right',
+  font: '10px/1.4 system-ui, sans-serif',
+}
+
+const dialogOverlayStyle: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 20,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 16,
+  background: 'rgba(0, 0, 0, 0.45)',
+}
+
+const dialogStyle: React.CSSProperties = {
+  display: 'grid',
+  gap: 10,
+  width: 'min(320px, 100%)',
+  boxSizing: 'border-box',
+  padding: 12,
+  borderRadius: 8,
+  border: '1px solid var(--dsw-border-color, rgba(127, 127, 127, 0.4))',
+  background: 'var(--dsw-surface-color, Canvas)',
+  color: 'var(--dsw-text-primary, CanvasText)',
+  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.35)',
+  font: '12px/1.5 system-ui, sans-serif',
+}
+
+const dialogTitleStyle: React.CSSProperties = {
+  margin: 0,
+  font: '600 13px/1.4 system-ui, sans-serif',
+}
+
+const dialogBodyStyle: React.CSSProperties = {
+  margin: 0,
+  opacity: 0.75,
 }
 
 const actionBaseStyle: React.CSSProperties = {
@@ -166,11 +217,6 @@ function formatDateTime(iso: string): string {
   )}:${pad(date.getMinutes())}`
 }
 
-interface HistoryFeedback {
-  readonly kind: 'success' | 'error'
-  readonly message: string
-}
-
 export interface AnnotationHistoryProps {
   readonly locale?: Locale
 }
@@ -178,44 +224,64 @@ export interface AnnotationHistoryProps {
 export function AnnotationHistory({ locale }: AnnotationHistoryProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
   const state = useAnnotationHistory()
-  const [confirmingId, setConfirmingId] = React.useState<string | null>(null)
+  const statuses = useAnnotationStatuses()
+  // Deletion opens a modal instead of leaving a "deleted" line under the list.
+  const [confirming, setConfirming] = React.useState<AnnotationHistoryEntry | null>(null)
+  const [deleting, setDeleting] = React.useState(false)
+  const [deleteError, setDeleteError] = React.useState<string | null>(null)
+  const cancelRef = React.useRef<HTMLButtonElement | null>(null)
   const [pendingId, setPendingId] = React.useState<string | null>(null)
-  const [feedback, setFeedback] = React.useState<HistoryFeedback | null>(null)
 
   // The disk is the source of truth, so each mount refreshes the cached list.
   React.useEffect(() => {
     void loadAnnotationHistory()
   }, [])
 
+  React.useEffect(() => {
+    if (confirming === null) return
+    cancelRef.current?.focus()
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setConfirming(null)
+      setDeleteError(null)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [confirming])
+
   const handleReopen = async (entry: AnnotationHistoryEntry): Promise<void> => {
     if (pendingId !== null) return
     setPendingId(entry.id)
-    setFeedback(null)
     try {
       await reopenAnnotationFromHistory(entry.id)
-      setFeedback({ kind: 'success', message: t('annotation.history.reopened') })
+      setAnnotationStatus(entry.id, {
+        kind: 'success',
+        message: t('annotation.history.reopened'),
+      })
     } catch {
-      setFeedback({ kind: 'error', message: t('annotation.history.reopenFailed') })
+      setAnnotationStatus(entry.id, {
+        kind: 'error',
+        message: t('annotation.history.reopenFailed'),
+      })
     } finally {
       setPendingId(null)
     }
   }
 
-  const handleDelete = async (entry: AnnotationHistoryEntry): Promise<void> => {
-    if (pendingId !== null) return
-    setPendingId(entry.id)
-    setFeedback(null)
+  const handleDelete = async (): Promise<void> => {
+    if (confirming === null || deleting) return
+    const entry = confirming
+    setDeleting(true)
+    setDeleteError(null)
     try {
-      const removed = await removeHistoryAnnotation(entry.id)
-      setFeedback({
-        kind: 'success',
-        message: removed ? t('annotation.history.deleted') : t('annotation.history.gone'),
-      })
+      await removeHistoryAnnotation(entry.id)
+      clearAnnotationStatus(entry.id)
+      setConfirming(null)
     } catch {
-      setFeedback({ kind: 'error', message: t('annotation.history.deleteFailed') })
+      setDeleteError(t('annotation.history.deleteFailed'))
     } finally {
-      setPendingId(null)
-      setConfirmingId(null)
+      setDeleting(false)
     }
   }
 
@@ -285,7 +351,7 @@ export function AnnotationHistory({ locale }: AnnotationHistoryProps): React.Rea
         <ol data-vibe-history-list="1" style={listStyle}>
           {state.entries.map((entry) => {
             const pending = pendingId === entry.id
-            const confirming = confirmingId === entry.id
+            const status = statuses.get(entry.id) ?? null
             return (
               <li key={entry.id} data-vibe-history-item={entry.id} style={itemStyle}>
                 <div style={rowStyle}>
@@ -310,51 +376,41 @@ export function AnnotationHistory({ locale }: AnnotationHistoryProps): React.Rea
                   {entry.comment}
                 </p>
                 <div style={actionsStyle}>
-                  {confirming ? (
-                    <>
-                      <button
-                        type="button"
-                        data-vibe-history-confirm="1"
-                        style={dangerStyle}
-                        disabled={pending}
-                        onClick={() => void handleDelete(entry)}
-                      >
-                        {t('annotation.history.confirmDelete')}
-                      </button>
-                      <button
-                        type="button"
-                        data-vibe-history-cancel="1"
-                        style={actionBaseStyle}
-                        disabled={pending}
-                        onClick={() => setConfirmingId(null)}
-                      >
-                        {t('annotation.item.cancel')}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        data-vibe-history-reopen="1"
-                        style={reopenStyle}
-                        disabled={pendingId !== null}
-                        onClick={() => void handleReopen(entry)}
-                      >
-                        {pending ? t('annotation.history.reopening') : t('annotation.history.reopen')}
-                      </button>
-                      <button
-                        type="button"
-                        data-vibe-history-delete="1"
-                        style={actionBaseStyle}
-                        disabled={pendingId !== null}
-                        onClick={() => {
-                          setFeedback(null)
-                          setConfirmingId(entry.id)
-                        }}
-                      >
-                        {t('annotation.history.delete')}
-                      </button>
-                    </>
+                  <button
+                    type="button"
+                    data-vibe-history-reopen="1"
+                    style={reopenStyle}
+                    disabled={pendingId !== null || deleting}
+                    onClick={() => void handleReopen(entry)}
+                  >
+                    {pending ? t('annotation.history.reopening') : t('annotation.history.reopen')}
+                  </button>
+                  <button
+                    type="button"
+                    data-vibe-history-delete="1"
+                    style={actionBaseStyle}
+                    disabled={pendingId !== null || deleting}
+                    onClick={() => {
+                      setDeleteError(null)
+                      setConfirming(entry)
+                    }}
+                  >
+                    {t('annotation.history.delete')}
+                  </button>
+                  {status === null ? null : (
+                    <span
+                      data-vibe-history-status={status.kind}
+                      role={status.kind === 'error' ? 'alert' : 'status'}
+                      style={{
+                        ...inlineStatusStyle,
+                        color:
+                          status.kind === 'error'
+                            ? 'var(--dsw-danger-color, #d14343)'
+                            : 'var(--dsw-success-color, #2ea043)',
+                      }}
+                    >
+                      {status.message}
+                    </span>
                   )}
                 </div>
               </li>
@@ -369,14 +425,63 @@ export function AnnotationHistory({ locale }: AnnotationHistoryProps): React.Rea
         </p>
       ) : null}
 
-      {feedback === null ? null : (
-        <p
-          data-vibe-history-status={feedback.kind}
-          role={feedback.kind === 'error' ? 'alert' : 'status'}
-          style={feedbackStyle(feedback.kind)}
+      {confirming === null ? null : (
+        <div
+          data-vibe-history-dialog="1"
+          style={dialogOverlayStyle}
+          onClick={(event) => {
+            if (event.target !== event.currentTarget || deleting) return
+            setConfirming(null)
+            setDeleteError(null)
+          }}
         >
-          {feedback.message}
-        </p>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="vibe-history-delete-title"
+            aria-describedby="vibe-history-delete-body"
+            style={dialogStyle}
+          >
+            <h4 id="vibe-history-delete-title" style={dialogTitleStyle}>
+              {t('annotation.history.deleteConfirm.title')}
+            </h4>
+            <p id="vibe-history-delete-body" style={dialogBodyStyle}>
+              {t('annotation.history.deleteConfirm.body')}
+            </p>
+            <code title={confirming.selector ?? undefined} style={selectorStyle}>
+              {confirming.selector ?? confirming.tag ?? t('annotation.item.noElement')}
+            </code>
+            {deleteError === null ? null : (
+              <p role="alert" style={feedbackStyle('error')}>
+                {deleteError}
+              </p>
+            )}
+            <div style={{ ...actionsStyle, justifyContent: 'flex-end' }}>
+              <button
+                ref={cancelRef}
+                type="button"
+                data-vibe-history-cancel="1"
+                style={actionBaseStyle}
+                disabled={deleting}
+                onClick={() => {
+                  setConfirming(null)
+                  setDeleteError(null)
+                }}
+              >
+                {t('annotation.item.cancel')}
+              </button>
+              <button
+                type="button"
+                data-vibe-history-confirm="1"
+                style={dangerStyle}
+                disabled={deleting}
+                onClick={() => void handleDelete()}
+              >
+                {t('annotation.history.confirmDelete')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </section>
   )

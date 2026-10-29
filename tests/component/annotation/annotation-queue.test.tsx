@@ -23,6 +23,11 @@ import {
 } from '../../../src/contracts/annotation'
 import { ANNOTATION_BUDGET_BYTES, utf8Bytes } from '../../../src/contracts/budget'
 import type { ElementContext } from '../../../src/contracts/inspect'
+import {
+  clearAllAnnotationStatuses,
+  getAnnotationStatus,
+  setAnnotationStatus,
+} from '../../../src/client/inspect/annotation-status'
 
 const ELEMENT: ElementContext = {
   selector: '[data-testid="save"]',
@@ -57,11 +62,13 @@ function add(comment: string, id?: string): Annotation {
 
 beforeEach(() => {
   clearAnnotationQueue()
+  clearAllAnnotationStatuses()
 })
 
 afterEach(() => {
   cleanup()
   clearAnnotationQueue()
+  clearAllAnnotationStatuses()
   vi.restoreAllMocks()
   // @ts-expect-error the test may have defined a clipboard that jsdom lacks
   delete navigator.clipboard
@@ -205,6 +212,39 @@ describe('AnnotationQueue', () => {
     expect(screen.getByText('No annotations yet')).toBeTruthy()
   })
 
+  it('renders a notice inside the card, right of Remove, not under the list (U02)', () => {
+    add('notice me', 'a-1')
+    setAnnotationStatus('a-1', { kind: 'success', message: 'Reopened in the queue above.' })
+    render(<AnnotationQueue locale="en" />)
+
+    const item = document.querySelector('[data-vibe-annotation-item="a-1"]')
+    const status = document.querySelector('[data-vibe-annotation-status="success"]')
+    expect(item?.contains(status)).toBe(true)
+    expect(status?.textContent).toBe('Reopened in the queue above.')
+
+    const remove = item?.querySelector('[data-vibe-annotation-remove="1"]')
+    // Same action row, after the Remove button.
+    expect(remove?.parentElement).toBe(status?.parentElement)
+    expect(
+      remove!.compareDocumentPosition(status!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+
+    // No stray line under the list: the footer only holds the hint.
+    const list = document.querySelector('[data-vibe-annotation-list="1"]')
+    expect(list?.parentElement?.querySelector('[data-vibe-annotation-status]')).toBe(status)
+  })
+
+  it('clears the matching history notice when a draft is removed (U02)', () => {
+    add('drop me', 'a-1')
+    setAnnotationStatus('a-1', { kind: 'success', message: 'Reopened in the queue above.' })
+    render(<AnnotationQueue locale="en" />)
+
+    expect(screen.getByText('Reopened in the queue above.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    expect(getAnnotationStatus('a-1')).toBeNull()
+    expect(screen.queryByText('Reopened in the queue above.')).toBeNull()
+  })
+
   it('never sends on its own — only a click sends', async () => {
     add('wait for me', 'a-1')
     const send = vi.fn(async () => {})
@@ -235,7 +275,13 @@ describe('AnnotationQueue', () => {
     expect(text).toContain('Make it bigger')
     expect(utf8Bytes(text)).toBeLessThanOrEqual(ANNOTATION_BUDGET_BYTES)
     expect(annotationQueueSnapshot()).toEqual([])
-    expect(screen.getByRole('status').textContent).toBe('Sent to the chat draft.')
+    // The card is gone, but the outcome is attached to the annotation id so the
+    // history card can show it (U02); nothing is left under the list.
+    expect(getAnnotationStatus(annotation.id)).toEqual({
+      kind: 'success',
+      message: 'Sent to the chat draft.',
+    })
+    expect(document.querySelector('[data-vibe-annotation-status]')).toBeNull()
   })
 
   it('falls back to the clipboard message when the sender reports nothing', async () => {
@@ -247,7 +293,7 @@ describe('AnnotationQueue', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Send to chat' }))
     })
 
-    expect(screen.getByRole('status').textContent).toBe(
+    expect(getAnnotationStatus('a-1')?.message).toBe(
       'Copied to the clipboard — paste it into the chat.',
     )
     expect(annotationQueueSnapshot()).toEqual([])
@@ -267,6 +313,11 @@ describe('AnnotationQueue', () => {
     expect(screen.getByRole('alert').textContent).toBe(
       'Could not send this annotation. Try again.',
     )
+    expect(
+      document.querySelector(
+        '[data-vibe-annotation-item="a-1"] [data-vibe-annotation-status="error"]',
+      ),
+    ).toBeTruthy()
     expect(annotationQueueSnapshot()).toHaveLength(1)
     expect(screen.getByText('Keep me')).toBeTruthy()
   })
@@ -315,7 +366,7 @@ describe('AnnotationQueue', () => {
     expect(copied).toContain('Clipboard please')
     expect(utf8Bytes(copied)).toBeLessThanOrEqual(ANNOTATION_BUDGET_BYTES)
     expect(annotationQueueSnapshot()).toEqual([])
-    expect(screen.getByRole('status').textContent).toContain('Copied to the clipboard')
+    expect(getAnnotationStatus('a-1')?.message).toContain('Copied to the clipboard')
   })
 
   it('keeps the draft when the clipboard is unavailable', async () => {

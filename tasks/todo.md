@@ -403,6 +403,27 @@
 
 ---
 
+## M3.5：M3 界面优化（用户《M3修改意见》）
+
+> 依赖：M3 已合并 `main`。范围只限标注气泡、队列与历史的界面和状态逻辑；不改拾取、上下文、预算、存储格式与发送语义（仍不自动提交）。依据：`界面审查/M3修改意见.docx`（未入库）与 `docs/2026-10-28-界面与项目方向.md` §1。
+
+### - [x] U02 标注发送入口与状态归位
+
+- **目标**：气泡增加直达发送；状态提示从列表底部移入对应卡片，随该标注的操作同步更新或解除；历史删除改为弹窗确认。
+- **验收**：
+  1. 气泡按钮顺序为“加入标注队列 / 发送到对话 / 取消”；点击“发送到对话”= 保存到历史 + 插入对话草稿（不自动提交），失败保留队列草稿可重试。
+  2. 所有状态提示只出现在对应标注卡片内、“移除/删除”按钮右侧；队列与历史列表底部不再有状态行。
+  3. 状态按标注 id 同步：重开 → 历史卡片显示“已重新放入上方队列，尚未发送。”；队列移除该条 → 该状态解除；队列/气泡/通知发送成功 → 旧状态解除，历史卡片显示“已插入对话草稿，尚未发送。”；发送失败 → 卡片内提示且保留草稿。
+  4. 历史删除改为弹窗确认，取消/Esc 可退出；删除成功后无残留“标注已删除”提示，失败在弹窗内提示。
+  5. `pnpm typecheck` 0 error、`pnpm test` 全绿、`pnpm build`、`pnpm test:e2e` 9/9；`vibe-dev` + headless Edge 实测按钮排版与状态流转（DOM 断言 + 截图）。
+- **验证**：组件测试覆盖气泡三按钮顺序与发送、队列/历史状态同步、删除弹窗；真实载体手测。
+- **文件**：`src/client/inspect/{AnnotationBubble,AnnotationQueue,History,AnnotationSaveNotice}.tsx`、新增 `src/client/inspect/annotation-status.ts`、`src/client/preview/Canvas.tsx`、`src/client/locales/*.json`、tests。
+- **结果（2026-10-29）**：新增 `annotation-status.ts`（模块级 `Map<id, {kind, message}>` + `useSyncExternalStore`，队列/历史按 id 共享同一条提示；`setAnnotationStatus` 同值不重复通知，`clearAnnotationStatus` 用于移除/编辑/删除）。`AnnotationBubble` 增加 `onSend` 与三按钮行（`加入标注队列 / 发送到对话 / 取消`，发送为强调色，`data-vibe-bubble-send` 与队列的 `data-vibe-annotation-send` 区分；`Ctrl+Enter` 仍只入队），`Canvas` 新增 `queuePickedComment`/`sendPickedComment`（发送 = 入队 + 落盘 + `sendQueuedAnnotation`，落盘失败只降级提示、不阻断发送），`QueueNotice` 改为 `{annotation, persisted, sent}`。`AnnotationSaveNotice` 新增 `sent`/`initialMessage`，气泡直达发送的结果在通知挂载后到达也能显示，并把“发送”按钮收起。队列/历史底部状态行删除，提示改到卡片内“移除/删除”右侧；队列移除与编辑会清除该 id 的提示；历史重开写“已重新放入上方队列，尚未发送。”，发送成功写“已插入对话草稿，尚未发送。”。历史删除改为 `role="dialog"` 弹窗（遮罩点击/Esc/取消可退出，失败提示留在弹窗内），删除成功后不再残留“标注已删除”。两语：+`annotation.bubble.send`、+`annotation.history.deleteConfirm.{title,body}`，−`annotation.history.{deleted,gone}`（184→185，en/zh 对齐）。
+- **验证结果（2026-10-29）**：`pnpm typecheck` 0 error；`pnpm test` 60 文件 / **529 用例**（新增 12：气泡三按钮顺序、气泡发送、`Ctrl+Enter` 不入发送、队列卡片内提示位置、移除清提示、发送失败提示在卡片内、历史提示位置、队列发送替换重开提示、队列移除清历史提示、删除弹窗确认/取消/Esc/已消失/失败、通知 `sent` 初值与挂载后到达、失败保留重试）；`pnpm build` host 200.6 / client 210.7 KiB；`pnpm test:e2e` 9/9。真实载体（`.tmp/u02-verify.mjs` → `.tmp/logs/u02-verify.json`，`ok:true`，0 console error，12 个动作）：气泡按钮为“加入标注队列/发送到对话/取消”；点“发送到对话”后通知“已插入对话草稿，尚未发送。”、composer 含完整标注、面板外 marker 0、队列 0 条、历史 1 条且提示“已插入对话草稿，尚未发送。”、列表底部状态 0 条；重开后队列 1 条、两边显示“已重新放入上方队列，尚未发送。”；队列移除后历史提示清空；删除弹窗 Esc/取消均退出且条目保留，确认后条目消失、无残留提示；3 s 后 composer 逐字节不变（未自动提交）。截图 `.tmp/logs/u02-{01-bubble,02-history-status,03-delete-dialog}.png`。清理：测试写入的 `.vibe/annotations` 与其空目录已删除，4320/4338 无监听残留。
+- **口径说明**：验收第 3 条“发送后解除两个队列中的状态”按“旧提示解除、历史卡片改为显示新的‘已插入对话草稿，尚未发送。’”实现——发送成功后草稿出队，若完全不显示结果，用户将看不到“已插入”这条本应出现的提示。
+
+---
+
 ## M4：API Workbench
 
 > 依赖：G1；可与 M2 并行。T035/T036/T037 可并行；T038 依赖 T035/T036；T039 依赖 T038；T040 依赖 T035；T041 独立；T042 依赖 T041；T043 依赖 T024/T037；T044 依赖 T037/T038/T043；T045 依赖 T035；T046 汇总。

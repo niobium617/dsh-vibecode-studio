@@ -34,7 +34,9 @@ import { createTranslator, type Locale } from '../i18n'
 import { AnnotationBubble, placeBubble } from '../inspect/AnnotationBubble'
 import {
   addAnnotationToQueue,
+  clipboardSender,
   createElementAnnotation,
+  sendQueuedAnnotation,
   type AnnotationSender,
 } from '../inspect/AnnotationQueue'
 import { AnnotationSaveNotice } from '../inspect/AnnotationSaveNotice'
@@ -240,8 +242,11 @@ export interface PreviewPageProps {
 }
 
 interface QueueNotice {
-  readonly kind: 'saved' | 'unsaved'
   readonly annotation: Annotation
+  /** False when the history write failed; the annotation is still queued. */
+  readonly persisted: boolean
+  /** Outcome of the bubble's direct "Send to chat", once it resolves. */
+  readonly sent: { readonly ok: boolean; readonly message: string } | null
 }
 
 export function PreviewPage({ locale, send }: PreviewPageProps): React.ReactElement {
@@ -288,6 +293,43 @@ export function PreviewPage({ locale, send }: PreviewPageProps): React.ReactElem
   React.useEffect(() => {
     if (pickedElement !== null) setQueueNotice(null)
   }, [pickedElement])
+
+  /**
+   * Queues the comment and writes the history file. Save and direct-send share
+   * this step so both land in the history list; a failed write only downgrades
+   * the notice, exactly as before.
+   */
+  const queuePickedComment = (comment: string): Annotation | null => {
+    const targetId = snapshot?.targetId ?? null
+    if (targetId === null || pickedElement === null) return null
+    const annotation = createElementAnnotation({ targetId, comment, element: pickedElement })
+    if (!addAnnotationToQueue(annotation)) return null
+    setQueueNotice({ annotation, persisted: true, sent: null })
+    picker.dismiss()
+    void persistAnnotation(annotation).then((saved) => {
+      if (saved) return
+      setQueueNotice((current) =>
+        current?.annotation.id === annotation.id ? { ...current, persisted: false } : current,
+      )
+    })
+    return annotation
+  }
+
+  /** "Send to chat" in the bubble: history first, then the composer handoff. */
+  const sendPickedComment = (comment: string): void => {
+    const annotation = queuePickedComment(comment)
+    if (annotation === null) return
+    void sendQueuedAnnotation(annotation, send ?? clipboardSender, {
+      sent: t('annotation.item.sent'),
+      failed: t('annotation.item.sendFailed'),
+    }).then((result) => {
+      setQueueNotice((current) =>
+        current?.annotation.id === annotation.id
+          ? { ...current, sent: { ok: result.ok, message: result.message } }
+          : current,
+      )
+    })
+  }
 
   const stageRef = React.useRef<HTMLDivElement | null>(null)
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null)
@@ -687,29 +729,8 @@ export function PreviewPage({ locale, send }: PreviewPageProps): React.ReactElem
             locale={locale}
             element={pickedElement}
             placement={bubblePlacement}
-            onSave={(comment) => {
-              const targetId = snapshot?.targetId ?? null
-              if (targetId === null) return
-              const annotation = createElementAnnotation({
-                targetId,
-                comment,
-                element: pickedElement,
-              })
-              if (addAnnotationToQueue(annotation)) {
-                setQueueNotice({ kind: 'saved', annotation })
-                picker.dismiss()
-                // History is a local record only; a failure never blocks the
-                // queue, it just downgrades the notice.
-                void persistAnnotation(annotation).then((saved) => {
-                  if (saved) return
-                  setQueueNotice((current) =>
-                    current?.annotation.id === annotation.id
-                      ? { ...current, kind: 'unsaved' }
-                      : current,
-                  )
-                })
-              }
-            }}
+            onSave={queuePickedComment}
+            onSend={sendPickedComment}
             onCancel={picker.dismiss}
           />
         ) : null}
@@ -719,7 +740,9 @@ export function PreviewPage({ locale, send }: PreviewPageProps): React.ReactElem
             key={queueNotice.annotation.id}
             locale={locale}
             annotation={queueNotice.annotation}
-            persisted={queueNotice.kind === 'saved'}
+            persisted={queueNotice.persisted}
+            sent={queueNotice.sent?.ok ?? false}
+            initialMessage={queueNotice.sent?.message}
             onViewQueue={() => setActiveTab('annotations')}
             send={send}
           />
