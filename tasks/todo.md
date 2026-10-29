@@ -444,12 +444,19 @@
 
 > 依赖：G1；可与 M2 并行。T035/T036/T037 可并行；T038 依赖 T035/T036；T039 依赖 T038；T040 依赖 T035；T041 独立；T042 依赖 T041；T043 依赖 T024/T037；T044 依赖 T037/T038/T043；T045 依赖 T035；T046 汇总。
 
-### - [ ] T035 HTTP 执行器
+### - [x] T035 HTTP 执行器
 
 - **目标**：method/url/query/headers/body/auth；超时/取消/重定向/响应上限。
 - **验收**：JSON/form/multipart；取消不泄漏；重定向可控；大响应截断；单测通过。
 - **验证**：`pnpm test -- tests/unit/http-executor` + 本地 echo server。
 - **文件**：`src/host/api/{executor,request}.ts`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 契约：新增 `src/contracts/api.ts`（`HTTP_METHODS`/`HTTP_REDIRECT_POLICIES`/`HttpAuth`/`HttpRequestBody`/`HttpRequestSpec`/`HttpExecutionResult` 与 `isHttpRequestSpec` 等手写守卫；体一律 text/base64，跨 unary 传输不带 Buffer）并从 `src/contracts/index.ts` 导出。
+  - 归一化：`src/host/api/request.ts` 把 `HttpRequestSpec` 解析成 `fetch` 可用的请求——只允许 http(s)、拒绝 URL 内凭证（改用 auth 字段）、拦截 169.254.0.0/16 与 metadata 主机（`permission_denied`/`blocked_host`）、合并 query（禁用行跳过、保留 URL 原有参数）、header 名/值校验（禁 CRLF、禁 runtime 头、大小写不敏感查重）、bearer/basic/api-key（header 或 query，冲突 `Authorization` 报 `invalid_input`）、JSON（先 `JSON.parse` 校验）/text/form/multipart 编码（固定 boundary 可注入、base64 校验与 4 MiB 文件上限）、GET/HEAD 禁 body、body 与 timeout/redirect/响应上限边界。
+  - 执行：`src/host/api/executor.ts` 的 `HttpExecutor`/`createHttpExecutor` 让超时与调用方 `AbortSignal` 共用一个 `AbortController`；`redirect: 'manual'` 手写跟随，记录 hop、302/303 改写（303→GET、301/302 POST→GET 并去掉 body 头）、307/308 保留方法与 body，`manual` 停在 3xx、`error` 抛 `redirect_not_allowed`、超 `maxRedirects` 抛 `too_many_redirects`、跳到 metadata/非 http(s) 抛 `blocked_redirect`；响应体流式读取并在 `maxResponseBytes` 处截断后 `reader.cancel()` 释放连接；响应头经 `redactHeaders`（`set-cookie` 等为 `REDACTED`）；错误映射 `timeout`/`network_error{cancelled|request_failed|…}`，消息不回显请求内容、只附 undici cause code。
+  - 验收对应：`tests/unit/http-executor/` 2 文件 / 34 用例（request 15 + executor 19，后者跑真实 `node:http` echo server）——JSON/form/multipart 往返、HEAD/二进制/204/404、302 跟随与 hop 记录、307 保留 body、303 改写 GET、manual/error 策略、maxRedirects、metadata 重定向拦截、64 KiB 响应按 1 KiB 截断、超时与取消都会让服务端观察到连接关闭（`res.on('close')`）、已中止 signal 不发请求、连接拒绝映射、校验先于建连。
+  - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm test` 62 文件 / 567 用例（基线 60 / 533）；`pnpm build` host 221.1 / client 210.7 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t035-{typecheck,test,build,e2e}.log`。
+  - 限制：未注册 unary 方法与 UI（T038 接）；跟随重定向时跨源仍携带 Authorization（与 curl/Postman 一致，未做浏览器式剥离）；文本一律按 UTF-8 解码（不读 charset）；结果携带截断后的 base64 全量（≤16 MiB）；`fetchImpl`/`now`/`boundary` 为测试注入点，运行时不外露。
 
 ### - [ ] T036 环境、变量与密钥
 

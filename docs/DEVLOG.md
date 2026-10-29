@@ -622,6 +622,16 @@
 - 清理：验证用的 4341/4323/4322 端口与 Edge 全部 `taskkill /T /F` 清理；未触碰 4317、`desktop`/`web` profile。
 - 用户手测确认后推送并合并：`task/m3-ui-refine`（`d110ad5`）推送到 `origin`，以 `--no-ff` 合并入 `main`（合并提交 `a1c7577`，含 U02 与 U03）；`main` 回归 `pnpm test` 60 文件 / **533 用例全通过**、`pnpm build` host 201.1 / client 210.7 KiB、`pnpm test:e2e` 9/9；分支保留。`.gitignore` 增 `界面审查/`（用户审查材料不入库），空 `.vibe/` 已清理。
 
+### T035 — HTTP 执行器（2026-10-29，`task/m4-api-workbench`）
+
+- 目标：M4 API Workbench 的执行底座——method/url/query/headers/body/auth，加上超时、取消、重定向策略与响应上限；不改 UI、不接 unary。
+- 契约：新增 `src/contracts/api.ts`，把请求与结果定义成纯 JSON（体走 text/base64），`isHttpRequestSpec`/`isHttpRequestBody`/`isHttpAuth` 手写守卫；`src/contracts/index.ts` 导出。
+- 归一化（`src/host/api/request.ts`）：只允许 http(s)；拒绝 URL 内凭证并提示改用 auth 字段；拦截 169.254.0.0/16 与 metadata 主机（`permission_denied`/`blocked_host`）；query 行合并（禁用行跳过、保留 URL 原有参数）；header 名/值校验（禁 CRLF、禁 `host`/`content-length` 等 runtime 头、大小写不敏感查重、保留原大小写）；bearer/basic/api-key（header 或 query；显式 `Authorization` 冲突报 `invalid_input`）；JSON（先 parse）/text/form/multipart 编码，multipart 用可注入 boundary、base64 严格校验、文件 ≤ 4 MiB；GET/HEAD 禁 body；timeout 100 ms–300 s、maxRedirects 0–10、响应上限 1 KiB–16 MiB。
+- 执行（`src/host/api/executor.ts`）：超时与调用方 `AbortSignal` 共用一个 `AbortController`；`redirect: 'manual'` 手写跟随以记录 hop 并实现三种策略——`follow` 下 303→GET、301/302 的 POST→GET 并去掉 body 头、307/308 原样重发；`manual` 停在 3xx；`error` 抛 `redirect_not_allowed`；超 `maxRedirects` 抛 `too_many_redirects`；跳到非 http(s)/metadata 抛 `blocked_redirect`。响应体流式读取，超过 `maxResponseBytes` 立即截断并 `reader.cancel()` 释放连接；响应头经 `redactHeaders`；错误映射 `timeout` / `network_error{cancelled|request_failed|invalid_redirect}`，只附 undici cause code，不回显请求内容。
+- 验证：`pnpm typecheck` 0 error；`pnpm test` 62 文件 / **567 用例**（新增 `tests/unit/http-executor/` 2 文件 / 34 用例，executor 跑真实 `node:http` echo server）；`pnpm build` host 221.1 / client 210.7 KiB；`pnpm test:e2e` 9/9。
+- 设计取舍：跨源重定向保留 `Authorization`（与 curl/Postman 一致，未做浏览器式剥离）；文本一律按 UTF-8 解码，不解析 charset；结果带截断后的 base64（≤16 MiB），二进制预览/下载留给 T039/T040；`fetchImpl`/`now`/`boundary` 只作测试注入点。
+- 遗留：尚未注册 `api.http.send` 一元方法与 UI（T038 接）；`api-workbench` 模块尚无 `ApiService` 聚合（T037/T038 落位）。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -810,6 +820,7 @@ pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 - 配置存储：`src/host/studio/store.ts`、`tests/unit/studio-store.test.ts`。
 - 标注存储：`src/host/inspect/annotation-store.ts`、`src/contracts/annotation.ts`、`tests/unit/annotation/annotation-store.test.ts`、`tests/unit/contracts/annotation.test.ts`。
 - Composer handoff：`src/client/inspect/handoff.ts`、`tests/component/annotation/composer-handoff.test.tsx`、`.tmp/logs/t032-{web,desktop}.json`。
+- HTTP 执行器：`src/contracts/api.ts`、`src/host/api/{request,executor}.ts`、`tests/unit/http-executor/{request,executor}.test.ts`。
 - Web 预览：`src/host/targets/web/{adapter,launch}.ts`、`tests/integration/web-adapter/`、`tests/helpers/png.ts`。
 - 预览生命周期：`src/host/preview/session.ts`、`src/client/preview/{Toolbar.tsx,lifecycle.ts,local-url.ts}`、`tests/integration/preview/session-lifecycle.test.ts`、`.tmp/logs/t025-{host,desktop}.json`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。
