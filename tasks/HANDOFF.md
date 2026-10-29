@@ -171,7 +171,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 - 修复：`src/host/inspect/inject.ts` 加 `Page.enable`（在 `Runtime.addBinding` 前）、监听 `Page.frameNavigated` 只在顶层帧复位 `activeNow`、`activate()` 缺脚本时就地重装一次再重试；`src/client/inspect/Picker.tsx` 在 `enabled` 变 false 时清零 `dismissedSeq`。
 - 验证：`pnpm typecheck` 0 error；`pnpm test` 60 文件 / 533 用例（532 通过，1 个已知环境误报 `picker-edge.test.ts` 的 Edge 残留断言看到用户 4317 预览）；`pnpm build` host 201.1 / client 210.7 KiB；`pnpm test:e2e` 9/9；真实载体 `.tmp/logs/verify-pick-recovery.json` `ok:true`（基线 / 页面 reload / 页面导航 / 死页回活 / 停止再启动 均能拾取，0 console error）。
 - 注意：用户当前运行的 DSH（4317）需**重启**才会载入新 `lib/*`。
-- 提交 `1013714`（U03）；**未合并 `main`**、未推送。
+- 提交 `f04dd29`（U03）；**未合并 `main`**、未推送。
 
 ### T026 遗留
 
