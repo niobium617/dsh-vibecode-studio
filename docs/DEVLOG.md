@@ -701,6 +701,18 @@
 - 报告：`spikes/s7/REPORT.md`，含依赖调研（`@apidevtools/swagger-parser` MIT、`json-schema-ref-parser` MIT、`yaml` ISC）与 T042 实现建议（解析/抓取分离、懒解引用、默认零联网、硬上限）。
 - 限制：只支持 JSON；DNS 解析后的 IP 未二次校验；未覆盖 callbacks/webhooks、OpenAPI 3.1 联合类型、本地多文件 ref。
 
+### T042 — OpenAPI 导入（2026-10-29，`task/m4-api-workbench`）
+
+- 目标：Swagger 2.0/OpenAPI 3.x → 可保存的集合；tag 分组、示例 body、远程 `$ref` 限制、端点上限、循环 ref 不崩。
+- 结构：`src/host/api/openapi/parser.ts`（形状校验、操作清点、结构 `$ref` 扫描，零 I/O）→ `resolver.ts`（`resolveRemotePolicy` → `bundleRemoteRefs` → 懒解引用，SSRF 唯一闸门）→ `mapper.ts`（示例生成、参数/认证/体映射、`importOpenApi` 管道）。依赖方向 parser ← resolver ← mapper，无环。
+- 映射：path 参数 → `{{name}}`；可选 query/header/form 行 `enabled:false`；cookie 参数、GET/HEAD body、禁用 header 只记警告；server 变量代入默认值，缺失 server → `{{baseUrl}}` 前缀（相对 server 也走同一前缀）；auth 生成 `{{scheme}}` / `{{schemeUser}}` / `{{schemePassword}}` 占位符；每个请求先过真实 `isHttpRequestSpec`，不合格计入 `skipped` 而不返回半成品。
+- 规模：500 端点（100 路径 × 5 方法）导入 < 5 s（实测约 1 s 内，含 500 次契约校验），500/500 有效、0 skipped、10 组；`ApiCollectionStore.save` 后 `read` 深度相等，占位符未被脱敏。
+- 上限：文档 8 MiB、1000 操作、结构遍历 128 层 / 50 万节点、`$ref` 链 32；远程 10 文档 × 1 MiB、单文档 5 s 超时；示例体 4 KiB / 文档总预算 512 KiB（超出记 `example_budget_exceeded` 并降级 none）。
+- 循环：别名环在映射时降级 `body none` 并保留 `ref_cycle:` 警告；`resolveRef` 直接调用抛 `ref_cycle`；自引用展开一层后停，互引用 A↔B 有界（`{"b":{}}`），体 < 4 KiB。
+- 远程：默认公网 ref `remote_ref_blocked` 且 0 fetch；loopback 需 `allowLoopback`；同文档去重；302 `remote_ref_redirect`；`maxBytes` 超限 `remote_ref_too_large`；嵌套 ref 同一策略；元数据地址即使显式列 origin 也拒绝；相对 ref 拒绝。
+- 契约配套：脱敏保留整值 `{{placeholder}}`（header/query/auth/JSON/URL），`new URL()` 的 `%7B%7Bname%7D%7D` 还原为 `{{name}}`；集合文件上限 256 KiB → 2 MiB；单 tag 超过 200 请求拆成 `tag`、`tag (2)` 文件夹。
+- 验证：`pnpm typecheck` 0；`pnpm exec vitest run tests/integration/openapi` 5 文件 / 36 用例；`pnpm test` 79 / 702；`pnpm build` host 257.1 / client 279.0 KiB；`pnpm test:e2e` 9/9。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -821,6 +833,13 @@
 5. **`pnpm test -- <path>` 在本仓库不过滤**：`--` 之后的路径会被当成重复参数，vitest 仍跑全量。只跑目录用 `pnpm exec vitest run <path>`（HANDOFF §9 已记录，T031 再次踩到）。
 6. **闭环入口要放在用户动作的落点**：预览页签与标注页签互斥，保存通知是唯一“刚发生且可见”的位置；把“发送到对话”放在通知里，动作从 4–5 个压到 3 个（点元素 → 保存 → 发送）。G3 初评的“≤3 步”失败正是因为入口藏在另一个页签。发送规则（成功才出队、失败保留草稿、无消息回退剪贴板文案）抽成 `sendQueuedAnnotation` 供队列与通知共用，避免两处行为漂移；通知用 `key={annotation.id}` 重置本地发送状态，防止上一条的结果串到下一条。
 
+### OpenAPI 导入 / 契约
+
+1. **`new URL()` 会编码占位符**：`https://api.example.com/pets/{{petId}}` 序列化后变成 `%7B%7BpetId%7D%7D`（路径与 `URLSearchParams` 都会），保存后环境解析器再也找不到变量。`redactUrl` 在返回前把 `%7B%7B<name>%7D%7D` 还原为 `{{name}}`，并对“整值都是占位符”的敏感字段跳过掩码；混合值（`Bearer {{token}}`）仍按原规则脱敏。
+2. **集合条目上限会挡住大文档**：`API_COLLECTION_ITEMS_MAX = 200` 是每个文件夹的上限，500 端点集中在单 tag 时直接 `isApiCollection` 失败。导入器按 200 拆成 `tag`、`tag (2)` 文件夹；`API_COLLECTION_FILE_BYTES_MAX` 同步从 256 KiB 提到 2 MiB，否则 500 端点美化 JSON 装不下。
+3. **示例数据里的 `$ref` 不是引用**：`example`/`default`/`enum`/`const`/`examples[*].value`/`x-*` 下的 `$ref` 是字面数据，扫描时切到 `example` 模式，既不解析也不抓取；`examples` 映射的条目对象保留 doc 模式（条目本身可 `$ref`），只把 `value` 当数据。这条来自 S7 spike 的 bug 修复，T042 已带进产品。
+4. **映射期错误要降级为警告**：单个参数/auth/示例的 `$ref` 坏掉不应让 500 端点导入整体失败；`mapBody`/`collectParameters`/`mapAuth` 捕获 `OpenApiError` 记 `${code}: ${message}`，只有文档级问题（JSON、版本、操作数、远程策略）才抛出。测试同时覆盖两种路径。
+
 ## 4. 已改变的计划假设
 
 | 决策 | 原假设 | 当前结论 | 证据 |
@@ -894,6 +913,7 @@ pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 - 集合与历史：`src/contracts/api.ts`（集合/历史模型与 `redactHttpRequest`）、`src/host/api/{store-files,collection-store,history-store}.ts`、`tests/unit/api-store/`。
 - 请求构建：`src/host/api/service.ts`、`src/client/api/{request-model.ts,RequestForm.tsx,RequestBuilder.tsx}`、`tests/unit/api-send/`、`tests/component/api-request/`。
 - 响应查看：`src/client/api/{ResponseView,ResponseHeaders}.tsx`、`tests/component/api-response/`、`.tmp/logs/t039-web.json`、`.tmp/t039-manual.mjs`。
+- OpenAPI 导入：`src/host/api/openapi/{parser,resolver,mapper}.ts`、`tests/integration/openapi/`、[S7 报告](../spikes/s7/REPORT.md)。
 - Web 预览：`src/host/targets/web/{adapter,launch}.ts`、`tests/integration/web-adapter/`、`tests/helpers/png.ts`。
 - 预览生命周期：`src/host/preview/session.ts`、`src/client/preview/{Toolbar.tsx,lifecycle.ts,local-url.ts}`、`tests/integration/preview/session-lifecycle.test.ts`、`.tmp/logs/t025-{host,desktop}.json`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。

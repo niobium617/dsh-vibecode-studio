@@ -549,12 +549,21 @@
   - Swagger 2.0 冒烟：host/basePath/schemes + body 参数 + basic auth，3/3 有效。
   - 报告：`spikes/s7/REPORT.md` 含环境/耗时/映射/SSRF/循环/失败路径/依赖调研（swagger-parser MIT、json-schema-ref-parser MIT、yaml ISC）与 T042 实现建议。
 
-### - [ ] T042 OpenAPI 导入
+### - [x] T042 OpenAPI 导入
 
 - **目标**：Swagger 2.0/OpenAPI 3.x；tag 分组；示例 body；远程 ref 限制；端点上限。
 - **验收**：500 端点可用；循环 ref 不崩；导入结果可保存；单测通过。
-- **验证**：`pnpm test -- tests/integration/openapi`。
+- **验证**：`pnpm exec vitest run tests/integration/openapi`（`pnpm test -- <path>` 不过滤）。
 - **文件**：`src/host/api/openapi/{parser,resolver,mapper}.ts`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 命令与结果：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/openapi` 5 文件 / 36 用例全通过；`pnpm test` 79 文件 / 702 用例全通过（首次全量跑时 `api-rich-response` 的 4000 节点用例 5.6 s 超时，单独重跑 17/17 通过，再跑全量全绿，判定为并行负载抖动）；`pnpm build` host 257.1 KiB / client 279.0 KiB；`pnpm test:e2e` 9/9。
+  - 结构：`parser` 只做形状检查/操作清点/结构 `$ref` 扫描，不做 I/O；`resolver` 先 `resolveRemotePolicy` 再 `bundleRemoteRefs`（默认 0 fetch），`OpenApiRefResolver` 懒解引用；`mapper` 生成示例并逐条 `isHttpRequestSpec` 校验，最后 `isApiCollection` 兜底。
+  - 映射：OpenAPI 3.x tag → 文件夹、path 参数 → `{{name}}`、可选行 `enabled:false`、cookie/GET body/禁用 header 只警告不失败、auth → `{{scheme}}` 占位符；Swagger 2.0 host/basePath/schemes、body/formData、basic/apiKey 均覆盖；缺 server → `{{baseUrl}}` 前缀。
+  - 远程：默认公网 ref `remote_ref_blocked` 且 fetch 0 次；loopback 需 `allowLoopback`；同文档去重 1 次；302 `remote_ref_redirect`；`maxBytes` 超限 `remote_ref_too_large`；嵌套 ref 走同一策略；元数据地址即使显式允许也拒绝；相对 ref 拒绝；缺失 fragment `ref_unresolved`。
+  - 循环：别名环映射时降级 `body none` 并保留 `ref_cycle:` 警告，`resolveRef` 直接调用抛 `ref_cycle`；自引用 schema 展开一层后停（`{"id":"string","child":{"id":"string"}}`），互引用 A↔B 有界（`{"b":{}}`），体 < 4 KiB。
+  - 规模/保存：500 端点（100 路径 × 5 方法）导入 < 5 s、500/500 契约有效、0 skipped、10 组；`ApiCollectionStore.save` 后 `read` 与原结果深度相等（占位符未被脱敏）。
+  - 上限：1001 操作 `too_many_operations`；单 tag 250 端点拆成 200 + 50 两个文件夹（`one`、`one (2)`）以满足 `API_COLLECTION_ITEMS_MAX`；集合文件上限由 256 KiB 提到 2 MiB。
+  - 配套契约改动：脱敏保留整值 `{{placeholder}}`（header/query/auth/JSON/URL，URL 里 `%7B%7Bname%7D%7D` 还原为 `{{name}}`），新增 1 条单测；`tests/unit/api-store/collection-store.test.ts` 的超限样例改为 2.5 MiB。
 
 ### - [ ] T043 抓包回放
 

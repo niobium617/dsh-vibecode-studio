@@ -150,7 +150,8 @@ describe('ApiCollectionStore', () => {
         {
           id: 'huge',
           name: 'Huge',
-          request: spec({ body: { kind: 'text', text: 'x'.repeat(300 * 1024) } }),
+          // The cap is 2 MiB since T042; stay clearly above it.
+          request: spec({ body: { kind: 'text', text: 'x'.repeat(2.5 * 1024 * 1024) } }),
         },
       ],
     })

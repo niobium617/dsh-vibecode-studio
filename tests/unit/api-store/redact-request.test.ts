@@ -98,6 +98,30 @@ describe('redactHttpRequest', () => {
     })
   })
 
+  it('keeps values that are only a {{placeholder}} so imported requests stay reusable', () => {
+    const result = redactHttpRequest(
+      spec({
+        url: 'https://api.example.com/v1?api_key={{apiKey}}',
+        headers: [{ name: 'Authorization', value: '{{token}}' }],
+        query: [{ name: 'token', value: '{{token}}' }],
+        body: { kind: 'json', text: JSON.stringify({ password: '{{password}}', token: SECRET }) },
+        auth: { kind: 'bearer', token: '{{token}}' },
+      }),
+    )
+    expect(result.headers).toEqual([{ name: 'Authorization', value: '{{token}}' }])
+    expect(result.query).toEqual([{ name: 'token', value: '{{token}}' }])
+    expect(result.url).toContain('api_key={{apiKey}}')
+    expect(result.body).toEqual({
+      kind: 'json',
+      text: JSON.stringify({ password: '{{password}}', token: REDACTED }),
+    })
+    expect(result.auth).toEqual({ kind: 'bearer', token: '{{token}}' })
+
+    // Only a value that is entirely a placeholder is exempt.
+    const mixed = redactHttpRequest(spec({ headers: [{ name: 'Authorization', value: 'Bearer {{token}}' }] }))
+    expect(mixed.headers).toEqual([{ name: 'Authorization', value: REDACTED }])
+  })
+
   it('keeps the result a valid request and free of plaintext secrets', () => {
     const result = redactHttpRequest(
       spec({

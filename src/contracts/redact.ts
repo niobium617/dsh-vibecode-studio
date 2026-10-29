@@ -8,6 +8,32 @@ export const REDACTED = 'REDACTED'
 const SENSITIVE_KEY_PATTERN =
   /authorization|cookie|token|secret|password|passwd|api[-_]?key|credential|private[-_]?key/i
 
+/**
+ * A value that is entirely a `{{variable}}` placeholder carries no secret, so
+ * redaction keeps it: imported requests (T042) are only reusable if their
+ * placeholders survive a save.
+ */
+const PLACEHOLDER_PATTERN = /^\{\{[A-Za-z_][A-Za-z0-9_.-]*\}\}$/
+
+export function isPlaceholderValue(value: string): boolean {
+  return PLACEHOLDER_PATTERN.test(value)
+}
+
+/**
+ * `new URL()` percent-encodes `{` and `}`, which would turn a saved
+ * `{{petId}}` into `%7B%7BpetId%7D%7D` and stop the env resolver from finding
+ * it. Restore just the placeholder sequences.
+ */
+const ENCODED_PLACEHOLDER_PATTERN = /%7B%7B([A-Za-z_][A-Za-z0-9_.-]*)%7D%7D/gi
+
+function restorePlaceholders(value: string): string {
+  return value.replace(ENCODED_PLACEHOLDER_PATTERN, '{{$1}}')
+}
+
+function maskSensitive(key: string, value: string): string {
+  return isSensitiveKey(key) && !isPlaceholderValue(value) ? REDACTED : value
+}
+
 export function isSensitiveKey(key: string): boolean {
   return SENSITIVE_KEY_PATTERN.test(key)
 }
@@ -15,7 +41,7 @@ export function isSensitiveKey(key: string): boolean {
 export function redactHeaders(headers: Readonly<Record<string, string>>): Record<string, string> {
   const result: Record<string, string> = {}
   for (const [key, value] of Object.entries(headers)) {
-    result[key] = isSensitiveKey(key) ? REDACTED : value
+    result[key] = maskSensitive(key, value)
   }
   return result
 }
@@ -35,10 +61,10 @@ export function redactUrl(value: string): string {
 
   const params = new URLSearchParams()
   for (const [key, entry] of url.searchParams) {
-    params.append(key, isSensitiveKey(key) ? REDACTED : entry)
+    params.append(key, maskSensitive(key, entry))
   }
   url.search = params.toString()
-  return url.toString()
+  return restorePlaceholders(url.toString())
 }
 
 export function redactJsonBody(value: unknown, depth = 0): unknown {
@@ -49,7 +75,12 @@ export function redactJsonBody(value: unknown, depth = 0): unknown {
   if (value !== null && typeof value === 'object') {
     const result: Record<string, unknown> = {}
     for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
-      result[key] = isSensitiveKey(key) ? REDACTED : redactJsonBody(entry, depth + 1)
+      result[key] =
+        typeof entry === 'string'
+          ? maskSensitive(key, entry)
+          : isSensitiveKey(key)
+            ? REDACTED
+            : redactJsonBody(entry, depth + 1)
     }
     return result
   }

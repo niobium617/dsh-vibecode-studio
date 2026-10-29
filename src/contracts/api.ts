@@ -6,7 +6,7 @@
  * base64 and every size is a byte count. The host normalizes and executes a
  * request; the panel only builds this shape and renders the result.
  */
-import { REDACTED, isSensitiveKey, redactJsonBody, redactUrl } from './redact'
+import { REDACTED, isPlaceholderValue, isSensitiveKey, redactJsonBody, redactUrl } from './redact'
 
 export const HTTP_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const
 export type HttpMethod = (typeof HTTP_METHODS)[number]
@@ -337,7 +337,9 @@ export const API_HTTP_SEND_METHOD = 'api.http.send'
 export const API_STORE_ID_PATTERN = '[A-Za-z0-9][A-Za-z0-9._-]{0,63}'
 export const API_NAME_CHARS_MAX = 200
 export const API_COLLECTION_ITEMS_MAX = 200
-export const API_COLLECTION_FILE_BYTES_MAX = 256 * 1024
+// Raised for OpenAPI imports (T042): 500 mapped endpoints with example bodies
+// exceed 256 KiB, and the importer budgets bodies well below this cap.
+export const API_COLLECTION_FILE_BYTES_MAX = 2 * 1024 * 1024
 export const API_HISTORY_FILE_BYTES_MAX = 1024 * 1024
 export const API_HISTORY_ENTRIES_MAX = 200
 export const API_HISTORY_QUERY_CHARS_MAX = 200
@@ -452,12 +454,20 @@ export function isApiHistoryQuery(value: unknown): value is ApiHistoryQuery {
   )
 }
 
-/** Sensitive row values become `REDACTED`; the row itself is kept visible. */
+/**
+ * Sensitive row values become `REDACTED`; the row itself is kept visible. A
+ * value that is only a `{{placeholder}}` is kept so imported requests still
+ * resolve against the environment after a save.
+ */
 function redactRows(
   rows: readonly HttpKeyValue[] | undefined,
 ): readonly HttpKeyValue[] | undefined {
   if (rows === undefined) return undefined
-  return rows.map((row) => (isSensitiveKey(row.name) ? { ...row, value: REDACTED } : { ...row }))
+  return rows.map((row) =>
+    isSensitiveKey(row.name) && !isPlaceholderValue(row.value)
+      ? { ...row, value: REDACTED }
+      : { ...row },
+  )
 }
 
 /** Re-serializes a JSON body with sensitive keys masked, when it parses. */
@@ -500,12 +510,24 @@ function redactAuth(auth: HttpAuth | undefined): HttpAuth | undefined {
     case 'none':
       return { kind: 'none' }
     case 'bearer':
-      return { kind: 'bearer', token: REDACTED }
+      return {
+        kind: 'bearer',
+        token: isPlaceholderValue(auth.token) ? auth.token : REDACTED,
+      }
     case 'basic':
       // The username identifies the account; the password is the secret.
-      return { kind: 'basic', username: auth.username, password: REDACTED }
+      return {
+        kind: 'basic',
+        username: auth.username,
+        password: isPlaceholderValue(auth.password) ? auth.password : REDACTED,
+      }
     case 'api-key':
-      return { kind: 'api-key', name: auth.name, value: REDACTED, in: auth.in }
+      return {
+        kind: 'api-key',
+        name: auth.name,
+        value: isPlaceholderValue(auth.value) ? auth.value : REDACTED,
+        in: auth.in,
+      }
   }
 }
 
