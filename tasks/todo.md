@@ -624,6 +624,14 @@
   - ❌ **密钥不泄漏**：bearer/basic/header api-key 正常（响应不含密钥、历史/集合落盘不含密钥、环境视图不含密钥、字面量落盘为 `REDACTED`、历史保留 `{{token}}`），但 **query 场景泄漏**：`api-key in=query` 与普通 `{{token}}` query 变量都会把解析后的密钥拼进最终 URL，`api.http.send` 返回的 `result.url`（以及重定向 hop 的 `url`/`location`）原样带回客户端。证据：`flows.queryKey.sent.url=/query-key?api_key=g4-secret-abc123`、`flows.queryVar.sent.url=/query-var?token=g4-secret-abc123`，两者 `outcomeHasSecret:true`。根因：`src/host/api/request.ts:190` 把 auth 值 append 到 URL、`:128` append query 行，`:349` 返回拼好的 `url`；`src/host/api/executor.ts:303-304` 原样返回 `url` 与 `redirects`；`src/host/api/service.ts:170` 未脱敏就返回。与 T038“解析后的密钥不进响应”的约定冲突；现有 `tests/unit/api-send/api-service.test.ts` 只覆盖 bearer header，未覆盖 query secret。
   - **SPEC 矩阵**：FR-API-01/02/03/09/10/12 通过；FR-API-11 按 D8 延后（手动 Cookie header 可用）；FR-API-04 部分——展开与未解析提示可用，但 `EnvironmentEditor` 从未挂载、客户端从不提交 `environment`，没有变量值来源与持久化；FR-API-05 部分——保存/重开/删除/持久化可用，无改名，`duplicate` 只在 store 层、无 unary/UI；FR-API-06 部分——搜索/重开/清空可用，N 固定 200 不可配置；FR-API-07 **未实现**（repo 无 cURL 导入/导出，MUST）；FR-API-08 部分——mapper 可用但无入口（MUST）。
   - **结论：NO-GO**。3 项专项验收 1 项通过、1 项仅模块级、1 项失败；SPEC 有 1 个 MUST 完全缺失（FR-API-07）、4 个 MUST 部分缺失（FR-API-04/05/06/08）。待用户选择返工范围后另开任务并复评；本节保持未勾选。
+- **返工计划（用户已选“补齐全部 M4 缺口”，2026-10-30）**：
+  - [x] **R1 密钥回传修复**：`resolveHttpRequest` 新增 host-only `secretValues`；新增 `src/host/api/result-redaction.ts`，`api.http.send` 返回前清洗 `result.url` 与每个重定向 hop 的 `url`/`location`（精确值 + percent-encoded + `+` 空格形式，再套 `redactUrl` 兜底字面量敏感键）；断言仍对真实响应求值。验证：`pnpm typecheck` 0；`pnpm test` 90 文件 / 806 用例通过；`pnpm build` host 280.4 / client 349.4 KiB；`.tmp/g4/evidence.ts` 复跑 `ok:true`，三条 flow 均 `outcomeHasSecret:false`。提交 `3195a85`。
+  - [ ] **R2 FR-API-07 cURL 导入/导出**：纯函数 parser/exporter + unary 或前端本地转换 + UI 入口；覆盖 `-X/-H/-d/--data-raw/-u/--url/-F` 与 `--compressed` 等常见参数；未知参数报可读错误；测试含往返。
+  - [ ] **R3 FR-API-08 导入入口**：unary `api.openapi.import` + UI（粘贴/选文件），保存为集合；解决 unary 64 KiB 上限（按格式定上限或提示超限），保留 tag 分组/示例。
+  - [ ] **R4 FR-API-04 环境编辑与持久化**：`.vibe/api/environments` 存储、`api.env.*` unary、发送时携带 `environmentId`、挂载 `EnvironmentEditor`；密钥只存引用并显示 configured。
+  - [ ] **R5 FR-API-05 集合改名/复制**：store rename + unary + UI；复制沿用现有 `duplicate`。
+  - [ ] **R6 FR-API-06 历史 N 可配置**：查询参数/UI 选择器，默认 50、封顶 200。
+  - [ ] **R7 G4 复评**：重跑四类基线 + 真实载体闭环/导入/密钥证据；更新本段、HANDOFF、DEVLOG；通过后勾选 T046。
 
 ---
 
