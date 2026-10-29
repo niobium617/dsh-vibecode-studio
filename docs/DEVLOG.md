@@ -676,6 +676,19 @@
 - 设计取舍：10 MB 验收在视图层用组件测试证明（真实端点会先被执行器 `maxResponseBytes` 默认 4 MiB 截断），手动检查同时验证了截断提示不会骗人。分页按字符切，超长单行会跨页断开——比一次性塞进 DOM 更可接受。
 - 限制：二进制/HTML/图片预览与下载是 T040；响应体上限仍由执行器决定；分页无“跳到第 n 页”输入。
 
+### T040 — 富响应体（2026-10-29，`task/m4-api-workbench`）
+
+- 目标：JSON 改为可折叠树、HTML 进沙箱 iframe、图片按 base64 内联、任意二进制可下载，全部带深度/节点上限。
+- `src/client/api/JsonTree.tsx`：`buildJsonTree(value, {maxNodes, maxDepth})` 先建有限模型再渲染，`JSON_TREE_MAX_NODES = 2000`、`JSON_TREE_MAX_DEPTH = 16`、`JSON_TREE_INITIAL_DEPTH = 2`；超预算置 `truncated`，触顶深度返回 `deep: true` + `omitted` 并置 `depthLimited`，两者都有独立说明行而不是静默丢数据。值只用 React 文本节点输出（`"<img ...>"` 原样显示），展开状态按路径存 `overrides`，`text` 变化时清空。`JsonContainer`/`JsonScalar` 拆开是因为判别式 `'object' | 'array'` 的联合成员无法用 `!== 'object' && !== 'array'` 收窄，改用 `isContainer` 守卫。
+- `src/client/api/HtmlPreview.tsx`：`<iframe sandbox="" srcDoc={html}>` + `csp="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:"`（`@types/react` 没有 `csp`，用 ref 设属性）。沙箱化后脚本、表单、弹窗与外网请求全部失效，HTML 永远不进面板文档。
+- `src/client/api/ImagePreview.tsx`：只认 8 种图片 MIME，`data:<type>;base64,...` 交给浏览器解码；SVG 落在 `<img>` 里也不会执行脚本。类型不在白名单时显示说明而不是坏图。
+- `ResponseView.tsx` 集成：默认模式按内容开箱——JSON → `tree`、HTML → `html`、其余 `raw`；JSON 额外给 `pretty` 文本视图，HTML 给 `raw` 以便看源码。二进制分支优先内联图片（仅当未截断且 base64 非空），否则显示大小说明；任何有 base64 的二进制都给“下载”按钮，`downloadResponseBody` 用 `Blob` + 对象 URL + `<a download>`，扩展名按 MIME 映射，点击后 `revokeObjectURL`。
+- 文案：新增 9 个 `api.response.*` 键（`mode.tree`、`mode.html`、`tree.truncated`、`tree.depth`、`tree.invalid`、`html.sandbox`、`download`、`image.alt`、`image.unsupported`），中英同步；`api.response.binary` 从“暂不支持预览”改为“该类型暂无内联预览”，因为图片现在能预览。
+- 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/component/api-rich-response tests/component/api-response tests/component/api-request` 4 文件 / 43 用例；`pnpm test` **74 文件 / 665 用例**（基线 73 / 647）；`pnpm build` host 256.3 / client 279.0 KiB；`pnpm test:e2e` 9/9。新增 `tests/component/api-rich-response/rich-response.test.tsx` 17 用例（节点/深度上限、默认折叠与展开、字符串不当 HTML、无效 JSON、zh-CN、iframe `sandbox=""`+CSP+srcdoc、`window.__xss` 未执行、data URI 与白名单、扩展名映射、Blob 字节与文件名、空体不下载、ResponseView 的 HTML/图片/PDF 集成）；T039 的默认模式断言改成“默认树 + 点美化看 `<pre>`”。
+- 手动（真实载体）：`.tmp/t040-manual.mjs` — dsh `vibe-dev` + 无头 Edge，本地服务提供 `/json`、`/html`（含 `<script>window.__xss=1</script>`）、`/png`（1×1 PNG）、`/pdf`。结果 `.tmp/logs/t040-web.json` `ok:true`：JSON 默认树、4 个折叠开关、展开后 `admin` 出现；iframe `sandbox=""`、CSP 正确、`srcdoc` 含脚本但 `window.__xss` 仍为 undefined、面板文本不含 `<h1>`、切 raw 能看到脚本源码；图片 `naturalWidth/Height = 1`、`src` 为 `data:image/png;base64,`；PDF 下载文件名 `response.pdf`、流式读取 59 B 与服务端一致；0 其他控制台错误。
+- 设计取舍：节点/深度双上限而不是只限深度——一个 2000 键的对象同样能拖垮渲染；截断时显示计数而不是“静默省略”。被截断的图片不做内联预览，因为半个 PNG 只会显示坏图，下载按钮仍可用。CSP 拒绝没有产生控制台错误（headless Edge 不记录），所以 XSS 验收以 `sandbox` 属性 + `window.__xss` 未定义 + 面板 DOM 不含脚本三点为准。
+- 限制：下载走整段 base64 → `atob` → `Uint8Array`，上限仍由执行器 4 MiB（base64 ≤ 16 MiB 契约）决定，大文件需专门通道；图片预览只按 MIME 判断，不校验文件头；HTML 预览固定 280 px 高、无“在新标签打开”。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体

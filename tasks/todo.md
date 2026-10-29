@@ -519,12 +519,19 @@
   - 修复（手动启动发现）：`apply()` 直接读 `ctx.credentials` 但 `inject` 只声明 `connection`，Cordis 拒绝未声明服务访问，导致插件在真实 carrier 中 `cannot get property "credentials" without inject` 完全不激活（单测用裸 ctx 无法覆盖）。`src/host/index.ts` 改为 `export const inject = ['connection', 'credentials']` 后启动无告警；重跑 typecheck / 647 用例 / e2e 9/9 全绿。
   - 限制：二进制、HTML、图片预览与下载是 T040；响应体仍受执行器 `maxResponseBytes`（默认 4 MiB）截断；分页按字符切分，超长单行会跨页断开。
 
-### - [ ] T040 富响应体（JSON 树/HTML/图片/二进制）
+### - [x] T040 富响应体（JSON 树/HTML/图片/二进制）
 
 - **目标**：可折叠 JSON 树、HTML 沙箱 iframe、图片预览、二进制下载；深度/节点上限。
 - **验收**：XSS 沙箱；大 JSON 不卡；图片正确；组件测试。
 - **验证**：`pnpm test -- tests/component/api-rich-response` + 手动。
 - **文件**：`src/client/api/{JsonTree,HtmlPreview,ImagePreview}.tsx`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 组件：`JsonTree.tsx`（`buildJsonTree` 先建有限模型：`JSON_TREE_MAX_NODES = 2000`、`JSON_TREE_MAX_DEPTH = 16`、`JSON_TREE_INITIAL_DEPTH = 2`；超预算 `truncated`、触顶 `deep`+`omitted`+`depthLimited` 各有说明行；值只走 React 文本节点，`text` 变化重置展开状态）；`HtmlPreview.tsx`（`sandbox=""` + `csp="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:"`，`csp` 因缺类型用 ref 设属性）；`ImagePreview.tsx`（8 种图片 MIME 白名单 → `data:` URI，`<img>` 内 SVG 不执行脚本）。
+  - `ResponseView.tsx` 集成：默认模式 JSON→`tree`、HTML→`html`、其余 `raw`；JSON 额外 `pretty`/`raw`，HTML 额外 `raw`；二进制优先内联图片（仅未截断且 base64 非空），否则大小说明；有 base64 即可下载（`Blob` + 对象 URL + `<a download>`，MIME→扩展名，点击后 revoke）。新增 9 个 `api.response.*` 键（中英同步），`api.response.binary` 文案改为“该类型暂无内联预览”。
+  - 验收对应：`tests/component/api-rich-response/rich-response.test.tsx` 17 用例（节点/深度上限、初始折叠与展开、字符串不当 HTML、无效 JSON、zh-CN、iframe `sandbox=""`+CSP+srcdoc、`window.__xss` 未执行、data URI 与白名单、扩展名映射、Blob 字节/文件名、空体不下载、HTML/图片/PDF 集成）；T039 默认模式断言改为“默认树 + 点美化看 `<pre>`”。
+  - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/component/api-rich-response tests/component/api-response tests/component/api-request` 4 文件 / 43 用例；`pnpm test` 74 文件 / 665 用例（基线 73 / 647）；`pnpm build` host 256.3 / client 279.0 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t040-*.log`。
+  - 手动（真实载体）：`.tmp/t040-manual.mjs` — dsh `vibe-dev` + 无头 Edge，本地服务 `/json`、`/html`（内嵌 `<script>window.__xss=1</script>`）、`/png`（1×1）、`/pdf`。结果 `.tmp/logs/t040-web.json` **`ok:true`**：JSON 默认树、4 个折叠开关、展开后 `admin` 出现；iframe `sandbox=""` + CSP 正确、`srcdoc` 含脚本但 `window.__xss` 未定义、面板文本不含 `<h1>`、raw 可见源码；图片 `naturalWidth 1`；PDF 下载 `response.pdf` 59 B 与服务端一致；0 其他控制台错误。
+  - 限制：下载整段 base64 解码，尺寸仍受执行器 `maxResponseBytes`（默认 4 MiB）限制；图片只按 MIME 判断不校验文件头；HTML 预览固定 280 px 高。
 
 ### - [ ] T041 S7 OpenAPI spike [P]
 
