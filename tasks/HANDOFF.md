@@ -162,7 +162,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 - 结果：`AnnotationBubble` 三按钮序列 加入队列 / 发送到对话 / 取消（`data-vibe-bubble-send`，蓝色强调）；新增 `src/client/inspect/annotation-status.ts`（按标注 id 的模块级状态表 + `useSyncExternalStore`），`sendQueuedAnnotation` 成功/失败都写状态，`handleRemove`/编辑保存/历史删除清除状态；队列卡片与历史卡片都在“移除/删除”右侧内联显示同一状态；直接发送会先落盘历史再插入 composer 草稿（从不自动提交）；`History` 删除改为 `role="dialog"` 弹窗（Esc / 遮罩 / 取消退出，失败文本留在弹窗内，成功不留底部提示）。
 - 口径（按用户实测反馈修正）：发送成功即清除该标注在**两个列表**中的状态（`sendQueuedAnnotation` 成功分支 `clearAnnotationStatus`），发送结果只在气泡保存通知里显示；`annotation.history.deleted`/`gone` 两个 key 删除，两语均 185 key。
 - 验证（修正后复测）：`pnpm typecheck` 0 error；`pnpm test` 60 文件 / 527 用例通过（另 2 个 `edge.test.ts`/`picker-edge.test.ts` 的“无 Playwright Edge 残留”断言失败，原因是用户正在运行的 `vibe-dev`（4317）预览 Edge，父进程为该 DSH host，属已知环境误报）；`pnpm build` host 200.6 / client 210.7 KiB；`pnpm test:e2e` 9/9；真实载体 `.tmp/logs/u02-verify.json` `ok:true`（`historyStatusAfterSend: null`、`queueStatusAfterQueueSend: null`、`historyStatusAfterQueueSend: null`、`notAutoSent: true`），console 0，截图 `u02-01-bubble.png`、`u02-02-history-status.png`、`u02-03-delete-dialog.png`；脚本 `.tmp/u02-verify.mjs` 非产品代码。
-- 分支 `task/m3-ui-refine`（由 `main` 新建），提交 `0f3b909`；**未合并 `main`**、未推送。
+- 分支 `task/m3-ui-refine`（由 `main` 新建），提交 `0f3b909`（首版）+ `ac717bc`（发送后两边状态解除的修正）；**未合并 `main`**、未推送。
 
 ### T026 遗留
 
