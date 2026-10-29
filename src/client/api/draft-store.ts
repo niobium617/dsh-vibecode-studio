@@ -1,8 +1,9 @@
 /**
  * Draft hand-off between the API page panels (T044).
  *
- * Three places load a request into the builder without sending it: capture
- * replay (preview drawer), the collection tree and the history list. The T043
+ * Four places load a request into the builder without sending it: capture
+ * replay (preview drawer), the collection tree, the history list and a pasted
+ * cURL command (T046 R2). The T043
  * store was consumed only on builder mount, which was enough for a tab switch
  * from the preview page but could never reach a builder that is already on
  * screen — the tree and the builder share the API tab and stay mounted.
@@ -13,7 +14,7 @@
  */
 import type { ApiReplayResult, HttpRequestSpec } from '../../contracts/api'
 
-export type DraftSource = 'replay' | 'collection' | 'history'
+export type DraftSource = 'replay' | 'collection' | 'history' | 'curl'
 
 /** Replay keeps the T043 banner: capture warnings and confirmation context. */
 export interface PendingReplay {

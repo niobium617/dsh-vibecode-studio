@@ -25,6 +25,7 @@ import {
   type AssertionDraft,
   type AssertionIssue,
 } from './AssertionsEditor'
+import { CurlPanel } from './CurlPanel'
 import { RequestForm } from './RequestForm'
 import { ResponseView } from './ResponseView'
 import { registerDraftTarget, type PendingDraft } from './draft-store'
@@ -314,6 +315,18 @@ export function RequestBuilder({
       })
   }, [assertionDrafts, draft, onSent, sendImpl, sending])
 
+  // FR-API-07: a parsed command becomes a draft exactly like a saved request
+  // does — the form is filled, nothing is sent, and the notice says so.
+  const handleCurlImport = React.useCallback((spec: HttpRequestSpec): void => {
+    setDraft(draftFromRequestSpec(spec))
+    setIssues([])
+    setAssertionResults(null)
+    setAssertionIssues([])
+    setPhase({ kind: 'idle' })
+    setSaveState({ kind: 'idle' })
+    setPending({ spec, source: 'curl' })
+  }, [])
+
   const handleAssertionsChange = React.useCallback((next: readonly AssertionDraft[]): void => {
     setAssertionDrafts(next)
     setAssertionIssues([])
@@ -397,6 +410,13 @@ export function RequestBuilder({
         footer={footer}
       />
 
+      <CurlPanel
+        draft={draft}
+        onImport={handleCurlImport}
+        disabled={sending}
+        {...(locale === undefined ? {} : { locale })}
+      />
+
       <AssertionsEditor
         drafts={assertionDrafts}
         onChange={handleAssertionsChange}
@@ -453,7 +473,9 @@ export function RequestBuilder({
           <span style={noticeLineStyle}>
             {pending.source === 'history'
               ? t('api.request.loaded.history')
-              : t('api.request.loaded.saved')}
+              : pending.source === 'curl'
+                ? t('api.request.loaded.curl')
+                : t('api.request.loaded.saved')}
           </span>
           <button
             type="button"
