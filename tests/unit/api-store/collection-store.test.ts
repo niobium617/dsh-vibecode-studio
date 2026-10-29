@@ -182,6 +182,27 @@ describe('ApiCollectionStore', () => {
     expect(await store.read('weather-api')).toBeNull()
   })
 
+  it('renames in place and keeps every nested id', async () => {
+    await store.save(collectionFixture())
+    const renamed = await store.rename('weather-api', '  Forecast  ')
+    expect(renamed.id).toBe('weather-api')
+    expect(renamed.name).toBe('Forecast')
+    expect(renamed.requests?.map((request) => request.id)).toEqual(['list-items'])
+    expect(renamed.folders?.map((folder) => folder.id)).toEqual(['folder-1'])
+    expect((await store.read('weather-api'))?.name).toBe('Forecast')
+  })
+
+  it('refuses a blank rename and a missing collection', async () => {
+    await store.save(collectionFixture())
+    await expect(store.rename('weather-api', '   ')).rejects.toMatchObject({
+      code: 'invalid_data',
+    })
+    await expect(store.rename('missing', 'Forecast')).rejects.toMatchObject({
+      code: 'not_found',
+    })
+    expect((await store.read('weather-api'))?.name).toBe('Weather')
+  })
+
   it('treats unusable ids as absent', async () => {
     expect(await store.read('..')).toBeNull()
     expect(await store.remove('bad id')).toBe(false)

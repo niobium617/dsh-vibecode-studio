@@ -383,6 +383,18 @@ export const API_COLLECTION_LIST_METHOD = 'api.collection.list'
 export const API_COLLECTION_GET_METHOD = 'api.collection.get'
 export const API_COLLECTION_ADD_METHOD = 'api.collection.add'
 export const API_COLLECTION_REMOVE_METHOD = 'api.collection.remove'
+/**
+ * Renames a collection in place (T046 R5, FR-API-05). The id stays, so an
+ * expanded row, a saved draft and a history entry that point at it keep
+ * working; only the display name changes on disk.
+ */
+export const API_COLLECTION_RENAME_METHOD = 'api.collection.rename'
+/**
+ * Copies a collection under a fresh id and name (T046 R5, FR-API-05). Every
+ * request and folder in the copy gets a new id too, and the Host never
+ * overwrites an existing collection: a taken slug becomes `-2`, `-3`, …
+ */
+export const API_COLLECTION_DUPLICATE_METHOD = 'api.collection.duplicate'
 export const API_HISTORY_LIST_METHOD = 'api.history.list'
 export const API_HISTORY_CLEAR_METHOD = 'api.history.clear'
 /**
@@ -467,6 +479,14 @@ export interface ApiCollectionAddResult {
 
 export interface ApiCollectionRemoveResult {
   readonly removed: boolean
+}
+
+/**
+ * Result of `api.collection.rename` and `api.collection.duplicate`: the row the
+ * tree should now show. The name is the trimmed value that landed on disk.
+ */
+export interface ApiCollectionMutationResult {
+  readonly collection: ApiCollectionSummary
 }
 
 export interface ApiOpenApiImportParams {

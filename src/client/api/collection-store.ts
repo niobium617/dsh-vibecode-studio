@@ -13,13 +13,16 @@
 import * as React from 'react'
 import {
   API_COLLECTION_ADD_METHOD,
+  API_COLLECTION_DUPLICATE_METHOD,
   API_COLLECTION_GET_METHOD,
   API_COLLECTION_LIST_METHOD,
   API_COLLECTION_REMOVE_METHOD,
+  API_COLLECTION_RENAME_METHOD,
   API_NAME_CHARS_MAX,
   type ApiCollection,
   type ApiCollectionAddParams,
   type ApiCollectionAddResult,
+  type ApiCollectionMutationResult,
   type ApiCollectionRemoveResult,
   type ApiCollectionSummaries,
   type ApiCollectionSummary,
@@ -35,6 +38,8 @@ export interface ApiCollectionApi {
   read(id: string): Promise<ApiCollection>
   add(params: ApiCollectionAddParams): Promise<ApiCollectionAddResult>
   remove(id: string): Promise<ApiCollectionRemoveResult>
+  rename(id: string, name: string): Promise<ApiCollectionMutationResult>
+  duplicate(id: string, name?: string): Promise<ApiCollectionMutationResult>
 }
 
 /** Default transport-backed implementation; tests inject a fake. */
@@ -43,6 +48,13 @@ export const hostApiCollectionApi: ApiCollectionApi = {
   read: (id) => callUnary<ApiCollection>(API_COLLECTION_GET_METHOD, { id }),
   add: (params) => callUnary<ApiCollectionAddResult>(API_COLLECTION_ADD_METHOD, params),
   remove: (id) => callUnary<ApiCollectionRemoveResult>(API_COLLECTION_REMOVE_METHOD, { id }),
+  rename: (id, name) =>
+    callUnary<ApiCollectionMutationResult>(API_COLLECTION_RENAME_METHOD, { id, name }),
+  duplicate: (id, name) =>
+    callUnary<ApiCollectionMutationResult>(API_COLLECTION_DUPLICATE_METHOD, {
+      id,
+      ...(name === undefined ? {} : { name }),
+    }),
 }
 
 export type ApiCollectionStatus = 'idle' | 'loading' | 'ready' | 'error'
@@ -236,6 +248,33 @@ export async function revealCollection(id: string): Promise<void> {
   if (state.details[id] === undefined && state.detailStatus[id] === undefined) {
     await loadCollectionDetail(id)
   }
+}
+
+/**
+ * Renames one collection in place (FR-API-05). The id is unchanged, so the
+ * expanded row and its cached document stay put; only the row label changes.
+ * Rejects so the tree can report a failed rename instead of a silent success.
+ */
+export async function renameCollection(
+  id: string,
+  name: string,
+): Promise<ApiCollectionSummary> {
+  const result = await api.rename(id, name)
+  await loadCollections()
+  return result.collection
+}
+
+/**
+ * Copies one collection and reveals the copy (FR-API-05). The Host picks a
+ * fresh id; `revealCollection` refreshes the tree and opens the new row.
+ */
+export async function duplicateCollection(
+  id: string,
+  name?: string,
+): Promise<ApiCollectionMutationResult> {
+  const result = await api.duplicate(id, name)
+  await revealCollection(result.collection.id)
+  return result
 }
 
 /** Deletes one collection and forgets its cached document. */

@@ -50,6 +50,12 @@ function collectionApi(): ApiCollectionApi {
     read: vi.fn(async () => ({ id: 'pet-store', name: 'Pet Store', requests: [] })),
     add: vi.fn(async () => ({ collectionId: 'saved', requestId: 'row', requestCount: 1 })),
     remove: vi.fn(async () => ({ removed: true })),
+    rename: vi.fn(async (id: string, name: string) => ({
+      collection: { id, name, requestCount: 0, folderCount: 0 },
+    })),
+    duplicate: vi.fn(async (id: string) => ({
+      collection: { id: `${id}-copy`, name: 'Copy', requestCount: 0, folderCount: 0 },
+    })),
   }
 }
 

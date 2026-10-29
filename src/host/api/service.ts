@@ -20,7 +20,9 @@ import {
   API_COLLECTION_GET_METHOD,
   API_COLLECTION_LIST_METHOD,
   API_COLLECTION_ITEMS_MAX,
+  API_COLLECTION_DUPLICATE_METHOD,
   API_COLLECTION_REMOVE_METHOD,
+  API_COLLECTION_RENAME_METHOD,
   API_ENV_GET_METHOD,
   API_ENV_LIST_METHOD,
   API_ENV_REMOVE_METHOD,
@@ -41,6 +43,7 @@ import {
   type ApiCollection,
   type ApiCollectionAddParams,
   type ApiCollectionAddResult,
+  type ApiCollectionMutationResult,
   type ApiCollectionRemoveResult,
   type ApiCollectionSummaries,
   type ApiCollectionSummary,
@@ -76,9 +79,11 @@ import type { UnaryRegistry } from '../transport'
 
 export {
   API_COLLECTION_ADD_METHOD,
+  API_COLLECTION_DUPLICATE_METHOD,
   API_COLLECTION_GET_METHOD,
   API_COLLECTION_LIST_METHOD,
   API_COLLECTION_REMOVE_METHOD,
+  API_COLLECTION_RENAME_METHOD,
   API_ENV_GET_METHOD,
   API_ENV_LIST_METHOD,
   API_ENV_REMOVE_METHOD,
@@ -303,6 +308,40 @@ export class ApiService {
     const id = collectionIdOf(params, 'api.collection.remove')
     const removed = await this.withCollections((store) => store.remove(id))
     return { removed }
+  }
+
+  /**
+   * Renames one collection in place (FR-API-05). The id stays, so the expanded
+   * row, the loaded draft and any history entry that names it keep working;
+   * only the display name changes. The Host trims and caps; a blank name is
+   * refused before the store is touched.
+   */
+  async renameCollection(params: unknown): Promise<ApiCollectionMutationResult> {
+    const id = collectionIdOf(params, 'api.collection.rename')
+    const name = collectionNameOf(params, 'api.collection.rename')
+    const renamed = await this.withCollections(async (store) => {
+      if ((await store.read(id)) === null) throw collectionNotFound()
+      return store.rename(id, name)
+    })
+    return { collection: summarizeCollection(renamed) }
+  }
+
+  /**
+   * Copies one collection under a new slug id (FR-API-05). Everything nested
+   * gets a new id, the source stays untouched, and a taken slug becomes `-2`,
+   * `-3`, … instead of overwriting. The default name is `<source> copy`.
+   */
+  async duplicateCollection(params: unknown): Promise<ApiCollectionMutationResult> {
+    const id = collectionIdOf(params, 'api.collection.duplicate')
+    const requested = collectionNameOf(params, 'api.collection.duplicate', true)
+    const copy = await this.withCollections(async (store) => {
+      const source = await store.read(id)
+      if (source === null) throw collectionNotFound()
+      const name = (requested ?? `${source.name} copy`).slice(0, API_NAME_CHARS_MAX)
+      const copyId = await freeCollectionId(store, collectionIdFrom(name))
+      return store.duplicate(id, { id: copyId, name })
+    })
+    return { collection: summarizeCollection(copy) }
   }
 
   /**
@@ -540,6 +579,49 @@ function collectionIdOf(params: unknown, method: string): string {
   return id
 }
 
+function collectionNotFound(): never {
+  throw studioError('not_found', 'vibe-studio: collection not found', { reason: 'not_found' })
+}
+
+/**
+ * Display name for rename / duplicate. Trimmed, non-empty and capped like a
+ * save; `optional` lets a bare duplicate fall back to `<source> copy`.
+ */
+function collectionNameOf(
+  params: unknown,
+  method: string,
+  optional?: false,
+): string
+function collectionNameOf(
+  params: unknown,
+  method: string,
+  optional: true,
+): string | undefined
+function collectionNameOf(
+  params: unknown,
+  method: string,
+  optional = false,
+): string | undefined {
+  if (!isRecord(params)) invalid(`${method} expects an object`, 'params')
+  const raw = params.name
+  if (raw === undefined && optional) return undefined
+  if (typeof raw !== 'string') invalid('name is not usable', 'name')
+  const name = raw.trim()
+  if (name === '' || name.length > API_NAME_CHARS_MAX) invalid('name is not usable', 'name')
+  return name
+}
+
+/** Collection ids come from the title; a CJK-only title falls back to `collection`. */
+function collectionIdFrom(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^[^a-z0-9]+/, '')
+    .replace(/[-.]+$/, '')
+    .slice(0, 64)
+  return isApiStoreId(slug) ? slug : 'collection'
+}
+
 function environmentIdOf(params: unknown, method: string): string {
   if (!isRecord(params)) invalid(`${method} expects an object`, 'params')
   const id = params.id
@@ -633,6 +715,10 @@ export function registerApiMethods(registry: UnaryRegistry, service: ApiService)
     registry.register(API_COLLECTION_GET_METHOD, (params) => service.readCollection(params)),
     registry.register(API_COLLECTION_ADD_METHOD, (params) => service.addToCollection(params)),
     registry.register(API_COLLECTION_REMOVE_METHOD, (params) => service.removeCollection(params)),
+    registry.register(API_COLLECTION_RENAME_METHOD, (params) => service.renameCollection(params)),
+    registry.register(API_COLLECTION_DUPLICATE_METHOD, (params) =>
+      service.duplicateCollection(params),
+    ),
     registry.register(API_HISTORY_LIST_METHOD, (params) => service.listHistory(params)),
     registry.register(API_HISTORY_CLEAR_METHOD, () => service.clearHistory()),
     registry.register(API_OPENAPI_IMPORT_METHOD, (params) => service.importOpenApi(params)),

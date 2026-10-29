@@ -11,9 +11,11 @@ import type { ApiCollection, ApiSavedRequest } from '../../contracts/api'
 import { createTranslator, type Locale } from '../i18n'
 import { EmptyState, ErrorState, LoadingState } from '../shell/StateViews'
 import {
+  duplicateCollection,
   loadCollectionDetail,
   loadCollections,
   removeCollection,
+  renameCollection,
   toggleCollection,
   useApiCollections,
 } from './collection-store'
@@ -98,6 +100,25 @@ const actionStyle: React.CSSProperties = {
   cursor: 'pointer',
 }
 
+const renameFormStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  flex: '0 1 auto',
+  minWidth: 0,
+}
+
+const renameInputStyle: React.CSSProperties = {
+  font: '11px/1.4 system-ui, sans-serif',
+  padding: '2px 6px',
+  borderRadius: 4,
+  border: '1px solid var(--dsw-border-color, rgba(127, 127, 127, 0.35))',
+  background: 'transparent',
+  color: 'inherit',
+  minWidth: 0,
+  width: 140,
+}
+
 const dangerStyle: React.CSSProperties = {
   ...actionStyle,
   borderColor: 'var(--dsw-danger-color, #d14343)',
@@ -168,6 +189,12 @@ export function CollectionTree({ locale }: CollectionTreeProps): React.ReactElem
   const [confirmingId, setConfirmingId] = React.useState<string | null>(null)
   const [deleting, setDeleting] = React.useState(false)
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
+  /** Inline rename: the row being edited, its draft, and one shared error line. */
+  const [renamingId, setRenamingId] = React.useState<string | null>(null)
+  const [renameDraft, setRenameDraft] = React.useState('')
+  const [renaming, setRenaming] = React.useState(false)
+  const [copyingId, setCopyingId] = React.useState<string | null>(null)
+  const [rowError, setRowError] = React.useState<string | null>(null)
 
   // The disk is the source of truth, so each mount refreshes the summaries.
   React.useEffect(() => {
@@ -189,6 +216,40 @@ export function CollectionTree({ locale }: CollectionTreeProps): React.ReactElem
       setDeleteError(t('api.collections.deleteFailed'))
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const startRename = (id: string, name: string): void => {
+    setRowError(null)
+    setRenamingId(id)
+    setRenameDraft(name)
+  }
+
+  const handleRename = async (id: string): Promise<void> => {
+    const name = renameDraft.trim()
+    if (renaming || name === '') return
+    setRenaming(true)
+    setRowError(null)
+    try {
+      await renameCollection(id, name)
+      setRenamingId(null)
+    } catch {
+      setRowError(t('api.collections.renameFailed'))
+    } finally {
+      setRenaming(false)
+    }
+  }
+
+  const handleCopy = async (id: string): Promise<void> => {
+    if (copyingId !== null) return
+    setCopyingId(id)
+    setRowError(null)
+    try {
+      await duplicateCollection(id)
+    } catch {
+      setRowError(t('api.collections.copyFailed'))
+    } finally {
+      setCopyingId(null)
     }
   }
 
@@ -258,18 +319,76 @@ export function CollectionTree({ locale }: CollectionTreeProps): React.ReactElem
                       {t('api.collections.requestCount', { count: collection.requestCount })}
                     </span>
                   </button>
-                  <button
-                    type="button"
-                    style={actionStyle}
-                    data-vibe-collection-delete="1"
-                    disabled={deleting}
-                    onClick={() => {
-                      setDeleteError(null)
-                      setConfirmingId(collection.id)
-                    }}
-                  >
-                    {t('api.collections.delete')}
-                  </button>
+                  {renamingId === collection.id ? (
+                    <span style={renameFormStyle}>
+                      <input
+                        style={renameInputStyle}
+                        data-vibe-collection-rename-input="1"
+                        aria-label={t('api.collections.rename')}
+                        value={renameDraft}
+                        autoFocus
+                        disabled={renaming}
+                        onChange={(event) => setRenameDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') void handleRename(collection.id)
+                          if (event.key === 'Escape') setRenamingId(null)
+                        }}
+                      />
+                      <button
+                        type="button"
+                        style={actionStyle}
+                        data-vibe-collection-rename-save="1"
+                        disabled={renaming || renameDraft.trim() === ''}
+                        onClick={() => void handleRename(collection.id)}
+                      >
+                        {t('api.collections.renameSave')}
+                      </button>
+                      <button
+                        type="button"
+                        style={actionStyle}
+                        data-vibe-collection-rename-cancel="1"
+                        disabled={renaming}
+                        onClick={() => setRenamingId(null)}
+                      >
+                        {t('api.collections.cancel')}
+                      </button>
+                    </span>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        style={actionStyle}
+                        data-vibe-collection-rename="1"
+                        disabled={deleting || copyingId !== null}
+                        onClick={() => startRename(collection.id, collection.name)}
+                      >
+                        {t('api.collections.rename')}
+                      </button>
+                      <button
+                        type="button"
+                        style={actionStyle}
+                        data-vibe-collection-copy="1"
+                        disabled={copyingId !== null || deleting}
+                        onClick={() => void handleCopy(collection.id)}
+                      >
+                        {copyingId === collection.id
+                          ? t('api.collections.copying')
+                          : t('api.collections.copy')}
+                      </button>
+                      <button
+                        type="button"
+                        style={actionStyle}
+                        data-vibe-collection-delete="1"
+                        disabled={deleting || copyingId !== null}
+                        onClick={() => {
+                          setDeleteError(null)
+                          setConfirmingId(collection.id)
+                        }}
+                      >
+                        {t('api.collections.delete')}
+                      </button>
+                    </>
+                  )}
                 </div>
 
                 {expanded ? (
@@ -339,6 +458,12 @@ export function CollectionTree({ locale }: CollectionTreeProps): React.ReactElem
           })}
         </ul>
       ) : null}
+
+      {rowError === null ? null : (
+        <p role="alert" style={errorLineStyle} data-vibe-collections-action-error="1">
+          {rowError}
+        </p>
+      )}
 
       {deleteTarget === null ? null : (
         <div style={confirmStyle} role="alertdialog" data-vibe-collection-confirm="1">

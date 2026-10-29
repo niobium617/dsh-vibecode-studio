@@ -130,7 +130,7 @@ describe('CollectionTree open', () => {
   })
 })
 
-describe('CollectionTree delete', () => {
+describe('CollectionTree delete, rename and copy', () => {
   it('asks for a second click and explains what is deleted', async () => {
     const { fake, container } = mount()
     await screen.findByText('Weather')
@@ -152,6 +152,84 @@ describe('CollectionTree delete', () => {
     await waitFor(() => expect(fake.remove).toHaveBeenCalledWith('weather'))
     expect(await screen.findByText('No saved requests yet')).toBeDefined()
     expect(container.querySelector('[data-vibe-collection-confirm="1"]')).toBeNull()
+  })
+
+  it('renames a collection in place from the row', async () => {
+    const { fake, container } = mount()
+    await screen.findByText('Weather')
+
+    fireEvent.click(container.querySelector('[data-vibe-collection-rename="1"]')!)
+    const input = container.querySelector<HTMLInputElement>(
+      '[data-vibe-collection-rename-input="1"]',
+    )!
+    expect(input.value).toBe('Weather')
+
+    fireEvent.change(input, { target: { value: '  Forecast  ' } })
+    fireEvent.click(container.querySelector('[data-vibe-collection-rename-save="1"]')!)
+
+    await waitFor(() => expect(fake.rename).toHaveBeenCalledWith('weather', 'Forecast'))
+    expect(await screen.findByText('Forecast')).toBeDefined()
+    expect(container.querySelector('[data-vibe-collection-rename-input="1"]')).toBeNull()
+  })
+
+  it('disables saving a blank rename and cancels with Escape semantics', async () => {
+    const { fake, container } = mount()
+    await screen.findByText('Weather')
+
+    fireEvent.click(container.querySelector('[data-vibe-collection-rename="1"]')!)
+    const input = container.querySelector<HTMLInputElement>(
+      '[data-vibe-collection-rename-input="1"]',
+    )!
+    fireEvent.change(input, { target: { value: '   ' } })
+    expect(
+      container.querySelector<HTMLButtonElement>('[data-vibe-collection-rename-save="1"]')!.disabled,
+    ).toBe(true)
+
+    fireEvent.click(container.querySelector('[data-vibe-collection-rename-cancel="1"]')!)
+    expect(container.querySelector('[data-vibe-collection-rename-input="1"]')).toBeNull()
+    expect(fake.rename).not.toHaveBeenCalled()
+    expect(screen.getByText('Weather')).toBeDefined()
+  })
+
+  it('reports a failed rename and keeps the row name', async () => {
+    const fake = createFakeCollections([WEATHER], { failRename: true })
+    setApiCollectionApi(fake.api)
+    const { container } = render(<CollectionTree />)
+    await screen.findByText('Weather')
+
+    fireEvent.click(container.querySelector('[data-vibe-collection-rename="1"]')!)
+    fireEvent.change(container.querySelector('[data-vibe-collection-rename-input="1"]')!, {
+      target: { value: 'Forecast' },
+    })
+    fireEvent.click(container.querySelector('[data-vibe-collection-rename-save="1"]')!)
+
+    expect(await screen.findByText('The collection could not be renamed.')).toBeDefined()
+    expect(screen.getByText('Weather')).toBeDefined()
+  })
+
+  it('copies a collection and reveals the copy', async () => {
+    const { fake, container } = mount()
+    await screen.findByText('Weather')
+
+    fireEvent.click(container.querySelector('[data-vibe-collection-copy="1"]')!)
+
+    await waitFor(() => expect(fake.duplicate).toHaveBeenCalledWith('weather', undefined))
+    expect(await screen.findByText('Weather copy')).toBeDefined()
+    // The copy is opened right away, so the source read is not the only one.
+    await waitFor(() => expect(fake.read).toHaveBeenCalledWith('weather-copy'))
+  })
+
+  it('reports a failed copy without changing the tree', async () => {
+    const fake = createFakeCollections([WEATHER], { failDuplicate: true })
+    setApiCollectionApi(fake.api)
+    const { container } = render(<CollectionTree />)
+    await screen.findByText('Weather')
+
+    fireEvent.click(container.querySelector('[data-vibe-collection-copy="1"]')!)
+
+    expect(await screen.findByText('The collection could not be copied.')).toBeDefined()
+    expect(screen.getByText('Weather')).toBeDefined()
+    expect(fake.duplicate).toHaveBeenCalledTimes(1)
   })
 
   it('keeps the dialog open and reports a failed delete', async () => {

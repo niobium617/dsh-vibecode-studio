@@ -186,6 +186,29 @@ export class ApiCollectionStore {
   }
 
   /**
+   * Renames a collection in place (T046 R5). The id and every request/folder id
+   * stay, so an open row, a saved draft and a history entry keep pointing at
+   * the same file; only the display name changes. The name is trimmed and
+   * capped exactly like a save, and a blank name is refused before any write.
+   */
+  async rename(id: string, name: string): Promise<ApiCollection> {
+    const trimmed = name.trim()
+    if (trimmed === '') {
+      throw new ApiStoreError('invalid_data', 'vibe-studio: a collection needs a name')
+    }
+    const source = await this.read(id)
+    if (!source) {
+      throw new ApiStoreError('not_found', `vibe-studio: collection not found: ${id}`)
+    }
+    const renamed: ApiCollection = {
+      ...source,
+      name: trimmed.slice(0, API_NAME_CHARS_MAX),
+    }
+    await this.save(renamed)
+    return renamed
+  }
+
+  /**
    * Copies a collection under a new id (and every nested id), leaving the
    * source untouched. The copy inherits the already-redacted stored spec.
    */

@@ -8,6 +8,7 @@ import type {
   ApiCollection,
   ApiCollectionAddParams,
   ApiCollectionAddResult,
+  ApiCollectionMutationResult,
   ApiCollectionRemoveResult,
   ApiCollectionSummaries,
   ApiHistoryClearResult,
@@ -35,6 +36,8 @@ export interface FakeCollectionOptions {
   skipped?: number
   failList?: boolean
   failRemove?: boolean
+  failRename?: boolean
+  failDuplicate?: boolean
 }
 
 export interface FakeCollections {
@@ -44,7 +47,18 @@ export interface FakeCollections {
   readonly read: ReturnType<typeof vi.fn>
   readonly add: ReturnType<typeof vi.fn>
   readonly remove: ReturnType<typeof vi.fn>
+  readonly rename: ReturnType<typeof vi.fn>
+  readonly duplicate: ReturnType<typeof vi.fn>
   readonly options: FakeCollectionOptions
+}
+
+function summaryOf(collection: ApiCollection) {
+  return {
+    id: collection.id,
+    name: collection.name,
+    requestCount: requestCountOf(collection),
+    folderCount: collection.folders?.length ?? 0,
+  }
 }
 
 export function createFakeCollections(
@@ -57,12 +71,7 @@ export function createFakeCollections(
   const list = vi.fn(async (): Promise<ApiCollectionSummaries> => {
     if (options.failList) throw new Error('vibe-studio: cannot list collections')
     return {
-      collections: [...documents.values()].map((collection) => ({
-        id: collection.id,
-        name: collection.name,
-        requestCount: requestCountOf(collection),
-        folderCount: collection.folders?.length ?? 0,
-      })),
+      collections: [...documents.values()].map(summaryOf),
       skipped: options.skipped ?? 0,
     }
   })
@@ -97,13 +106,43 @@ export function createFakeCollections(
     return { removed: documents.delete(id) }
   })
 
+  const rename = vi.fn(
+    async (id: string, name: string): Promise<ApiCollectionMutationResult> => {
+      if (options.failRename) throw new Error('vibe-studio: cannot rename collection')
+      const found = documents.get(id)
+      if (found === undefined) throw new Error('vibe-studio: collection not found')
+      const next = { ...found, name }
+      documents.set(id, next)
+      return { collection: summaryOf(next) }
+    },
+  )
+
+  const duplicate = vi.fn(
+    async (id: string, name?: string): Promise<ApiCollectionMutationResult> => {
+      if (options.failDuplicate) throw new Error('vibe-studio: cannot copy collection')
+      const found = documents.get(id)
+      if (found === undefined) throw new Error('vibe-studio: collection not found')
+      let copyId = `${id}-copy`
+      for (let suffix = 2; documents.has(copyId); suffix += 1) copyId = `${id}-copy-${suffix}`
+      const copy: ApiCollection = {
+        ...clone(found),
+        id: copyId,
+        name: name ?? `${found.name} copy`,
+      }
+      documents.set(copyId, copy)
+      return { collection: summaryOf(copy) }
+    },
+  )
+
   return {
-    api: { list, read, add, remove },
+    api: { list, read, add, remove, rename, duplicate },
     documents,
     list,
     read,
     add,
     remove,
+    rename,
+    duplicate,
     options,
   }
 }
