@@ -6,6 +6,7 @@
  * later preview features register methods on the same registry.
  */
 import { createApiCollectionStore } from './api/collection-store'
+import { createApiEnvironmentStore } from './api/environment-store'
 import { createApiHistoryStore } from './api/history-store'
 import type { ApiSecretStore, CredentialProviderLike } from './api/secrets'
 import { createApiSecretStore } from './api/secrets'
@@ -69,6 +70,14 @@ export type {
   ResolveHttpRequestOptions,
   ResolvedHttpRequest,
 } from './api/environment'
+export {
+  API_ENVIRONMENT_DIR_NAME,
+  API_ENVIRONMENT_FILE_EXT,
+  ApiEnvironmentStore,
+  createApiEnvironmentStore,
+  summarizeEnvironment,
+} from './api/environment-store'
+export type { ApiEnvironmentListResult } from './api/environment-store'
 export { createApiSecretStore, CREDENTIAL_NAME_PATTERN, isCredentialName } from './api/secrets'
 export type {
   ApiSecretStore,
@@ -104,6 +113,10 @@ export {
   API_COLLECTION_GET_METHOD,
   API_COLLECTION_LIST_METHOD,
   API_COLLECTION_REMOVE_METHOD,
+  API_ENV_GET_METHOD,
+  API_ENV_LIST_METHOD,
+  API_ENV_REMOVE_METHOD,
+  API_ENV_SAVE_METHOD,
   API_HISTORY_CLEAR_METHOD,
   API_HISTORY_LIST_METHOD,
   API_HTTP_SEND_METHOD,
@@ -329,10 +342,14 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
   // saves through `api.collection.add` and reads one page of history at a time.
   const apiCollections = createApiCollectionStore(process.cwd())
   const apiHistory = createApiHistoryStore(process.cwd())
+  // T046 R4: environments are edited and persisted under `.vibe/api`; a send
+  // names one by id and the Host loads it, so secret references stay host-side.
+  const apiEnvironments = createApiEnvironmentStore(process.cwd())
   const api = new ApiService({
     secrets: apiSecrets,
     collections: apiCollections,
     history: apiHistory,
+    environments: apiEnvironments,
   })
   const setupApi = () => registerApiMethods(registry, api)
   if (typeof ctx.effect === 'function') {

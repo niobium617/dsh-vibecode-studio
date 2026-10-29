@@ -11,6 +11,7 @@ import * as React from 'react'
 import type { HttpRequestSpec } from '../../contracts/api'
 import { createTranslator, type Locale } from '../i18n'
 import { CollectionTree } from './CollectionTree'
+import { EnvironmentPanel } from './EnvironmentPanel'
 import { HistoryList } from './HistoryList'
 import { OpenApiImportPanel } from './OpenApiImportPanel'
 import { RequestBuilder } from './RequestBuilder'
@@ -43,6 +44,7 @@ export function ApiWorkbench({ locale }: ApiWorkbenchProps): React.ReactElement 
   return (
     <div style={rootStyle} data-vibe-api-workbench="1">
       <RequestBuilder locale={locale} save={save} onSent={onSent} />
+      <EnvironmentPanel locale={locale} />
       <CollectionTree locale={locale} />
       <OpenApiImportPanel locale={locale} />
       <HistoryList locale={locale} />

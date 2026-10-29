@@ -395,6 +395,48 @@ export const API_HISTORY_CLEAR_METHOD = 'api.history.clear'
  */
 export const API_OPENAPI_IMPORT_METHOD = 'api.openapi.import'
 
+/* -------------------------------------------------------------------------
+ * Environments (T046 R4, FR-API-04)
+ *
+ * A saved environment is one file under `.vibe/api/environments`. It never
+ * holds a secret value: a secret row stores a credential *name*, and the panel
+ * only ever receives what `ctx.credentials.describe()` reports (`configured`,
+ * `source`) alongside the reference, never a value. Reads return both the
+ * stored document (for editing the references) and its client-safe view.
+ * ---------------------------------------------------------------------- */
+
+export const API_ENV_LIST_METHOD = 'api.env.list'
+export const API_ENV_GET_METHOD = 'api.env.get'
+export const API_ENV_SAVE_METHOD = 'api.env.save'
+export const API_ENV_REMOVE_METHOD = 'api.env.remove'
+
+/** 200 variables × 8 KiB values still fits; the cap bounds a foreign file. */
+export const API_ENVIRONMENT_FILE_BYTES_MAX = 2 * 1024 * 1024
+
+/** One row of the environment picker; variables stay on disk until opened. */
+export interface ApiEnvironmentSummary {
+  readonly id: string
+  readonly name: string
+  readonly variableCount: number
+  readonly secretCount: number
+}
+
+export interface ApiEnvironmentSummaries {
+  readonly environments: readonly ApiEnvironmentSummary[]
+  /** Files with a valid stem that read as invalid or foreign. */
+  readonly skipped: number
+}
+
+/** Stored document plus its safe view (`describeEnvironment`). */
+export interface ApiEnvironmentDetail {
+  readonly environment: ApiEnvironment
+  readonly view: ApiEnvironmentView
+}
+
+export interface ApiEnvironmentRemoveResult {
+  readonly removed: boolean
+}
+
 /** One row of the collection tree; bodies stay on disk until opened. */
 export interface ApiCollectionSummary {
   readonly id: string

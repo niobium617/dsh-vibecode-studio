@@ -21,6 +21,10 @@ import {
   API_COLLECTION_LIST_METHOD,
   API_COLLECTION_ITEMS_MAX,
   API_COLLECTION_REMOVE_METHOD,
+  API_ENV_GET_METHOD,
+  API_ENV_LIST_METHOD,
+  API_ENV_REMOVE_METHOD,
+  API_ENV_SAVE_METHOD,
   API_HISTORY_CLEAR_METHOD,
   API_HISTORY_LIST_METHOD,
   API_HTTP_SEND_METHOD,
@@ -40,6 +44,10 @@ import {
   type ApiCollectionRemoveResult,
   type ApiCollectionSummaries,
   type ApiCollectionSummary,
+  type ApiEnvironment,
+  type ApiEnvironmentDetail,
+  type ApiEnvironmentRemoveResult,
+  type ApiEnvironmentSummaries,
   type ApiHistoryClearResult,
   type ApiHistoryPage,
   type ApiHistoryQuery,
@@ -54,7 +62,8 @@ import { evaluateAssertions } from './assertions'
 import { isStudioError, studioError } from '../../contracts/errors'
 import { MAX_UNARY_BODY_BYTES } from '../../contracts/transport'
 import type { ApiCollectionStore } from './collection-store'
-import { resolveHttpRequest } from './environment'
+import { describeEnvironment, parseApiEnvironment, resolveHttpRequest } from './environment'
+import { summarizeEnvironment, type ApiEnvironmentStore } from './environment-store'
 import { createHttpExecutor, type HttpExecutor } from './executor'
 import type { ApiHistoryStore } from './history-store'
 import { importOpenApi as importOpenApiDocument, type OpenApiImportResult } from './openapi/mapper'
@@ -70,6 +79,10 @@ export {
   API_COLLECTION_GET_METHOD,
   API_COLLECTION_LIST_METHOD,
   API_COLLECTION_REMOVE_METHOD,
+  API_ENV_GET_METHOD,
+  API_ENV_LIST_METHOD,
+  API_ENV_REMOVE_METHOD,
+  API_ENV_SAVE_METHOD,
   API_HISTORY_CLEAR_METHOD,
   API_HISTORY_LIST_METHOD,
   API_HTTP_SEND_METHOD,
@@ -85,6 +98,8 @@ export interface ApiServiceOptions {
   readonly collections?: ApiCollectionStore
   /** `.vibe/api/history.json`; without it sends are not logged. */
   readonly history?: ApiHistoryStore
+  /** `.vibe/api/environments`; without it the environment methods report `internal`. */
+  readonly environments?: ApiEnvironmentStore
 }
 
 export interface ApiSendOutcome {
@@ -126,12 +141,14 @@ export class ApiService {
   private readonly secrets: ApiSecretStore
   private readonly collections: ApiCollectionStore | undefined
   private readonly history: ApiHistoryStore | undefined
+  private readonly environments: ApiEnvironmentStore | undefined
 
   constructor(options: ApiServiceOptions) {
     this.executor = options.executor ?? createHttpExecutor()
     this.secrets = options.secrets
     this.collections = options.collections
     this.history = options.history
+    this.environments = options.environments
   }
 
   /**
@@ -157,11 +174,22 @@ export class ApiService {
     if (environment !== undefined && !isApiEnvironment(environment)) {
       invalid('environment is not a valid environment document', 'environment')
     }
+    const environmentId = params.environmentId
+    if (environmentId !== undefined) {
+      if (!isApiStoreId(environmentId)) invalid('environmentId is not a usable id', 'environmentId')
+      if (environment !== undefined) {
+        invalid('send either environment or environmentId, not both', 'environmentId')
+      }
+    }
     const assertions = parseAssertions(params.assertions)
     const raw = params.request
+    // A saved environment is loaded host-side; the panel only names it, so the
+    // document (and its credential references) never has to round-trip.
+    const activeEnvironment =
+      environmentId === undefined ? environment : await this.loadEnvironment(environmentId)
     const resolved = await resolveHttpRequest(raw, {
       secrets: this.secrets,
-      ...(environment === undefined ? {} : { environment }),
+      ...(activeEnvironment === undefined ? {} : { environment: activeEnvironment }),
     })
     const spec = isHttpRequestSpec(raw) ? raw : null
     let result: HttpExecutionResult
@@ -278,6 +306,58 @@ export class ApiService {
   }
 
   /**
+   * Environment picker rows (FR-API-04). Only counts cross the wire here;
+   * `readEnvironment` sends the document with a client-safe view attached.
+   */
+  async listEnvironments(): Promise<ApiEnvironmentSummaries> {
+    const result = await this.withEnvironments((store) => store.list())
+    return {
+      environments: result.environments.map(summarizeEnvironment),
+      skipped: result.skipped,
+    }
+  }
+
+  /** One stored environment plus its `describe`-based view. */
+  async readEnvironment(params: unknown): Promise<ApiEnvironmentDetail> {
+    const id = environmentIdOf(params, 'api.env.get')
+    return this.describeStoredEnvironment(id)
+  }
+
+  /**
+   * Creates or replaces one environment. The document is validated host-side
+   * (`parseApiEnvironment`), including "a secret names a credential rather
+   * than holding a value"; a new environment gets a slug id, with `-2`, `-3`…
+   * when the slug is taken. The response carries the saved document and its
+   * view so the panel can show `configured` without a second round trip.
+   */
+  async saveEnvironment(params: unknown): Promise<ApiEnvironmentDetail> {
+    if (!isRecord(params)) invalid('api.env.save expects an object', 'params')
+    if (!isApiEnvironment(params.environment)) {
+      invalid('environment is not a valid environment document', 'environment')
+    }
+    const parsed = parseApiEnvironment(params.environment)
+    const name = parsed.name?.trim() ?? ''
+    if (name === '' || name.length > API_NAME_CHARS_MAX) invalid('name is not usable', 'name')
+    if (parsed.id !== undefined && !isApiStoreId(parsed.id)) {
+      invalid('environment id is not usable', 'environment.id')
+    }
+
+    return this.withEnvironments(async (store) => {
+      const id =
+        parsed.id ?? (await freeEnvironmentId(store, environmentIdFrom(name)))
+      const saved: ApiEnvironment = { id, name, variables: parsed.variables }
+      await store.save(saved)
+      return { environment: saved, view: await describeEnvironment(saved, this.secrets) }
+    })
+  }
+
+  async removeEnvironment(params: unknown): Promise<ApiEnvironmentRemoveResult> {
+    const id = environmentIdOf(params, 'api.env.remove')
+    const removed = await this.withEnvironments((store) => store.remove(id))
+    return { removed }
+  }
+
+  /**
    * Parses an OpenAPI 3.x / Swagger 2.0 document into a collection (FR-API-08).
    *
    * Everything that touches the document runs host-side: the panel sends text,
@@ -380,6 +460,31 @@ export class ApiService {
     return this.history
   }
 
+  private environmentStore(): ApiEnvironmentStore {
+    if (this.environments === undefined) {
+      throw studioError('internal', 'vibe-studio: environment storage is not available', {
+        reason: 'unavailable',
+      })
+    }
+    return this.environments
+  }
+
+  /** Reads one stored environment or fails with a stable `not_found`. */
+  private async loadEnvironment(id: string): Promise<ApiEnvironment> {
+    const found = await this.withEnvironments((store) => store.read(id))
+    if (found === null) {
+      throw studioError('not_found', 'vibe-studio: environment not found', {
+        reason: 'not_found',
+      })
+    }
+    return found
+  }
+
+  private async describeStoredEnvironment(id: string): Promise<ApiEnvironmentDetail> {
+    const environment = await this.loadEnvironment(id)
+    return { environment, view: await describeEnvironment(environment, this.secrets) }
+  }
+
   /**
    * Store failures become stable, path-free StudioErrors. An error the service
    * raised itself (`collection_full`) is already stable and passes through:
@@ -404,6 +509,18 @@ export class ApiService {
       throw toApiStoreStudioError(error)
     }
   }
+
+  private async withEnvironments<T>(
+    operation: (store: ApiEnvironmentStore) => Promise<T>,
+  ): Promise<T> {
+    const store = this.environmentStore()
+    try {
+      return await operation(store)
+    } catch (error) {
+      if (isStudioError(error)) throw error
+      throw toApiStoreStudioError(error)
+    }
+  }
 }
 
 /** Absent means "no checks"; anything else must be a short list of known shapes. */
@@ -421,6 +538,41 @@ function collectionIdOf(params: unknown, method: string): string {
   const id = params.id
   if (!isApiStoreId(id)) invalid('id is not a usable collection id', 'id')
   return id
+}
+
+function environmentIdOf(params: unknown, method: string): string {
+  if (!isRecord(params)) invalid(`${method} expects an object`, 'params')
+  const id = params.id
+  if (!isApiStoreId(id)) invalid('id is not a usable environment id', 'id')
+  return id
+}
+
+/**
+ * New-environment ids come from the display name; a name with no usable
+ * characters (for example all CJK) falls back to `env`. The id pattern caps
+ * the stem at 64 characters.
+ */
+function environmentIdFrom(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^[^a-z0-9]+/, '')
+    .replace(/[-.]+$/, '')
+    .slice(0, 64)
+  return isApiStoreId(slug) ? slug : 'env'
+}
+
+/** Same never-overwrite policy as collections: `env`, `env-2`, `env-3`, … */
+async function freeEnvironmentId(store: ApiEnvironmentStore, base: string): Promise<string> {
+  if ((await store.read(base)) === null) return base
+  for (let suffix = 2; suffix <= 99; suffix += 1) {
+    const marker = `-${suffix}`
+    const candidate = `${base.slice(0, 64 - marker.length)}${marker}`
+    if ((await store.read(candidate)) === null) return candidate
+  }
+  throw studioError('invalid_input', 'too many environments share this name; rename or remove some first', {
+    reason: 'environment_exists',
+  })
 }
 
 /**
@@ -484,6 +636,10 @@ export function registerApiMethods(registry: UnaryRegistry, service: ApiService)
     registry.register(API_HISTORY_LIST_METHOD, (params) => service.listHistory(params)),
     registry.register(API_HISTORY_CLEAR_METHOD, () => service.clearHistory()),
     registry.register(API_OPENAPI_IMPORT_METHOD, (params) => service.importOpenApi(params)),
+    registry.register(API_ENV_LIST_METHOD, () => service.listEnvironments()),
+    registry.register(API_ENV_GET_METHOD, (params) => service.readEnvironment(params)),
+    registry.register(API_ENV_SAVE_METHOD, (params) => service.saveEnvironment(params)),
+    registry.register(API_ENV_REMOVE_METHOD, (params) => service.removeEnvironment(params)),
   ]
   return () => {
     for (const dispose of unregister) dispose()

@@ -26,6 +26,7 @@ import {
   type AssertionIssue,
 } from './AssertionsEditor'
 import { CurlPanel } from './CurlPanel'
+import { useApiEnvironments } from './environment-store'
 import { RequestForm } from './RequestForm'
 import { ResponseView } from './ResponseView'
 import { registerDraftTarget, type PendingDraft } from './draft-store'
@@ -48,6 +49,8 @@ export interface ApiSendOptions {
   readonly signal?: AbortSignal
   /** Declarative checks evaluated host-side after the response (T045). */
   readonly assertions?: readonly ApiAssertion[]
+  /** Saved environment to expand against (T046 R4); loaded host-side. */
+  readonly environmentId?: string
 }
 
 export type ApiSend = (spec: HttpRequestSpec, options?: ApiSendOptions) => Promise<ApiSendOutcome>
@@ -60,6 +63,9 @@ export function createTransportSend(): ApiSend {
       {
         request: spec,
         ...(options.assertions === undefined ? {} : { assertions: options.assertions }),
+        ...(options.environmentId === undefined
+          ? {}
+          : { environmentId: options.environmentId }),
       },
       {
         ...(options.signal === undefined ? {} : { signal: options.signal }),
@@ -243,6 +249,9 @@ export function RequestBuilder({
   const controllerRef = React.useRef<AbortController | null>(null)
   const defaultSend = React.useMemo(() => createTransportSend(), [])
   const sendImpl = send ?? defaultSend
+  // FR-API-04: a saved environment is selected in the environment panel; the
+  // send only names it, and the Host loads the document itself.
+  const environmentId = useApiEnvironments().activeId
 
   React.useEffect(() => {
     return () => controllerRef.current?.abort()
@@ -295,6 +304,7 @@ export function RequestBuilder({
     void sendImpl(built.spec, {
       signal: controller.signal,
       ...(assertions.length === 0 ? {} : { assertions }),
+      ...(environmentId === null ? {} : { environmentId }),
     })
       .then((outcome) => {
         if (controller.signal.aborted) return
@@ -313,7 +323,7 @@ export function RequestBuilder({
       .finally(() => {
         if (controllerRef.current === controller) controllerRef.current = null
       })
-  }, [assertionDrafts, draft, onSent, sendImpl, sending])
+  }, [assertionDrafts, draft, environmentId, onSent, sendImpl, sending])
 
   // FR-API-07: a parsed command becomes a draft exactly like a saved request
   // does — the form is filled, nothing is sent, and the notice says so.
