@@ -244,7 +244,7 @@ describe('AnnotationHistory notices (U02)', () => {
     ).toBeTruthy()
   })
 
-  it('replaces the reopen notice after sending from the queue', async () => {
+  it('releases the reopen notice in both lists after sending from the queue', async () => {
     const stored = make('Sync me', 'ann-sync')
     const fake = createFake([stored])
     setAnnotationHistoryApi(fake.api)
@@ -270,14 +270,11 @@ describe('AnnotationHistory notices (U02)', () => {
         screen.queryByText('Reopened in the queue above. Nothing was sent.'),
       ).toBeNull()
     })
-    expect(
-      screen.getByText('Inserted into the chat draft — nothing was sent.'),
-    ).toBeDefined()
+    // Sent: no notice is left in either list, not even the send result.
+    expect(document.querySelector('[data-vibe-annotation-status]')).toBeNull()
+    expect(document.querySelector('[data-vibe-history-status]')).toBeNull()
     expect(annotationQueueSnapshot()).toEqual([])
-    expect(getAnnotationStatus('ann-sync')).toEqual({
-      kind: 'success',
-      message: 'Inserted into the chat draft — nothing was sent.',
-    })
+    expect(getAnnotationStatus('ann-sync')).toBeNull()
   })
 
   it('clears the history notice when the queued draft is removed', async () => {

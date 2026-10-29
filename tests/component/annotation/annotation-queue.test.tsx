@@ -13,6 +13,7 @@ import {
   clearAnnotationQueue,
   createElementAnnotation,
   removeQueuedAnnotation,
+  sendQueuedAnnotation,
   subscribeAnnotationQueue,
   updateQueuedAnnotation,
 } from '../../../src/client/inspect/AnnotationQueue'
@@ -275,27 +276,30 @@ describe('AnnotationQueue', () => {
     expect(text).toContain('Make it bigger')
     expect(utf8Bytes(text)).toBeLessThanOrEqual(ANNOTATION_BUDGET_BYTES)
     expect(annotationQueueSnapshot()).toEqual([])
-    // The card is gone, but the outcome is attached to the annotation id so the
-    // history card can show it (U02); nothing is left under the list.
-    expect(getAnnotationStatus(annotation.id)).toEqual({
-      kind: 'success',
-      message: 'Sent to the chat draft.',
-    })
+    // A successful send releases the notice for both lists (U02): the history
+    // card must stop saying "reopened, not sent" once this draft is sent.
+    expect(getAnnotationStatus(annotation.id)).toBeNull()
     expect(document.querySelector('[data-vibe-annotation-status]')).toBeNull()
   })
 
-  it('falls back to the clipboard message when the sender reports nothing', async () => {
-    add('Copy me', 'a-1')
-    const send = vi.fn(async () => {})
-    render(<AnnotationQueue locale="en" send={send} />)
+  it('reports the fallback message to the caller when the sender reports nothing', async () => {
+    const annotation = add('Copy me', 'a-1')
+    let result: Awaited<ReturnType<typeof sendQueuedAnnotation>> | null = null
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Send to chat' }))
+      result = await sendQueuedAnnotation(annotation, async () => {}, {
+        sent: 'Copied to the clipboard — paste it into the chat.',
+        failed: 'Could not send this annotation. Try again.',
+      })
     })
 
-    expect(getAnnotationStatus('a-1')?.message).toBe(
-      'Copied to the clipboard — paste it into the chat.',
-    )
+    // The message still reaches the save notice (U02), even though a success
+    // clears the inline notice shared by the queue and history cards.
+    expect(result).toEqual({
+      ok: true,
+      message: 'Copied to the clipboard — paste it into the chat.',
+    })
+    expect(getAnnotationStatus('a-1')).toBeNull()
     expect(annotationQueueSnapshot()).toEqual([])
   })
 
@@ -366,7 +370,7 @@ describe('AnnotationQueue', () => {
     expect(copied).toContain('Clipboard please')
     expect(utf8Bytes(copied)).toBeLessThanOrEqual(ANNOTATION_BUDGET_BYTES)
     expect(annotationQueueSnapshot()).toEqual([])
-    expect(getAnnotationStatus('a-1')?.message).toContain('Copied to the clipboard')
+    expect(getAnnotationStatus('a-1')).toBeNull()
   })
 
   it('keeps the draft when the clipboard is unavailable', async () => {

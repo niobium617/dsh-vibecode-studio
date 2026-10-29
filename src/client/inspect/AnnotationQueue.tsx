@@ -161,8 +161,10 @@ export interface AnnotationSendResult {
  * Sends one queued annotation and drops it only after the handoff resolves, so
  * a failed send never loses the comment. Shared by the queue list, the preview
  * save notice (T034) and the bubble's direct send (U02) so all follow the same
- * rule. The per-annotation notice is written here too: whichever list shows
- * that id next (the history card after a successful send) renders the outcome.
+ * rule. A success releases the per-annotation notice in both lists, so the
+ * history card stops saying "reopened, not sent" once the draft is sent; the
+ * caller still receives the message to show in the save notice. A failure keeps
+ * the draft queued and shows the error on its card.
  */
 export async function sendQueuedAnnotation(
   annotation: Annotation,
@@ -173,7 +175,9 @@ export async function sendQueuedAnnotation(
     const raw = await send(annotation, renderAnnotationText(annotation))
     const message = typeof raw === 'string' && raw.length > 0 ? raw : messages.sent
     removeQueuedAnnotation(annotation.id)
-    setAnnotationStatus(annotation.id, { kind: 'success', message })
+    // "Reopened in the queue above, not sent" is stale once it is sent; clear it
+    // in both lists instead of replacing it with another lingering line.
+    clearAnnotationStatus(annotation.id)
     return { ok: true, message }
   } catch {
     setAnnotationStatus(annotation.id, { kind: 'error', message: messages.failed })
