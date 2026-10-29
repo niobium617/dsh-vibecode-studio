@@ -374,6 +374,7 @@
   "api.history.noMatch.body": "换个更短的关键词，或换方法、状态试试。",
   "api.history.clearSearch": "清空搜索",
   "api.history.open": "打开",
+  "api.history.limitLabel": "显示条数",
   "api.history.clear": "清空历史",
   "api.history.clearFailed": "历史没能清空。",
   "api.history.clearConfirm.title": "清空发送记录？",

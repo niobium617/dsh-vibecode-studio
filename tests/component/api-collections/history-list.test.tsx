@@ -9,7 +9,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { HistoryList } from '../../../src/client/api/HistoryList'
 import { RequestBuilder } from '../../../src/client/api/RequestBuilder'
 import { resetDraftStore } from '../../../src/client/api/draft-store'
-import { resetApiHistoryStore, setApiHistoryApi } from '../../../src/client/api/history-store'
+import {
+  resetApiHistoryStore,
+  setApiHistoryApi,
+  setApiHistoryLimit,
+} from '../../../src/client/api/history-store'
 import { resetApiCollectionStore } from '../../../src/client/api/collection-store'
 import { createFakeHistory, historyEntry, spec, type FakeHistoryOptions } from './fakes'
 import type { ApiHistoryEntry } from '../../../src/contracts/api'
@@ -65,7 +69,8 @@ describe('HistoryList rows', () => {
     expect(rows[0]!.textContent).toContain('https://api.example.com/users')
     expect(rows[0]!.textContent).toContain('201 · 40 ms')
     expect(container.querySelector('[data-vibe-send-history-count="1"]')?.textContent).toBe('2')
-    expect(fake.list).toHaveBeenCalledWith(undefined)
+    // One page is asked for explicitly, 50 rows by default.
+    expect(fake.list).toHaveBeenCalledWith({ limit: 50 })
   })
 
   it('says how many older rows are not shown', async () => {
@@ -106,6 +111,58 @@ describe('HistoryList rows', () => {
 
     expect(await screen.findByText('还没发送过')).toBeDefined()
     expect(screen.getByLabelText('搜索历史')).toBeDefined()
+    expect(screen.getByLabelText('显示条数')).toBeDefined()
+  })
+})
+
+describe('HistoryList page size', () => {
+  it('asks for 50 rows by default and keeps the search when the size changes', async () => {
+    const { fake, container } = mount([ITEMS])
+    await screen.findByText('https://api.example.com/items')
+
+    const select = container.querySelector<HTMLSelectElement>('[data-vibe-send-history-limit="1"]')!
+    expect(select.value).toBe('50')
+    expect([...select.options].map((option) => option.value)).toEqual(['50', '100', '200'])
+
+    fireEvent.change(screen.getByLabelText('Search history'), { target: { value: 'items' } })
+    await waitFor(() => expect(fake.list).toHaveBeenLastCalledWith({ query: 'items', limit: 50 }))
+
+    fireEvent.change(select, { target: { value: '200' } })
+    await waitFor(() => expect(fake.list).toHaveBeenLastCalledWith({ query: 'items', limit: 200 }))
+    expect(select.value).toBe('200')
+  })
+
+  it('shows more rows after raising the page size', async () => {
+    const many = Array.from({ length: 60 }, (_, index) =>
+      historyEntry({ id: `entry-${index}`, url: `https://api.example.com/items/${index}` }),
+    )
+    const { container } = mount(many)
+    await screen.findByText('https://api.example.com/items/0')
+
+    expect(container.querySelectorAll('[data-vibe-send-history-item]')).toHaveLength(50)
+    expect(screen.getByText('10 older requests not shown.')).toBeDefined()
+
+    fireEvent.change(container.querySelector('[data-vibe-send-history-limit="1"]')!, {
+      target: { value: '200' },
+    })
+
+    await waitFor(() =>
+      expect(container.querySelectorAll('[data-vibe-send-history-item]')).toHaveLength(60),
+    )
+    expect(screen.queryByText(/older requests not shown/)).toBeNull()
+  })
+
+  it('caps the page at 200 rows', async () => {
+    const fake = createFakeHistory([ITEMS])
+    setApiHistoryApi(fake.api)
+    setApiHistoryLimit(500)
+    const { container } = render(<HistoryList />)
+    await screen.findByText('https://api.example.com/items')
+
+    expect(fake.list).toHaveBeenLastCalledWith({ limit: 200 })
+    expect(
+      container.querySelector<HTMLSelectElement>('[data-vibe-send-history-limit="1"]')!.value,
+    ).toBe('200')
   })
 })
 
@@ -118,7 +175,7 @@ describe('HistoryList search', () => {
     const input = screen.getByLabelText('Search history') as HTMLInputElement
     fireEvent.change(input, { target: { value: 'users' } })
 
-    await waitFor(() => expect(fake.list).toHaveBeenLastCalledWith({ query: 'users' }))
+    await waitFor(() => expect(fake.list).toHaveBeenLastCalledWith({ query: 'users', limit: 50 }))
     await waitFor(() =>
       expect(screen.queryByText('https://api.example.com/items')).toBeNull(),
     )
@@ -131,7 +188,7 @@ describe('HistoryList search', () => {
 
     expect(await screen.findByText('https://api.example.com/items')).toBeDefined()
     expect(input.value).toBe('')
-    expect(fake.list).toHaveBeenLastCalledWith(undefined)
+    expect(fake.list).toHaveBeenLastCalledWith({ limit: 50 })
   })
 })
 

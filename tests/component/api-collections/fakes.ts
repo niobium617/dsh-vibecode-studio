@@ -4,6 +4,7 @@
  * page) so the panel tests never touch `.vibe/api` or the transport.
  */
 import { vi } from 'vitest'
+import { API_HISTORY_LIMIT_DEFAULT } from '../../../src/contracts/api'
 import type {
   ApiCollection,
   ApiCollectionAddParams,
@@ -176,7 +177,11 @@ export function createFakeHistory(
         needle === '' ||
         `${entry.method} ${entry.url} ${entry.status ?? ''}`.toLowerCase().includes(needle),
     )
-    const limit = options.pageLimit ?? 50
+    // The Host honors `limit`; `pageLimit` still wins so a test can force a short page.
+    const limit = Math.min(
+      options.pageLimit ?? Number.POSITIVE_INFINITY,
+      query?.limit ?? API_HISTORY_LIMIT_DEFAULT,
+    )
     return { entries: matched.slice(0, limit), total: matched.length, skipped: options.skipped ?? 0 }
   })
 

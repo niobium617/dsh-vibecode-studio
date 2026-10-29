@@ -374,6 +374,7 @@
   "api.history.noMatch.body": "Try a shorter search or a different method or status.",
   "api.history.clearSearch": "Clear search",
   "api.history.open": "Open",
+  "api.history.limitLabel": "Rows shown",
   "api.history.clear": "Clear history",
   "api.history.clearFailed": "The history could not be cleared.",
   "api.history.clearConfirm.title": "Clear the send log?",

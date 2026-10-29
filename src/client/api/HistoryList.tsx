@@ -2,13 +2,18 @@
  * Send log for the API page (T044).
  *
  * The Host writes one redacted row per send and searches host-side; this panel
- * shows one page. Opening a row refills the request builder — nothing is
- * replayed automatically, and the notice reminds the user that secret values
- * were removed when the row was stored. Clearing the log asks for a second
- * click and deletes the whole document.
+ * shows one page whose size the user picks (50 rows by default, 200 at most).
+ * Opening a row refills the request builder — nothing is replayed
+ * automatically, and the notice reminds the user that secret values were
+ * removed when the row was stored. Clearing the log asks for a second click and
+ * deletes the whole document.
  */
 import * as React from 'react'
-import type { ApiHistoryEntry } from '../../contracts/api'
+import {
+  API_HISTORY_ENTRIES_MAX,
+  API_HISTORY_LIMIT_DEFAULT,
+  type ApiHistoryEntry,
+} from '../../contracts/api'
 import { createTranslator, type Locale } from '../i18n'
 import { EmptyState, ErrorState, LoadingState } from '../shell/StateViews'
 import { openDraftInBuilder } from './draft-store'
@@ -16,6 +21,7 @@ import {
   clearApiHistory,
   loadApiHistory,
   searchApiHistory,
+  setApiHistoryLimit,
   useApiHistory,
 } from './history-store'
 
@@ -45,6 +51,26 @@ const countStyle: React.CSSProperties = {
 
 const spacerStyle: React.CSSProperties = {
   marginLeft: 'auto',
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: 6,
+}
+
+const limitStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: 4,
+  font: '10px/1.4 system-ui, sans-serif',
+  opacity: 0.8,
+}
+
+const limitSelectStyle: React.CSSProperties = {
+  font: '10px/1.4 system-ui, sans-serif',
+  padding: '1px 2px',
+  borderRadius: 4,
+  border: '1px solid var(--dsw-border-color, rgba(127, 127, 127, 0.4))',
+  background: 'transparent',
+  color: 'inherit',
 }
 
 const searchStyle: React.CSSProperties = {
@@ -166,6 +192,10 @@ export function HistoryList({ locale }: HistoryListProps): React.ReactElement {
 
   const searching = state.query.trim() !== ''
   const ready = state.status === 'ready'
+  // 50 by default, 200 at the cap; a value set through the store still shows.
+  const limits = [
+    ...new Set([API_HISTORY_LIMIT_DEFAULT, 100, API_HISTORY_ENTRIES_MAX, state.limit]),
+  ].sort((left, right) => left - right)
 
   const handleOpen = (entry: ApiHistoryEntry): void => {
     openDraftInBuilder({ spec: entry.request, source: 'history' })
@@ -194,8 +224,24 @@ export function HistoryList({ locale }: HistoryListProps): React.ReactElement {
         <span data-vibe-send-history-count="1" style={countStyle}>
           {state.total}
         </span>
-        {state.total === 0 ? null : (
-          <span style={spacerStyle}>
+        <span style={spacerStyle}>
+          <label style={limitStyle}>
+            {t('api.history.limitLabel')}
+            <select
+              data-vibe-send-history-limit="1"
+              aria-label={t('api.history.limitLabel')}
+              value={state.limit}
+              onChange={(event) => setApiHistoryLimit(Number(event.target.value))}
+              style={limitSelectStyle}
+            >
+              {limits.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+          {state.total === 0 ? null : (
             <button
               type="button"
               style={actionStyle}
@@ -208,8 +254,8 @@ export function HistoryList({ locale }: HistoryListProps): React.ReactElement {
             >
               {t('api.history.clear')}
             </button>
-          </span>
-        )}
+          )}
+        </span>
       </div>
 
       <input

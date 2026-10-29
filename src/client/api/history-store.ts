@@ -2,13 +2,16 @@
  * Send-log store for the API page (T044).
  *
  * `.vibe/api/history.json` is owned by the Host; search runs there so the panel
- * only ever holds one page (50 rows by default). The store keeps the query and
- * the last result across internal tab switches, mirrors the annotation history
- * store, and never sends anything — opening an entry only refills the builder.
+ * only ever holds one page (50 rows by default, 200 at most). The store keeps
+ * the query, the page size and the last result across internal tab switches,
+ * mirrors the annotation history store, and never sends anything — opening an
+ * entry only refills the builder.
  */
 import * as React from 'react'
 import {
   API_HISTORY_CLEAR_METHOD,
+  API_HISTORY_ENTRIES_MAX,
+  API_HISTORY_LIMIT_DEFAULT,
   API_HISTORY_LIST_METHOD,
   API_HISTORY_QUERY_CHARS_MAX,
   type ApiHistoryClearResult,
@@ -34,6 +37,8 @@ export type ApiHistoryStatus = 'idle' | 'loading' | 'ready' | 'error'
 
 export interface ApiHistoryState {
   readonly query: string
+  /** Rows asked from the Host per page; 1..API_HISTORY_ENTRIES_MAX. */
+  readonly limit: number
   readonly entries: readonly ApiHistoryEntry[]
   readonly total: number
   readonly skipped: number
@@ -44,6 +49,7 @@ export interface ApiHistoryState {
 
 const EMPTY_STATE: ApiHistoryState = {
   query: '',
+  limit: API_HISTORY_LIMIT_DEFAULT,
   entries: [],
   total: 0,
   skipped: 0,
@@ -92,9 +98,15 @@ export function resetApiHistoryStore(): void {
   emit()
 }
 
-function queryOf(query: string): ApiHistoryQuery | undefined {
+function queryOf(query: string, limit: number): ApiHistoryQuery {
   const trimmed = query.trim()
-  return trimmed === '' ? undefined : { query: trimmed }
+  return { ...(trimmed === '' ? {} : { query: trimmed }), limit }
+}
+
+/** Clamps a requested page size to what the Host accepts. */
+function clampLimit(limit: number): number {
+  if (!Number.isFinite(limit)) return API_HISTORY_LIMIT_DEFAULT
+  return Math.min(Math.max(Math.trunc(limit), 1), API_HISTORY_ENTRIES_MAX)
 }
 
 /** Loads the current query; the newest request wins. */
@@ -103,7 +115,7 @@ export async function loadApiHistory(): Promise<void> {
   state = { ...state, status: 'loading', error: null }
   emit()
   try {
-    const result = await api.list(queryOf(state.query))
+    const result = await api.list(queryOf(state.query, state.limit))
     if (seq !== requestSeq) return
     state = {
       ...state,
@@ -125,6 +137,15 @@ export function searchApiHistory(query: string): void {
   const next = query.slice(0, API_HISTORY_QUERY_CHARS_MAX)
   if (next === state.query) return
   state = { ...state, query: next }
+  emit()
+  void loadApiHistory()
+}
+
+/** Changes how many rows one page holds and reloads it; the query is kept. */
+export function setApiHistoryLimit(limit: number): void {
+  const next = clampLimit(limit)
+  if (next === state.limit) return
+  state = { ...state, limit: next }
   emit()
   void loadApiHistory()
 }
