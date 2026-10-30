@@ -339,7 +339,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 - 真值来源：`PreviewService` 保持唯一状态机，工具只读 `status()`；`reload` 在 closed 时靠服务的 `requireReady()` 抛 `target_unavailable`，工具不重复判断。
 - **未接线（有意）**：`apply()` 仍未注册 `vibe_preview` 也未挂审批监听器——可见性门禁与装配在 T052/T053。
 - 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/preview-tool tests/unit/artifacts` 4 文件 / 52 用例；`pnpm test` **110 文件 / 1002 用例**（基线 106/950）；`pnpm build` host **420.3** / client 440.5 KiB（`host entry imports cleanly`）；`pnpm test:e2e` 9/9（23.6 s）。
-- 提交：`f2ecf60`（实现）+ 本次文档提交。分支 `task/m5-agent-integration`（未推送、未合并）。归档 `F:\Project\claudecode修改优化\2026-10-30-T049-preview工具与门禁.md`。
+- 提交：`f2ecf60`（实现）、`c1e7565`（文档）。分支 `task/m5-agent-integration`（未推送、未合并）。归档 `F:\Project\claudecode修改优化\2026-10-30-T049-preview工具与门禁.md`。
 
 ### T026 遗留
 
@@ -468,7 +468,7 @@ dsh --profile vibe-dev --dump-config
 
 ## 10. 本次退出状态（2026-10-30）
 
-- **T049 preview 工具与门禁完成（2026-10-30，`task/m5-agent-integration`，未推送）**：`vibe_preview` 五动作落地，origin 门禁 loopback → `allowedOrigins` → 同源（跨源/非本地/越权全部 `permission_denied`）；新增 `PreviewService.captureScreenshot` 与 `.vibe/artifacts`（`ArtifactStore`：id 白名单、realpath 包含校验、8 MiB 上限、原子 rename 重试），截图字节永不进工具结果（FR-AGENT-09），结果只回 id + 尺寸 + 字节数；start/stop 的 ask 以 `tools/pre-execute` 监听器导出（`createPreviewApprovalGate`，非 ask 一律 `next()`），尚未挂 `apply()`（T052/T053）。验证：`pnpm typecheck` 0 error；聚焦 4 文件 / 52 用例；`pnpm test` **110 文件 / 1002 用例**（基线 106/950）；`pnpm build` host 420.3 / client 440.5 KiB；`pnpm test:e2e` 9/9（23.6 s）。提交 `f2ecf60`（实现）+ 文档提交；下一项 T050（`/vibe` 命令）。
+- **T049 preview 工具与门禁完成（2026-10-30，`task/m5-agent-integration`，未推送）**：`vibe_preview` 五动作落地，origin 门禁 loopback → `allowedOrigins` → 同源（跨源/非本地/越权全部 `permission_denied`）；新增 `PreviewService.captureScreenshot` 与 `.vibe/artifacts`（`ArtifactStore`：id 白名单、realpath 包含校验、8 MiB 上限、原子 rename 重试），截图字节永不进工具结果（FR-AGENT-09），结果只回 id + 尺寸 + 字节数；start/stop 的 ask 以 `tools/pre-execute` 监听器导出（`createPreviewApprovalGate`，非 ask 一律 `next()`），尚未挂 `apply()`（T052/T053）。验证：`pnpm typecheck` 0 error；聚焦 4 文件 / 52 用例；`pnpm test` **110 文件 / 1002 用例**（基线 106/950）；`pnpm build` host 420.3 / client 440.5 KiB；`pnpm test:e2e` 9/9（23.6 s）。提交 `f2ecf60`（实现）、`c1e7565`（文档）；下一项 T050（`/vibe` 命令）。
 - **T048 status/observe/annotation 实现完成（2026-10-30，`task/m5-agent-integration`，未推送）**：`vibe_status`/`vibe_observe`/`vibe_annotation_get` 落地（宿主计数、摘要 + 8 KB 适配、不可信包裹），新增只读 `PreviewService.domSnapshot`（`src/host/preview/dom.ts`：4 KB / 400 节点 / 14 层，页内序列化后宿主再归一化）。artifact id 有意留到 T049。验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/tools` 4 文件 / 31 用例；`pnpm test` **106 文件 / 950 用例**（基线 102/919）；`pnpm build` host 398.7 / client 440.5 KiB；`pnpm test:e2e` 9/9（21.4 s）。下一项 T049（preview 工具与 ask/审批门禁）。
 - **T047 工具 schema 与注册完成（2026-10-30，`task/m5-agent-integration`，未推送）**：新增 `src/host/agent/tools/definitions.ts`（`VIBE_TOOL_SPECS` 单一定义源、DSH 强制子集自检 `validateToolSpecs`、`validateToolArguments`）与 `src/host/agent/tools/register.ts`（`createVibeToolDefinitions`/`registerVibeTools`/`renderToolResult`/`VibeToolError`/`asVibeToolError`），`src/host/index.ts` 导出；四个工具参数/输出均 object 根 + `additionalProperties:false`。**有意不在 `apply()` 注册**：实现体在 T048/T049、可见性门禁在 T052。验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/tools` 2 文件 / 22 用例；`pnpm test` **102 文件 / 919 用例**（基线 100/897）；`pnpm build` host 372.8 / client 440.5 KiB；`pnpm test:e2e` 9/9（15.1 s）；DSH 自带 `assertObjectJsonSchema`/`validateJsonSchemaValue` 16/16 通过（`.tmp/logs/t047-schema-check.json` `ok:true`）。提交 `9f8cfb0`；下一项 T048（status/observe/annotation 实现）。
 

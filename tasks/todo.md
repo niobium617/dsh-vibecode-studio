@@ -707,7 +707,7 @@
   - 审批门禁：“审批触发”由 `tools/pre-execute` 监听器承载（DSH 的 `ToolRunContext` 没有审批字段，工具体无法自行 ask）：`createPreviewApprovalGate()` 只对 `start`/`stop` 返回 `{kind:'ask', reason, displayReason:{en, 'zh-CN'}}`（start 附带 URL，超 120 字符截断并去控制字符），其余调用一律 `next()`，避免用 `allow` 跳过后续监听器；`previewApprovalDecision()` 对畸形参数返回 `null`，交给 schema 报更清楚的错。**尚未挂到 `apply()`**：监听器注册与 preset 可见性门禁在 T052/T053。
   - 共享规则：新增 `src/host/preview/url.ts` 的 `isLoopbackHost`，Web 适配器改用同一实现（原私有副本删除），保证“预览启动”与“工具导航”两处 loopback 判定不会分歧。
   - 未做（范围外）：`apply()` 未接线（T052 preset/wiring）；文件名预留/过期清理与 artifact 读取入口（T050+ 按需）；T048 留下的 `vibe_observe` artifact id 接入未在此任务回填。
-  - 提交：`f2ecf60`（实现）+ 文档提交；归档 `F:\Project\claudecode修改优化\2026-10-30-T049-preview工具与门禁.md`。
+  - 提交：`f2ecf60`（实现）、`c1e7565`（文档）；归档 `F:\Project\claudecode修改优化\2026-10-30-T049-preview工具与门禁.md`。
 
 ### - [ ] T050 `/vibe` 命令
 
