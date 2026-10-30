@@ -692,12 +692,22 @@
   - 未做（范围外）：preview 工具与审批、`/vibe`、skill、preset、hooks（T049–T053）。
   - 提交：`7b4e56a`（实现）、`6aed5c0`（文档）（`task/m5-agent-integration`，未推送、未合并）。
 
-### - [ ] T049 preview 工具与门禁
+### - [x] T049 preview 工具与门禁
 
 - **目标**：reload/navigate/screenshot/start/stop；origin 限制；start/stop 走 ask/审批。
 - **验收**：越权/非 localhost 被拒；审批触发；单测通过。
 - **验证**：`pnpm test -- tests/integration/preview-tool`。
 - **文件**：`src/host/agent/tools/preview.ts`、tests。
+- **验证结果（2026-10-30，`task/m5-agent-integration`）**：
+  - 命令与结果：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/preview-tool tests/unit/artifacts` **4 文件 / 52 用例**通过；`pnpm test` **110 文件 / 1002 用例**通过（T048 基线 106/950）；`pnpm build` host **420.3 KiB** / client **440.5 KiB**（`host entry imports cleanly`）；`pnpm test:e2e` **9/9**（23.6 s）。
+  - 五个动作：`reload`/`navigate` 只在 `ready` 时执行（关闭 → `target_unavailable`，沿用 `requireReady()`）；`start` 在已运行时返回 `state:'ready'` + “already running; use navigate”，不静默改地址；`stop` 报告是否真在运行；`url` 只允许出现在 `navigate`/`start`（其余 → `invalid_input` + `details.field='url'`）；`targetId` 只接受当前目标 id 与 `preview`（`start` 时），否则 `not_found`。
+  - origin 门禁顺序：绝对 http(s)（拒绝 `file:`/凭证 URL/超 2048 字符）→ loopback（`isLoopbackHost`，`127.0.0.0/8`、`localhost`、`*.localhost`、`::1`；非本地 → `permission_denied` + `details.host`）→ `allowedOrigins`（`permission_denied` + `details.origin`）→ 运行状态 → 与当前页同源（不同源 → `permission_denied` + `details.{origin,currentOrigin}`）。`allowedOrigins` 此前没有任何执行点，现由 preview 工具统一执行。
+  - 截图（FR-AGENT-09）：`PreviewService.captureScreenshot()` 能力门控（无 `screenshot` → `unsupported` + `capability`，适配器异常 → `preview_failed`，空图 → `preview_failed`），返回 `{bytes,width,height}`；工具侧读**实时** `screenshotEnabled`（关闭 → `permission_denied` 且不采集），字节交给新的 `ArtifactStore.saveScreenshot()` 落 `.vibe/artifacts/<id>.png` + `<id>.json` 边车，结果只含 `{artifactId,width,height,bytes}` 与说明文字；测试断言结果 JSON 不含 base64、总长 < 1 KB。
+  - artifact 存储（`src/host/artifacts/store.ts`）：`.vibe/artifacts` 先字节后边车的原子写（临时文件 + `rename`，`EPERM`/`EBUSY`/`EACCES` 有界重试 4 次）、8 MiB / 4 KiB 上限、id 白名单（同时是文件名）、`realpath` 校验拒绝 `.vibe` 或 `artifacts` 越界 junction、`read()` 对缺失/坏 JSON/版本不符/id 不符/尺寸不符/符号链接一律 `null`；`toArtifactStudioError()` 映射为 `invalid_config`/`permission_denied`/`preview_failed`/`internal`。
+  - 审批门禁：“审批触发”由 `tools/pre-execute` 监听器承载（DSH 的 `ToolRunContext` 没有审批字段，工具体无法自行 ask）：`createPreviewApprovalGate()` 只对 `start`/`stop` 返回 `{kind:'ask', reason, displayReason:{en, 'zh-CN'}}`（start 附带 URL，超 120 字符截断并去控制字符），其余调用一律 `next()`，避免用 `allow` 跳过后续监听器；`previewApprovalDecision()` 对畸形参数返回 `null`，交给 schema 报更清楚的错。**尚未挂到 `apply()`**：监听器注册与 preset 可见性门禁在 T052/T053。
+  - 共享规则：新增 `src/host/preview/url.ts` 的 `isLoopbackHost`，Web 适配器改用同一实现（原私有副本删除），保证“预览启动”与“工具导航”两处 loopback 判定不会分歧。
+  - 未做（范围外）：`apply()` 未接线（T052 preset/wiring）；文件名预留/过期清理与 artifact 读取入口（T050+ 按需）；T048 留下的 `vibe_observe` artifact id 接入未在此任务回填。
+  - 提交：`f2ecf60`（实现）+ 文档提交；归档 `F:\Project\claudecode修改优化\2026-10-30-T049-preview工具与门禁.md`。
 
 ### - [ ] T050 `/vibe` 命令
 
