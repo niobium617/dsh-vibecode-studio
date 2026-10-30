@@ -675,12 +675,21 @@
   - 未做（范围外）：工具实现体、审批/门禁、skill、preset、hooks（T048–T053）。
   - 提交：`9f8cfb0`（`task/m5-agent-integration`，未推送、未合并）。
 
-### - [ ] T048 status/observe/annotation 实现
+### - [x] T048 status/observe/annotation 实现
 
 - **目标**：三个工具的实际数据；摘要 + artifact id；预算截断。
 - **验收**：默认 ≤ 8 KB；数据正确；不可信包裹；单测通过。
 - **验证**：`pnpm test -- tests/integration/tools`。
-- **文件**：`src/host/agent/tools/{status,observe,annotation}.ts`、tests。
+- **文件**：`src/host/agent/tools/{status,observe,annotation,preview-data}.ts`、`src/host/preview/{dom,session}.ts`、tests。
+- **验证结果（2026-10-30，`task/m5-agent-integration`）**：
+  - 命令与结果：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/tools` **4 文件 / 31 用例**通过；`pnpm exec vitest run tests/unit/tools` 2 文件 / 22 用例通过；`pnpm test` **106 文件 / 950 用例**通过（T047 基线 102/919）；`pnpm build` host **398.7 KiB** / client **440.5 KiB**（`host entry imports cleanly`，T047 基线 372.8）；`pnpm test:e2e` **9/9**（21.4 s）。
+  - `vibe_status`：只读宿主自有数据（`preview.status()`、缓冲区快照、`annotations.list({limit:1}).total`），默认不读页面源码；输出 `{target?,preview:{state,fps},consoleErrors,networkFailures,annotations:{queued,saved},summary}`。`idle` 映射为工具的 `closed`；缓冲区只在 `ready` 时读取；console/network 不可用写进 `summary` 而不失败；`queued` 恒为 0（客户端队列，宿主不可见）并注明；`stale` 留给 T053。
+  - `vibe_observe`：`detail`（`summary` 2 KB / `full` 4 KB DOM）与 `include`（空 = 全部）解析严格；DOM/console/network 各自降级为摘要备注，单一指定 section 失败时抛真实错误，`invalid_input` 始终上抛；DOM/console/network 文本全部经 `wrapUntrustedPageContent`（source 分别为 selector/`document`、`preview-console`、`preview-network`）；`truncated` 在丢弃条目或触页面上限时为 true；8 KB 适配循环先丢 network/console 行再截 DOM，保证 JSON 可解析（不依赖注册层字符串截断）。
+  - `vibe_annotation_get`：`history.get({id})`，用户评论在结构化字段与 `content` 中位于不可信包裹之外；元素数据（selector/tag/text/source 定位）在 `renderAnnotationText` 的包裹内；有意不重复输出 `element.html`（页面标记只存在于包裹内）；超长评论按 8 KB 收缩评论字段，仍保持可解析 JSON。
+  - 新增只读能力：`PreviewService.domSnapshot(params?)`（`src/host/preview/session.ts`）+ 页内序列化器 `src/host/preview/dom.ts`（4 KB 上限、400 节点、14 层、跳过 script/style/hidden，逐次 `Runtime.evaluate` 后 `detach`）；页面回包在宿主侧再归一化（去控制字符、按字节截断、nodeCount ≤ 400），畸形回包 → `preview_failed`，选择器无效 → `invalid_input`，无匹配 → `not_found`。
+  - **artifact id 未做（有意）**：仓库只有 `ArtifactRef` 契约，没有 artifact 存储/读取实现；`vibe_observe` 的二次读取用 `detail:'full'` 承载 FR-AGENT-10，`artifactId` 留到 T049 截图/artifact 路径落地后再接入。
+  - 支持性偏差：T048 文件清单外新增 `src/host/preview/dom.ts`、`src/host/agent/tools/preview-data.ts`、`PreviewService.domSnapshot`，因为 DOM 读取无既有通道；`apply()` 仍未调用 `registerVibeTools`（T052 门禁）。
+  - 未做（范围外）：preview 工具与审批、`/vibe`、skill、preset、hooks（T049–T053）。
 
 ### - [ ] T049 preview 工具与门禁
 
