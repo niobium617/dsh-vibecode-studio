@@ -80,7 +80,7 @@ describe('CollectionTree list', () => {
     render(<CollectionTree />)
 
     expect(await screen.findByText('Weather')).toBeDefined()
-    expect(screen.getByText('2 collection files could not be read.')).toBeDefined()
+    expect(screen.getByText('2 saved-request files could not be read.')).toBeDefined()
   })
 
   it('shows an error state and retries', async () => {
@@ -88,13 +88,13 @@ describe('CollectionTree list', () => {
     setApiCollectionApi(fake.api)
     render(<CollectionTree />)
 
-    expect(await screen.findByText('Collections unavailable')).toBeDefined()
+    expect(await screen.findByText('Saved requests unavailable')).toBeDefined()
 
     fake.options.failList = false
     fireEvent.click(screen.getByText('Retry'))
 
     expect(await screen.findByText('Weather')).toBeDefined()
-    expect(screen.queryByText('Collections unavailable')).toBeNull()
+    expect(screen.queryByText('Saved requests unavailable')).toBeNull()
   })
 
   it('renders Chinese labels', async () => {
@@ -103,7 +103,7 @@ describe('CollectionTree list', () => {
     render(<CollectionTree locale="zh-CN" />)
 
     expect(await screen.findByText('还没有保存的请求')).toBeDefined()
-    expect(screen.getByText('集合')).toBeDefined()
+    expect(screen.getByText('我的收藏')).toBeDefined()
   })
 })
 
@@ -139,7 +139,7 @@ describe('CollectionTree delete, rename and copy', () => {
 
     const dialog = container.querySelector('[data-vibe-collection-confirm="1"]')!
     expect(dialog).not.toBeNull()
-    expect(dialog.textContent).toContain('Delete this collection?')
+    expect(dialog.textContent).toContain('Delete these saved requests?')
     expect(dialog.textContent).toContain('Weather')
 
     fireEvent.click(container.querySelector('[data-vibe-collection-cancel="1"]')!)
@@ -203,7 +203,7 @@ describe('CollectionTree delete, rename and copy', () => {
     })
     fireEvent.click(container.querySelector('[data-vibe-collection-rename-save="1"]')!)
 
-    expect(await screen.findByText('The collection could not be renamed.')).toBeDefined()
+    expect(await screen.findByText('The list could not be renamed.')).toBeDefined()
     expect(screen.getByText('Weather')).toBeDefined()
   })
 
@@ -227,7 +227,7 @@ describe('CollectionTree delete, rename and copy', () => {
 
     fireEvent.click(container.querySelector('[data-vibe-collection-copy="1"]')!)
 
-    expect(await screen.findByText('The collection could not be copied.')).toBeDefined()
+    expect(await screen.findByText('The list could not be copied.')).toBeDefined()
     expect(screen.getByText('Weather')).toBeDefined()
     expect(fake.duplicate).toHaveBeenCalledTimes(1)
   })
@@ -241,7 +241,7 @@ describe('CollectionTree delete, rename and copy', () => {
     fireEvent.click(container.querySelector('[data-vibe-collection-delete="1"]')!)
     fireEvent.click(container.querySelector('[data-vibe-collection-confirm-delete="1"]')!)
 
-    expect(await screen.findByText('The collection could not be deleted.')).toBeDefined()
+    expect(await screen.findByText('The list could not be deleted.')).toBeDefined()
     expect(container.querySelector('[data-vibe-collection-confirm="1"]')).not.toBeNull()
     expect(screen.getByText('Weather')).toBeDefined()
   })

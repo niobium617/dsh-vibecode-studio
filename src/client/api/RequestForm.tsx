@@ -36,7 +36,7 @@ const formStyle: React.CSSProperties = {
 
 const barStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'auto minmax(0, 1fr)',
+  gridTemplateColumns: 'auto minmax(0, 1fr) auto',
   gap: 6,
   alignItems: 'center',
 }
@@ -70,6 +70,42 @@ const textareaStyle: React.CSSProperties = {
 
 const sectionStyle: React.CSSProperties = {
   display: 'grid',
+  gap: 6,
+}
+
+const sectionTitleStyle: React.CSSProperties = {
+  font: '600 11px/1.4 system-ui, sans-serif',
+  opacity: 0.8,
+  margin: '2px 0 0',
+}
+
+const fieldStyle: React.CSSProperties = {
+  display: 'grid',
+  gap: 3,
+}
+
+const labelStyle: React.CSSProperties = {
+  font: '11px/1.4 system-ui, sans-serif',
+  opacity: 0.7,
+}
+
+const moreStyle: React.CSSProperties = {
+  display: 'grid',
+  gap: 6,
+  borderTop: '1px solid var(--dsw-border-color, rgba(127, 127, 127, 0.18))',
+  paddingTop: 8,
+}
+
+const summaryStyle: React.CSSProperties = {
+  cursor: 'pointer',
+  font: '11px/1.4 system-ui, sans-serif',
+  opacity: 0.75,
+  padding: '2px 0',
+}
+
+const coreActionStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
   gap: 6,
 }
 
@@ -128,7 +164,7 @@ const errorStyle: React.CSSProperties = {
   color: 'var(--dsw-color-danger, #c62828)',
 }
 
-const SECTIONS: readonly RequestSection[] = ['query', 'headers', 'body', 'auth']
+const MORE_SECTIONS: readonly RequestSection[] = ['headers', 'body', 'auth']
 
 export interface RequestFormProps {
   readonly draft: RequestDraft
@@ -138,8 +174,10 @@ export interface RequestFormProps {
   readonly locale?: Locale
   /** Fired by Enter in a text input and by the hidden submit button. */
   readonly onSubmit?: () => void
-  /** Actions rendered at the bottom of the form (send, cancel, status). */
-  readonly footer?: React.ReactNode
+  /** Send / cancel, rendered as the third cell of the core row. */
+  readonly coreAction?: React.ReactNode
+  /** Save and status line, rendered right below the core row. */
+  readonly secondaryActions?: React.ReactNode
 }
 
 function countRows(rows: readonly KeyValueDraft[]): number {
@@ -152,10 +190,13 @@ export function RequestForm({
   disabled = false,
   locale,
   onSubmit,
-  footer,
+  coreAction,
+  secondaryActions,
 }: RequestFormProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
-  const [section, setSection] = React.useState<RequestSection>('query')
+  // U04: query parameters stay on screen; headers, body and auth move into a
+  // collapsed "more options" group so the first screen keeps one core row.
+  const [section, setSection] = React.useState<RequestSection>('headers')
   const [fileError, setFileError] = React.useState<string | null>(null)
   const patch = (next: Partial<RequestDraft>): void => onChange({ ...draft, ...next })
 
@@ -222,44 +263,53 @@ export function RequestForm({
           disabled={disabled}
           onChange={(event) => patch({ url: event.target.value })}
         />
+        <div style={coreActionStyle}>{coreAction}</div>
       </div>
+      {secondaryActions}
 
-      <div role="tablist" aria-label={t('api.request.sections')} style={tabListStyle}>
-        {SECTIONS.map((id) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            id={`vibe-api-section-${id}`}
-            aria-selected={section === id}
-            data-vibe-section={id}
-            style={tabStyle(section === id)}
-            onClick={() => setSection(id)}
-          >
-            {t(`api.request.section.${id}`)}
-            {sectionCount[id] > 0 ? ` (${sectionCount[id]})` : ''}
-          </button>
-        ))}
-      </div>
+      <section style={sectionStyle} data-vibe-query-section="1">
+        <h3 style={sectionTitleStyle}>{t('api.request.section.query')}</h3>
+        <KeyValueEditor
+          section="query"
+          rows={draft.query}
+          disabled={disabled}
+          locale={locale}
+          onChange={(rows) => patch({ query: rows })}
+        />
+      </section>
 
-      {section === 'query' || section === 'headers' ? (
-        <section
-          role="tabpanel"
-          aria-labelledby={`vibe-api-section-${section}`}
-          style={sectionStyle}
-        >
-          <KeyValueEditor
-            section={section}
-            rows={section === 'query' ? draft.query : draft.headers}
-            disabled={disabled}
-            locale={locale}
-            onChange={(rows) => patch(section === 'query' ? { query: rows } : { headers: rows })}
-          />
-          {section === 'headers' ? (
+      <details style={moreStyle} data-vibe-more-config="1">
+        <summary style={summaryStyle}>{t('api.request.more')}</summary>
+        <div role="tablist" aria-label={t('api.request.sections')} style={tabListStyle}>
+          {MORE_SECTIONS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              id={`vibe-api-section-${id}`}
+              aria-selected={section === id}
+              data-vibe-section={id}
+              style={tabStyle(section === id)}
+              onClick={() => setSection(id)}
+            >
+              {t(`api.request.section.${id}`)}
+              {sectionCount[id] > 0 ? ` (${sectionCount[id]})` : ''}
+            </button>
+          ))}
+        </div>
+
+        {section === 'headers' ? (
+          <section role="tabpanel" aria-labelledby="vibe-api-section-headers" style={sectionStyle}>
+            <KeyValueEditor
+              section="headers"
+              rows={draft.headers}
+              disabled={disabled}
+              locale={locale}
+              onChange={(rows) => patch({ headers: rows })}
+            />
             <span style={hintStyle}>{t('api.request.headers.hint')}</span>
-          ) : null}
-        </section>
-      ) : null}
+          </section>
+        ) : null}
 
       {section === 'body' ? (
         <section role="tabpanel" aria-labelledby="vibe-api-section-body" style={sectionStyle}>
@@ -382,92 +432,120 @@ export function RequestForm({
           </select>
 
           {draft.authKind === 'bearer' ? (
-            <input
-              aria-label={t('api.request.auth.token')}
-              data-vibe-auth-token="1"
-              style={inputStyle}
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="{{token}}"
-              value={draft.bearerToken}
-              disabled={disabled}
-              onChange={(event) => patch({ bearerToken: event.target.value })}
-            />
+            <LabeledField label={t('api.request.auth.token')}>
+              <input
+                aria-label={t('api.request.auth.token')}
+                data-vibe-auth-token="1"
+                style={inputStyle}
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="{{token}}"
+                value={draft.bearerToken}
+                disabled={disabled}
+                onChange={(event) => patch({ bearerToken: event.target.value })}
+              />
+            </LabeledField>
           ) : null}
 
           {draft.authKind === 'basic' ? (
             <>
-              <input
-                aria-label={t('api.request.auth.username')}
-                data-vibe-auth-username="1"
-                style={inputStyle}
-                type="text"
-                autoComplete="off"
-                spellCheck={false}
-                value={draft.basicUsername}
-                disabled={disabled}
-                onChange={(event) => patch({ basicUsername: event.target.value })}
-              />
-              <input
-                aria-label={t('api.request.auth.password')}
-                data-vibe-auth-password="1"
-                style={inputStyle}
-                type="password"
-                autoComplete="off"
-                value={draft.basicPassword}
-                disabled={disabled}
-                onChange={(event) => patch({ basicPassword: event.target.value })}
-              />
+              <LabeledField label={t('api.request.auth.username')}>
+                <input
+                  aria-label={t('api.request.auth.username')}
+                  data-vibe-auth-username="1"
+                  style={inputStyle}
+                  type="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={t('api.request.auth.username.placeholder')}
+                  value={draft.basicUsername}
+                  disabled={disabled}
+                  onChange={(event) => patch({ basicUsername: event.target.value })}
+                />
+              </LabeledField>
+              <LabeledField label={t('api.request.auth.password')}>
+                <input
+                  aria-label={t('api.request.auth.password')}
+                  data-vibe-auth-password="1"
+                  style={inputStyle}
+                  type="password"
+                  autoComplete="off"
+                  placeholder={t('api.request.auth.password.placeholder')}
+                  value={draft.basicPassword}
+                  disabled={disabled}
+                  onChange={(event) => patch({ basicPassword: event.target.value })}
+                />
+              </LabeledField>
             </>
           ) : null}
 
           {draft.authKind === 'api-key' ? (
             <>
-              <input
-                aria-label={t('api.request.auth.keyName')}
-                data-vibe-auth-key-name="1"
-                style={inputStyle}
-                type="text"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder="X-API-Key"
-                value={draft.apiKeyName}
-                disabled={disabled}
-                onChange={(event) => patch({ apiKeyName: event.target.value })}
-              />
-              <input
-                aria-label={t('api.request.auth.keyValue')}
-                data-vibe-auth-key-value="1"
-                style={inputStyle}
-                type="password"
-                autoComplete="off"
-                placeholder="{{apiKey}}"
-                value={draft.apiKeyValue}
-                disabled={disabled}
-                onChange={(event) => patch({ apiKeyValue: event.target.value })}
-              />
-              <select
-                aria-label={t('api.request.auth.keyIn')}
-                data-vibe-auth-key-in="1"
-                style={selectStyle}
-                value={draft.apiKeyIn}
-                disabled={disabled}
-                onChange={(event) =>
-                  patch({ apiKeyIn: event.target.value === 'query' ? 'query' : 'header' })
-                }
-              >
-                <option value="header">{t('api.request.auth.in.header')}</option>
-                <option value="query">{t('api.request.auth.in.query')}</option>
-              </select>
+              <LabeledField label={t('api.request.auth.keyName')}>
+                <input
+                  aria-label={t('api.request.auth.keyName')}
+                  data-vibe-auth-key-name="1"
+                  style={inputStyle}
+                  type="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="X-API-Key"
+                  value={draft.apiKeyName}
+                  disabled={disabled}
+                  onChange={(event) => patch({ apiKeyName: event.target.value })}
+                />
+              </LabeledField>
+              <LabeledField label={t('api.request.auth.keyValue')}>
+                <input
+                  aria-label={t('api.request.auth.keyValue')}
+                  data-vibe-auth-key-value="1"
+                  style={inputStyle}
+                  type="password"
+                  autoComplete="off"
+                  placeholder="{{apiKey}}"
+                  value={draft.apiKeyValue}
+                  disabled={disabled}
+                  onChange={(event) => patch({ apiKeyValue: event.target.value })}
+                />
+              </LabeledField>
+              <LabeledField label={t('api.request.auth.keyIn')}>
+                <select
+                  aria-label={t('api.request.auth.keyIn')}
+                  data-vibe-auth-key-in="1"
+                  style={selectStyle}
+                  value={draft.apiKeyIn}
+                  disabled={disabled}
+                  onChange={(event) =>
+                    patch({ apiKeyIn: event.target.value === 'query' ? 'query' : 'header' })
+                  }
+                >
+                  <option value="header">{t('api.request.auth.in.header')}</option>
+                  <option value="query">{t('api.request.auth.in.query')}</option>
+                </select>
+              </LabeledField>
             </>
           ) : null}
           <span style={hintStyle}>{t('api.request.auth.hint')}</span>
         </section>
       ) : null}
-
-      {footer}
+      </details>
     </form>
+  )
+}
+
+function LabeledField({
+  label,
+  children,
+}: {
+  readonly label: string
+  readonly children: React.ReactNode
+}): React.ReactElement {
+  return (
+    <label style={fieldStyle}>
+      <span style={labelStyle}>{label}</span>
+      {children}
+    </label>
   )
 }
 

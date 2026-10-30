@@ -33,6 +33,9 @@ import {
   API_NAME_CHARS_MAX,
   API_OPENAPI_IMPORT_METHOD,
   API_REPLAY_PREPARE_METHOD,
+  API_SAMPLE_INFO_METHOD,
+  isApiSampleInfo,
+  type ApiSampleInfo,
   isApiAssertion,
   isApiHistoryQuery,
   isApiEnvironment,
@@ -93,6 +96,7 @@ export {
   API_HTTP_SEND_METHOD,
   API_OPENAPI_IMPORT_METHOD,
   API_REPLAY_PREPARE_METHOD,
+  API_SAMPLE_INFO_METHOD,
 }
 
 export interface ApiServiceOptions {
@@ -105,6 +109,8 @@ export interface ApiServiceOptions {
   readonly history?: ApiHistoryStore
   /** `.vibe/api/environments`; without it the environment methods report `internal`. */
   readonly environments?: ApiEnvironmentStore
+  /** Loopback sample endpoint (U04); without it the panel falls back to an empty URL. */
+  readonly sample?: () => Promise<ApiSampleInfo>
 }
 
 export interface ApiSendOutcome {
@@ -147,6 +153,7 @@ export class ApiService {
   private readonly collections: ApiCollectionStore | undefined
   private readonly history: ApiHistoryStore | undefined
   private readonly environments: ApiEnvironmentStore | undefined
+  private readonly sample: (() => Promise<ApiSampleInfo>) | undefined
 
   constructor(options: ApiServiceOptions) {
     this.executor = options.executor ?? createHttpExecutor()
@@ -154,6 +161,26 @@ export class ApiService {
     this.collections = options.collections
     this.history = options.history
     this.environments = options.environments
+    this.sample = options.sample
+  }
+
+  /**
+   * URL of the built-in sample request (U04). Starting the listener is the only
+   * side effect; the URL is loopback-only and carries no data.
+   */
+  async sampleInfo(): Promise<ApiSampleInfo> {
+    if (this.sample === undefined) {
+      throw studioError('internal', 'vibe-studio: sample endpoint is unavailable', {
+        reason: 'unavailable',
+      })
+    }
+    const info = await this.sample()
+    if (!isApiSampleInfo(info)) {
+      throw studioError('internal', 'vibe-studio: sample endpoint returned an invalid URL', {
+        reason: 'invalid',
+      })
+    }
+    return info
   }
 
   /**
@@ -710,6 +737,7 @@ export function registerApiMethods(registry: UnaryRegistry, service: ApiService)
     registry.register(API_HTTP_SEND_METHOD, (params, context) =>
       service.send(params, context.signal),
     ),
+    registry.register(API_SAMPLE_INFO_METHOD, () => service.sampleInfo()),
     registry.register(API_REPLAY_PREPARE_METHOD, (params) => service.prepareReplay(params)),
     registry.register(API_COLLECTION_LIST_METHOD, () => service.listCollections()),
     registry.register(API_COLLECTION_GET_METHOD, (params) => service.readCollection(params)),

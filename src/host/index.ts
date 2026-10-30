@@ -8,6 +8,7 @@
 import { createApiCollectionStore } from './api/collection-store'
 import { createApiEnvironmentStore } from './api/environment-store'
 import { createApiHistoryStore } from './api/history-store'
+import { createApiSampleServer } from './api/sample-server'
 import type { ApiSecretStore, CredentialProviderLike } from './api/secrets'
 import { createApiSecretStore } from './api/secrets'
 import { ApiService, registerApiMethods } from './api/service'
@@ -79,6 +80,8 @@ export {
 } from './api/environment-store'
 export type { ApiEnvironmentListResult } from './api/environment-store'
 export { createApiSecretStore, CREDENTIAL_NAME_PATTERN, isCredentialName } from './api/secrets'
+export { createApiSampleServer } from './api/sample-server'
+export type { ApiSampleServer } from './api/sample-server'
 export type {
   ApiSecretStore,
   ApiSecretStoreOptions,
@@ -122,6 +125,7 @@ export {
   API_HTTP_SEND_METHOD,
   API_OPENAPI_IMPORT_METHOD,
   API_REPLAY_PREPARE_METHOD,
+  API_SAMPLE_INFO_METHOD,
   ApiService,
   registerApiMethods,
   summarizeCollection,
@@ -345,17 +349,27 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
   // T046 R4: environments are edited and persisted under `.vibe/api`; a send
   // names one by id and the Host loads it, so secret references stay host-side.
   const apiEnvironments = createApiEnvironmentStore(process.cwd())
+  // U04: a loopback-only sample endpoint so the first Send works without typing
+  // a URL or reaching the internet. It starts lazily on the first panel request.
+  const apiSample = createApiSampleServer()
   const api = new ApiService({
     secrets: apiSecrets,
     collections: apiCollections,
     history: apiHistory,
     environments: apiEnvironments,
+    sample: () => apiSample.info(),
   })
-  const setupApi = () => registerApiMethods(registry, api)
+  const setupApi = () => {
+    const disposeMethods = registerApiMethods(registry, api)
+    return async () => {
+      disposeMethods()
+      await apiSample.dispose()
+    }
+  }
   if (typeof ctx.effect === 'function') {
     ctx.effect(setupApi, 'vibe-studio: api methods')
   } else {
-    setupApi()
+    void setupApi()
   }
 
   ctx.provide('vibeStudio', {

@@ -37,6 +37,7 @@ import {
   type RequestDraft,
   type RequestIssue,
 } from './request-model'
+import type { ApiUiMode } from './ui-mode'
 
 export interface ApiSendOutcome {
   readonly result: HttpExecutionResult
@@ -85,7 +86,37 @@ const footerStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 8,
   flexWrap: 'wrap',
-  padding: '4px 0 0',
+  padding: '2px 0 0',
+  font: '11px/1.4 system-ui, sans-serif',
+}
+
+const responseAreaStyle: React.CSSProperties = {
+  display: 'grid',
+  gap: 6,
+  marginTop: 4,
+  paddingTop: 10,
+  borderTop: '1px solid var(--dsw-border-color, rgba(127, 127, 127, 0.18))',
+  minHeight: 120,
+}
+
+const responseTitleStyle: React.CSSProperties = {
+  font: '600 11px/1.4 system-ui, sans-serif',
+  opacity: 0.8,
+  margin: 0,
+}
+
+const responseEmptyStyle: React.CSSProperties = {
+  font: '11px/1.4 system-ui, sans-serif',
+  opacity: 0.55,
+  padding: '12px 0',
+}
+
+const advancedStyle: React.CSSProperties = {
+  display: 'grid',
+  gap: 8,
+  marginTop: 6,
+  paddingTop: 8,
+  borderTop: '1px solid var(--dsw-border-color, rgba(127, 127, 127, 0.18))',
 }
 
 const buttonStyle: React.CSSProperties = {
@@ -95,15 +126,23 @@ const buttonStyle: React.CSSProperties = {
   background: 'var(--dsw-accent-color, #4f8cff)',
   color: '#fff',
   cursor: 'pointer',
-  font: '600 12px/1.4 system-ui, sans-serif',
-  padding: '6px 12px',
+  font: '600 13px/1.4 system-ui, sans-serif',
+  minHeight: 34,
+  padding: '8px 16px',
+  whiteSpace: 'nowrap',
 }
 
-const secondaryButtonStyle: React.CSSProperties = {
-  ...buttonStyle,
+/** Quiet text action: available, but never competing with Send. */
+const quietButtonStyle: React.CSSProperties = {
+  appearance: 'none',
+  border: 'none',
   background: 'transparent',
   color: 'inherit',
-  borderColor: 'var(--dsw-border-color, rgba(127, 127, 127, 0.35))',
+  cursor: 'pointer',
+  font: '11px/1.4 system-ui, sans-serif',
+  opacity: 0.75,
+  padding: '2px 2px',
+  textDecoration: 'underline',
 }
 
 const statusStyle: React.CSSProperties = {
@@ -190,6 +229,10 @@ export interface RequestBuilderProps {
   /** Runs after a send settles, so the history list can refresh. */
   readonly onSent?: () => void
   readonly locale?: Locale
+  /** U04: beginner hides cURL and result checks; professional shows them. */
+  readonly mode?: ApiUiMode
+  /** URL of the loopback sample request; fills an untouched, empty URL. */
+  readonly sampleUrl?: string | null
 }
 
 function issueKey(issue: RequestIssue): string {
@@ -232,9 +275,14 @@ export function RequestBuilder({
   save,
   onSent,
   locale,
+  mode = 'pro',
+  sampleUrl = null,
 }: RequestBuilderProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
   const [draft, setDraft] = React.useState<RequestDraft>(() => initialDraft ?? createRequestDraft())
+  // U04: the sample URL arrives a tick after mount; only fill a URL the user
+  // has not touched and that came in empty (a replay/collection draft wins).
+  const urlTouchedRef = React.useRef<boolean>((initialDraft?.url ?? '') !== '')
   const [phase, setPhase] = React.useState<Phase>({ kind: 'idle' })
   const [issues, setIssues] = React.useState<readonly RequestIssue[]>([])
   // T045: checks live beside the draft; results belong to one send, so editing
@@ -257,6 +305,22 @@ export function RequestBuilder({
     return () => controllerRef.current?.abort()
   }, [])
 
+  React.useEffect(() => {
+    if (sampleUrl === null || sampleUrl === '') return
+    setDraft((current) => {
+      if (urlTouchedRef.current || current.url !== '') return current
+      return { ...current, url: sampleUrl }
+    })
+  }, [sampleUrl])
+
+  const handleDraftChange = React.useCallback(
+    (next: RequestDraft): void => {
+      if (next.url !== draft.url) urlTouchedRef.current = true
+      setDraft(next)
+    },
+    [draft.url],
+  )
+
   // T044: replay, the collection tree and the history list all hand a draft
   // over through one store. Registering also drains a draft that arrived while
   // the builder was unmounted (the T043 tab-switch case); a draft is loaded
@@ -264,6 +328,7 @@ export function RequestBuilder({
   React.useEffect(
     () =>
       registerDraftTarget((next) => {
+        urlTouchedRef.current = true
         setDraft(draftFromRequestSpec(next.spec))
         setIssues([])
         // Checks are kept (the same API is often re-tested) but their verdicts
@@ -328,6 +393,7 @@ export function RequestBuilder({
   // FR-API-07: a parsed command becomes a draft exactly like a saved request
   // does — the form is filled, nothing is sent, and the notice says so.
   const handleCurlImport = React.useCallback((spec: HttpRequestSpec): void => {
+    urlTouchedRef.current = true
     setDraft(draftFromRequestSpec(spec))
     setIssues([])
     setAssertionResults(null)
@@ -362,26 +428,26 @@ export function RequestBuilder({
     controllerRef.current?.abort()
   }, [])
 
-  const footer = (
-    <div style={footerStyle}>
-      <button
-        type="button"
-        style={buttonStyle}
-        data-vibe-send="1"
-        disabled={sending}
-        onClick={handleSend}
-      >
-        {t('api.request.send')}
-      </button>
-      {sending ? (
-        <button type="button" style={secondaryButtonStyle} data-vibe-cancel="1" onClick={handleCancel}>
-          {t('api.request.cancel')}
-        </button>
-      ) : null}
+  // U04: Send is the only loud control; the core row ends with it. Save and the
+  // status lines sit on a quiet line right below so one screen holds one action.
+  const coreAction = (
+    <button
+      type="button"
+      style={buttonStyle}
+      data-vibe-send="1"
+      disabled={sending}
+      onClick={handleSend}
+    >
+      {t('api.request.send')}
+    </button>
+  )
+
+  const secondaryActions = (
+    <div style={footerStyle} data-vibe-secondary-actions="1">
       {save === undefined ? null : (
         <button
           type="button"
-          style={secondaryButtonStyle}
+          style={quietButtonStyle}
           data-vibe-save="1"
           disabled={sending || saving}
           onClick={handleSave}
@@ -389,6 +455,11 @@ export function RequestBuilder({
           {saving ? t('api.request.saving') : t('api.request.save')}
         </button>
       )}
+      {sending ? (
+        <button type="button" style={quietButtonStyle} data-vibe-cancel="1" onClick={handleCancel}>
+          {t('api.request.cancel')}
+        </button>
+      ) : null}
       <span style={statusStyle} role="status" data-vibe-request-status="1">
         {phase.kind === 'sending'
           ? t('api.request.sending')
@@ -413,27 +484,12 @@ export function RequestBuilder({
     <div style={rootStyle} data-vibe-request-builder="1">
       <RequestForm
         draft={draft}
-        onChange={setDraft}
+        onChange={handleDraftChange}
         disabled={sending}
         locale={locale}
         onSubmit={handleSend}
-        footer={footer}
-      />
-
-      <CurlPanel
-        draft={draft}
-        onImport={handleCurlImport}
-        disabled={sending}
-        {...(locale === undefined ? {} : { locale })}
-      />
-
-      <AssertionsEditor
-        drafts={assertionDrafts}
-        onChange={handleAssertionsChange}
-        {...(assertionResults === null ? {} : { results: assertionResults })}
-        issues={assertionIssues}
-        disabled={sending}
-        {...(locale === undefined ? {} : { locale })}
+        coreAction={coreAction}
+        secondaryActions={secondaryActions}
       />
 
       {replayNotice !== null ? (
@@ -522,28 +578,54 @@ export function RequestBuilder({
         </div>
       ) : null}
 
-      {phase.kind === 'sent' ? (
-        <>
+      {/* U04: the response is the centre of the screen, so it is always here and
+          an untouched screen says what will appear rather than showing a void. */}
+      <section style={responseAreaStyle} data-vibe-response-area="1" aria-label={t('api.response.title')}>
+        <h3 style={responseTitleStyle}>{t('api.response.title')}</h3>
+        {phase.kind === 'sent' ? (
           <ResponseView
             result={phase.outcome.result}
             {...(locale === undefined ? {} : { locale })}
           />
-          {phase.outcome.unresolved.length > 0 ? (
-            <div style={warnBoxStyle} data-vibe-request-unresolved="1">
-              <strong style={{ font: '600 11px/1.4 system-ui, sans-serif' }}>
-                {t('api.env.unresolved.title')}
-              </strong>
-              <ul style={listStyle}>
-                {phase.outcome.unresolved.map((item) => (
-                  <li key={`${item.name}\u0000${item.where}`}>
-                    {t('api.env.unresolved.row', { name: item.name, where: item.where })}{' '}
-                    {t(`api.env.reason.${item.reason}`)}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </>
+        ) : (
+          <p style={responseEmptyStyle} data-vibe-response-empty="1">
+            {t('api.response.empty')}
+          </p>
+        )}
+        {phase.kind === 'sent' && phase.outcome.unresolved.length > 0 ? (
+          <div style={warnBoxStyle} data-vibe-request-unresolved="1">
+            <strong style={{ font: '600 11px/1.4 system-ui, sans-serif' }}>
+              {t('api.env.unresolved.title')}
+            </strong>
+            <ul style={listStyle}>
+              {phase.outcome.unresolved.map((item) => (
+                <li key={`${item.name}\u0000${item.where}`}>
+                  {t('api.env.unresolved.row', { name: item.name, where: item.where })}{' '}
+                  {t(`api.env.reason.${item.reason}`)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </section>
+
+      {mode === 'pro' ? (
+        <div style={advancedStyle} data-vibe-advanced="1">
+          <CurlPanel
+            draft={draft}
+            onImport={handleCurlImport}
+            disabled={sending}
+            {...(locale === undefined ? {} : { locale })}
+          />
+          <AssertionsEditor
+            drafts={assertionDrafts}
+            onChange={handleAssertionsChange}
+            {...(assertionResults === null ? {} : { results: assertionResults })}
+            issues={assertionIssues}
+            disabled={sending}
+            {...(locale === undefined ? {} : { locale })}
+          />
+        </div>
       ) : null}
     </div>
   )

@@ -633,6 +633,24 @@
   - [x] **R6 FR-API-06 历史 N 可配置**：client `history-store` 新增 `limit`（默认 50，`setApiHistoryLimit` 夹到 1..200，改后保留搜索词重载，重置回 50），`queryOf` 始终携带 `limit` 调 `api.history.list`；`HistoryList` 头部新增 50/100/200 选择器（`data-vibe-send-history-limit`，i18n `api.history.limitLabel`），换大后“还有 N 条未显示”消失。Host 侧校验与默认值原已支持。验证：`pnpm typecheck` 0；`pnpm test` 98 文件 / **885 用例通过**（`history-list.test.tsx` +3：默认 50 且保留搜索、提到 200 后 60 行全显示、500 夹到 200）；`pnpm build` host 348.9 / client 429.6 KiB。
   - [x] **R7 G4 复评（GO）**：四类基线全绿——`pnpm typecheck` 0；`pnpm test` 98 文件 / **885 用例通过**（37.6 s）；`pnpm build` host 348.9 / client 429.6 KiB（gzip host 78.5 / client 86.2 KiB）；`pnpm test:e2e` **9/9**（16.5 s）。证据脚本扩展后 `.tmp/logs/g4-evidence-r7.out` `ok:true`：500 端点 **12.14 ms**；三条密钥 flow `outcomeHasSecret:false`；R4 存储环境发送 `storedSendReachedServerWithSecret:true` 且 `storedSendHasSecret:false`、环境文件无密钥、双来源 `field:environmentId`、未知 id `not_found`；R5 改名保 id、复制 `g4-literal-renamed-copy` 换新嵌套 id 且源不变；R6 `limit:2`/`limit:200` 均按页返回（总数 4）；R8 服务层导入 500 端点，二次导入 `g4-big-api-2`→`g4-big-api-3` 不覆盖。真实载体 `.tmp/g4/flow.mjs`（`.tmp/logs/g4-flow.json`，旧结果备份 `g4-flow-r6-backup.json`）`ok:true`：3 击回放→保存→重开，保存/重开期间站点请求数保持 4，reload 后 1 集合/1 请求，发送 1 次 `HTTP 200 OK` + 历史 1 条，0 其他 console 错误。SPEC 矩阵：FR-API-01/02/03/04/05/06/07/08/09/10/12 通过，FR-API-11 按 D8 延后。结论：**GO**；T046 已勾选；未推送、未合并，等待用户批准后再推送/合并。
 
+### - [x] U04 界面整改（M4 界面审查，2026-10-30）
+
+- **依据**：`界面审查/M4修改意见.docx`（用户本地审查材料，未入库、不提交）。三项已确认设计（2026-10-30）：①默认 **新手模式** 并记住上次选择；②示例端点用 **插件内置本地 loopback 服务**；③术语在本插件**所有界面统一**。
+- **目标**：首屏只留“方法 + URL + 发送”一行核心操作；响应区是视觉中心；断言/环境/收藏/OpenAPI/历史收进默认关闭的抽屉；术语口语化；Basic 认证有可见标签。
+- **验收**：打开页面不改任何输入即可点“发送”并看到结果；断言、cURL、环境、收藏、OpenAPI、历史默认不可见；`pnpm typecheck` / `test` / `build` / `test:e2e` 全绿。
+- **文件**：`src/client/api/{ApiWorkbench,RequestBuilder,RequestForm,ui-mode}.tsx|ts`、`src/host/api/{sample-server,service}.ts`、`src/host/index.ts`、`src/contracts/api.ts`、`src/client/locales/{en,zh-CN}.json`、tests。
+- **验证结果（2026-10-30，`task/m4-api-workbench`）**：
+  - `pnpm typecheck` 0 error；`pnpm test` **100 文件 / 897 用例全通过**（基线 R7 98/885）；`pnpm build` host 354.0 / client 440.5 KiB；`pnpm test:e2e` **9/9**（34.3 s）。
+  - 新增 `tests/unit/api-send/api-sample.test.ts`（6 例：loopback JSON、单监听复用与 dispose 后拒绝、404/405、`ApiService.sampleInfo` 注入/缺失/非法、unary 注册）与 `tests/component/api/api-workbench-u04.test.tsx`（5 例：默认新手、专业模式持久化、抽屉默认关闭、空 URL 填示例、已有草稿不被覆盖）。
+  - 布局：`RequestBuilder` 核心行 = 方法 + URL + 发送（`data-vibe-send`，深色强调、600 字重、34 px 高）；保存/取消/请求状态/保存状态降为无边框下划线小字；响应区（`data-vibe-response-area`）常驻，未发送时显示“发送后，结果会显示在这里。”；cURL 与断言只在 `mode === 'pro'` 渲染。
+  - 折叠：`RequestForm` 默认只展开「URL 参数」，「更多配置」（`data-vibe-more-config`）内是标头/请求内容/身份验证三个分区；`ApiWorkbench` 的“更多工具”抽屉（`data-vibe-drawer`）默认 `display:none`，内含收藏、历史、环境、OpenAPI 四个面板（保持挂载以维持既有测试与状态）。
+  - 模式：`ui-mode.ts` 用 `localStorage['vibe-studio.api-mode']`，默认 `beginner`，右上角分段按钮 `data-vibe-mode="beginner|pro"`。
+  - 示例端点：`src/host/api/sample-server.ts` 只绑 `127.0.0.1:0`、`GET|HEAD /sample` 返回固定 JSON、其余 404、写方法 405 + `allow: GET, HEAD`；懒启动、`ctx.effect` 释放后终态拒绝；unary `api.sample.info`（`API_SAMPLE_INFO_METHOD`）返回 `{url, method}`，`isApiSampleInfo` 只接受 `http:` + `127.0.0.1`。panel 只在 URL 未被用户触碰时填入（`urlTouchedRef`），已载入的集合/历史草稿永不被覆盖。
+  - 术语（中/英统一）：查询参数→URL 参数、认证→身份验证、断言→结果校验、集合→我的收藏/收藏。
+  - Basic 认证：用户名/密码均加可见 `<span>` 标签与占位（`例如 admin` / `例如 密码或 {{password}}`）。
+  - 反向影响：英文文案改为 “Saved requests” 等后，`collection-tree`/`history-list`/`workbench` 三处既有断言同步更新（8 条），未回退文案。
+  - 未做（范围外）：抽屉内四个面板的进一步合并/重排；未在真实载体做像素级视觉复核（组件测试 + e2e 覆盖行为）。
+
 ---
 
 ## M5：Agent Integration
@@ -781,9 +799,10 @@
 | M2.5 UI Layout v2 | 1 | U01（2026-10-28 插入，阻塞 T027） |
 | M3 Inspect | 8 | T027–T034 |
 | M4 API | 12 | T035–T046 |
+| M4.5 UI 整改 | 1 | U04（2026-10-30 插入，M4 界面审查返工） |
 | M5 Agent | 8 | T047–T054 |
 | M6 Hardening | 7 | T055–T061 |
-| **合计** | **62** | 不含 B/C backlog |
+| **合计** | **63** | 不含 B/C backlog |
 
 **关键路径：**
 
@@ -821,4 +840,5 @@ T001–T004 → T005 → T006 → T007/T008/T009 → T010/T011/T012/T013/T014 �
 
 - 2026-10-25：用户回复“批准”，接受 61 个任务、依赖顺序与 G0–G6 评审门禁。
 - 2026-10-28：按用户界面反馈（本地 `M1阶段界面审查/M1界面修改意见.docx`，未入库）新增 **U01 预览界面精简（Layout v2）**，置于 T027 之前；依据与产品方向见 `docs/2026-10-28-界面与项目方向.md`。其余任务范围不变，总数 62。
+- 2026-10-30：按 M4 人工审核意见（本地 `界面审查/M4修改意见.docx`，未入库）新增 **U04 界面整改**，属 T046 之后、M4 合并前的界面返工；三项设计已由用户确认（新手模式默认并记忆、内置 loopback 示例端点、术语全插件统一）。总数 63。
 - 执行规则：按任务顺序推进；发现计划假设不成立时先更新 `plan.md`/SPEC，再继续。

@@ -334,6 +334,33 @@ export function isApiEnvironmentView(value: unknown): value is ApiEnvironmentVie
 /** Unary method the panel uses to send one expanded request (T038). */
 export const API_HTTP_SEND_METHOD = 'api.http.send'
 
+/**
+ * Unary method that hands the panel a ready-to-run sample request (U04).
+ *
+ * The Host owns a loopback-only echo endpoint, so a beginner's first Send works
+ * without typing a URL and without an internet connection. The URL is minted
+ * lazily and is the only thing that crosses the wire — no credentials, no
+ * project data.
+ */
+export const API_SAMPLE_INFO_METHOD = 'api.sample.info'
+
+export interface ApiSampleInfo {
+  readonly url: string
+  readonly method: 'GET'
+}
+
+export function isApiSampleInfo(value: unknown): value is ApiSampleInfo {
+  if (value === null || typeof value !== 'object') return false
+  const info = value as Record<string, unknown>
+  if (typeof info.url !== 'string' || info.method !== 'GET') return false
+  try {
+    const url = new URL(info.url)
+    return url.protocol === 'http:' && url.hostname === '127.0.0.1'
+  } catch {
+    return false
+  }
+}
+
 /* -------------------------------------------------------------------------
  * Capture replay (T043)
  *

@@ -129,7 +129,7 @@ describe('ApiWorkbench acceptance', () => {
     fireEvent.click(container.querySelector('[data-vibe-save="1"]')!)
 
     expect(
-      await screen.findByText('This collection is full; remove a request before saving another.'),
+      await screen.findByText('This saved list is full; remove a request before saving another.'),
     ).toBeDefined()
   })
 })

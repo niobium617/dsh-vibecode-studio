@@ -222,7 +222,7 @@ describe('HistoryList clear', () => {
 
     const dialog = container.querySelector('[data-vibe-send-history-confirm="1"]')!
     expect(dialog.textContent).toContain('Clear the send log?')
-    expect(dialog.textContent).toContain('Saved collections are not affected.')
+    expect(dialog.textContent).toContain('Saved requests are not affected.')
 
     fireEvent.click(container.querySelector('[data-vibe-send-history-cancel="1"]')!)
     expect(container.querySelector('[data-vibe-send-history-confirm="1"]')).toBeNull()

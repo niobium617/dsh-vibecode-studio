@@ -171,10 +171,32 @@ describe('RequestBuilder', () => {
     })
   })
 
+  it('labels the Basic auth username and password fields', () => {
+    const { container } = render(<RequestBuilder send={vi.fn<ApiSend>(async () => outcome())} />)
+    section(container, 'auth')
+    fireEvent.change(container.querySelector('[data-vibe-auth-kind="1"]')!, {
+      target: { value: 'basic' },
+    })
+
+    expect(screen.getByText('Username')).toBeTruthy()
+    expect(screen.getByText('Password')).toBeTruthy()
+    const username = container.querySelector<HTMLInputElement>('[data-vibe-auth-username="1"]')!
+    expect(username.placeholder).toBe('e.g. admin')
+    expect(username.getAttribute('aria-label')).toBe('Username')
+  })
+
+  it('shows the response area before anything is sent', () => {
+    const { container } = render(<RequestBuilder send={vi.fn<ApiSend>(async () => outcome())} />)
+    expect(container.querySelector('[data-vibe-response-area="1"]')).toBeTruthy()
+    expect(container.querySelector('[data-vibe-response-empty="1"]')?.textContent).toBe(
+      'Press Send; the result appears here.',
+    )
+  })
+
   it('renders the zh-CN labels', () => {
     const { container } = render(<RequestBuilder send={vi.fn<ApiSend>(async () => outcome())} locale="zh-CN" />)
     expect(screen.getByText('发送')).toBeTruthy()
-    expect(screen.getByText('查询参数')).toBeTruthy()
+    expect(screen.getByText('URL 参数')).toBeTruthy()
     expect(fields(container).url.placeholder).toContain('https://')
   })
 })
