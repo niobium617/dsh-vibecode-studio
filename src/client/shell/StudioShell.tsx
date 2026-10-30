@@ -5,6 +5,7 @@
  */
 import * as React from 'react'
 import { browserLocale, createTranslator, type Locale } from '../i18n'
+import { ApiWorkbench } from '../api/ApiWorkbench'
 import { AnnotationQueue, useAnnotationQueue } from '../inspect/AnnotationQueue'
 import { AnnotationHistory } from '../inspect/History'
 import { persistAnnotation } from '../inspect/history-store'
@@ -145,6 +146,8 @@ export function StudioShell({ locale }: StudioShellProps): React.ReactElement {
               <AnnotationQueue locale={activeLocale} send={handoff} persist={persistAnnotation} />
               <AnnotationHistory locale={activeLocale} />
             </>
+          ) : current.id === 'api' ? (
+            <ApiWorkbench locale={activeLocale} />
           ) : (
             <EmptyState title={t('state.empty.title')} body={t(current.emptyKey)} />
           )}

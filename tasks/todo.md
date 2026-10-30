@@ -444,89 +444,212 @@
 
 > 依赖：G1；可与 M2 并行。T035/T036/T037 可并行；T038 依赖 T035/T036；T039 依赖 T038；T040 依赖 T035；T041 独立；T042 依赖 T041；T043 依赖 T024/T037；T044 依赖 T037/T038/T043；T045 依赖 T035；T046 汇总。
 
-### - [ ] T035 HTTP 执行器
+### - [x] T035 HTTP 执行器
 
 - **目标**：method/url/query/headers/body/auth；超时/取消/重定向/响应上限。
 - **验收**：JSON/form/multipart；取消不泄漏；重定向可控；大响应截断；单测通过。
 - **验证**：`pnpm test -- tests/unit/http-executor` + 本地 echo server。
 - **文件**：`src/host/api/{executor,request}.ts`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 契约：新增 `src/contracts/api.ts`（`HTTP_METHODS`/`HTTP_REDIRECT_POLICIES`/`HttpAuth`/`HttpRequestBody`/`HttpRequestSpec`/`HttpExecutionResult` 与 `isHttpRequestSpec` 等手写守卫；体一律 text/base64，跨 unary 传输不带 Buffer）并从 `src/contracts/index.ts` 导出。
+  - 归一化：`src/host/api/request.ts` 把 `HttpRequestSpec` 解析成 `fetch` 可用的请求——只允许 http(s)、拒绝 URL 内凭证（改用 auth 字段）、拦截 169.254.0.0/16 与 metadata 主机（`permission_denied`/`blocked_host`）、合并 query（禁用行跳过、保留 URL 原有参数）、header 名/值校验（禁 CRLF、禁 runtime 头、大小写不敏感查重）、bearer/basic/api-key（header 或 query，冲突 `Authorization` 报 `invalid_input`）、JSON（先 `JSON.parse` 校验）/text/form/multipart 编码（固定 boundary 可注入、base64 校验与 4 MiB 文件上限）、GET/HEAD 禁 body、body 与 timeout/redirect/响应上限边界。
+  - 执行：`src/host/api/executor.ts` 的 `HttpExecutor`/`createHttpExecutor` 让超时与调用方 `AbortSignal` 共用一个 `AbortController`；`redirect: 'manual'` 手写跟随，记录 hop、302/303 改写（303→GET、301/302 POST→GET 并去掉 body 头）、307/308 保留方法与 body，`manual` 停在 3xx、`error` 抛 `redirect_not_allowed`、超 `maxRedirects` 抛 `too_many_redirects`、跳到 metadata/非 http(s) 抛 `blocked_redirect`；响应体流式读取并在 `maxResponseBytes` 处截断后 `reader.cancel()` 释放连接；响应头经 `redactHeaders`（`set-cookie` 等为 `REDACTED`）；错误映射 `timeout`/`network_error{cancelled|request_failed|…}`，消息不回显请求内容、只附 undici cause code。
+  - 验收对应：`tests/unit/http-executor/` 2 文件 / 34 用例（request 15 + executor 19，后者跑真实 `node:http` echo server）——JSON/form/multipart 往返、HEAD/二进制/204/404、302 跟随与 hop 记录、307 保留 body、303 改写 GET、manual/error 策略、maxRedirects、metadata 重定向拦截、64 KiB 响应按 1 KiB 截断、超时与取消都会让服务端观察到连接关闭（`res.on('close')`）、已中止 signal 不发请求、连接拒绝映射、校验先于建连。
+  - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm test` 62 文件 / 567 用例（基线 60 / 533）；`pnpm build` host 221.1 / client 210.7 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t035-{typecheck,test,build,e2e}.log`。
+  - 限制：未注册 unary 方法与 UI（T038 接）；跟随重定向时跨源仍携带 Authorization（与 curl/Postman 一致，未做浏览器式剥离）；文本一律按 UTF-8 解码（不读 charset）；结果携带截断后的 base64 全量（≤16 MiB）；`fetchImpl`/`now`/`boundary` 为测试注入点，运行时不外露。
 
-### - [ ] T036 环境、变量与密钥
+### - [x] T036 环境、变量与密钥
 
 - **目标**：环境模型、`{{var}}` 解析、`ctx.credentials` 集成；UI 只读 describe。
 - **验收**：未解析变量有提示；密钥不回传客户端；单测通过。
 - **验证**：`pnpm test -- tests/unit/api-env`。
 - **文件**：`src/host/api/{environment,secrets}.ts`、`src/client/api/EnvironmentEditor.tsx`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 契约：`src/contracts/api.ts` 追加 `ApiEnvironment`/`ApiEnvironmentVariable`（值必填、`secret` 变量只能存凭证引用名）、客户端安全视图 `ApiEnvironmentView`/`ApiEnvironmentVariableView`（明文行带 `value`；secret 行只有 `configured`/`writable`/`source`）、`UnresolvedVariable{name, where, reason: 'missing'|'secret_not_configured'|'disabled'}`、`API_ENV_*` 限额，以及 `isApiEnvironmentVariableName`/`isApiEnvironmentVariable`/`isApiEnvironment`/`isApiEnvironmentView` 守卫（最后一个拒绝 secret 行携带 `value`）。
+  - 密钥接缝：`src/host/api/secrets.ts` 的 `createApiSecretStore({ credentials })` 用结构化类型镜像 DSH 的 credentials 服务（不新增依赖）；`resolve` 只在 host 侧调用，空值与缺失一律视为未配置；无 provider 时 resolve→`undefined`、describe→`{configured:false,writable:false}`、set/unset→`permission_denied{credentials_unavailable}`；provider 异常映射 `internal{credential_resolve_failed|credential_store_failed}` 且不回显值或原始错误消息。
+  - 解析：`src/host/api/environment.ts` 的 `parseApiEnvironment()`（名字格式、重名、secret 必须指向凭证名）、`resolveHttpRequest(request, { environment, secrets })` 按字段展开 url/query 行/header 名与值/JSON·text·form·multipart 元数据/auth（`url`、`query[i].value`、`headers[i].name|value`、`body.json`、`body.files[i].fileName|contentType`、`auth.token|username|password` 等），base64 文件内容不展开；单次扫描（展开出的值里再出现 `{{x}}` 不二次展开）；同一请求内密钥按引用缓存、只 resolve 一次；失败逐字段进 `unresolved` 并区分三种原因。`describeEnvironment()` 生成客户端视图（describe 抛错按未配置处理），`secretReferences()` 列出环境引用的凭证。
+  - UI：`src/client/api/EnvironmentEditor.tsx` 只读面板——明文值、密钥仅“Configured / Not configured”+“from {source}”、禁用标记、未解析列表（`{name} in {where}` + 原因）与逐行徽标；`EmptyState` 空态；中英 `api.env.*` 14 个键两侧一致。
+  - 接线：`src/host/index.ts` 服务槽新增 `apiSecrets`，`HostContext` 增加可选 `credentials`，`apply()` 用 `ctx.credentials` 构造 store（无该接缝的主机整体降级为“未配置”而不是另存密钥）。
+  - 验收对应：`tests/unit/api-env/secrets.test.ts`（6 用例：解析/描述/空值/无 provider/set·unset 透传/非法名/异常不回显）、`tests/unit/api-env/environment.test.ts`（12 用例：解析校验、跨 URL·query·header·JSON·bearer 展开、三种未解析原因与逐字段去重、单次展开、密钥同请求只 resolve 一次、multipart 元数据、describe 视图不含明文且 describe 失败按未配置）、`tests/component/api/environment-editor.test.tsx`（3 用例：明文与密钥状态、未解析框与徽标、空态与 zh-CN 文案）；`tests/unit/config.test.ts` 服务形状断言补 `apiSecrets`。
+  - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/api-env tests/component/api` 3 文件 / 21 用例通过；`pnpm test` 65 文件 / 588 用例（基线 62 / 567）；`pnpm build` host 232.1 / client 211.9 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t036-{test,build,e2e}.log`。
+  - 限制：未注册 unary 方法、面板未挂到页面（T038）；未做集合/历史持久化（T037）；`{{var}}` 单次展开、不支持嵌套或表达式；describe 失败与无 provider 都显示“未配置”，不区分原因；secret 变量只能引用凭证名，不能在环境里内联写值。
 
-### - [ ] T037 集合与历史持久化
+### - [x] T037 集合与历史持久化
 
 - **目标**：集合/文件夹/历史 JSON；原子写；脱敏；schema 校验。
 - **验收**：保存/重开/复制/删除；历史搜索/清空；无明文密钥。
 - **验证**：`pnpm test -- tests/unit/api-store`。
 - **文件**：`src/host/api/{collection-store,history-store}.ts`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 契约：`src/contracts/api.ts` 追加集合/历史形状与守卫——`ApiSavedRequest`/`ApiCollectionFolder`（单层文件夹）/`ApiCollection`、`ApiHistoryEntry{id, at, method, url, status?, elapsedMs?, request}`、`ApiHistoryQuery`、`API_STORE_ID_PATTERN`/`API_COLLECTION_FILE_BYTES_MAX`(256 KiB)/`API_HISTORY_FILE_BYTES_MAX`(1 MiB)/`API_HISTORY_ENTRIES_MAX`(200) 等限额、`isApiStoreId`/`isApiSavedRequest`/`isApiCollectionFolder`/`isApiCollection`/`isApiHistoryEntry`/`isApiHistoryQuery`，以及 `redactHttpRequest()`（URL 凭证与敏感 query 清除、敏感 header/query/form 行置 `REDACTED`、auth 只留 kind/用户名·名、JSON body 递归脱敏、multipart 丢弃文件字节）。
+  - 公共文件层：`src/host/api/store-files.ts` 提供 `.vibe/api` 的路径封闭（realpath/junction/symlink 拒绝）、大小上限、同目录临时文件 + `rename`（EPERM/EBUSY/EACCES 有界重试）与“坏文件读作 undefined”的读法，以及 `ApiStoreError` 稳定码（`invalid_project_path|project_missing|path_outside_project|invalid_id|invalid_data|too_large|not_found|io`）。
+  - 集合：`src/host/api/collection-store.ts` 的 `ApiCollectionStore` 用 `.vibe/api/collections/<id>.json` 一集合一文件；`save` 先校验（`isApiCollection`）再 `redactCollection` 再原子写，`read`/`list`（按名排序、坏文件计入 `skipped`、文件名与内文 id 必须一致）/`remove`，`duplicate(id, {id?,name?})` 生成新集合 id 与全新嵌套 id、源文件不动、源缺失 `not_found`。
+  - 历史：`src/host/api/history-store.ts` 的 `ApiHistoryStore` 用单个有界 `.vibe/api/history.json`（`{version:1, entries}`，最新在前，200 条封顶）；`append(request, {status?, elapsedMs?, at?})` 先脱敏再写，`list({query?, limit?})` 按 method/url/status 大小写不敏感子串过滤、`total` 为截断前匹配数、`skipped` 统计非法条目，`clear()` 删文档；坏文档读作空并在下次 append 时自然重建；`now`/`nextId`/`renameFile` 可注入。
+  - 接线：`src/host/index.ts` 导出两个 store 与 `ApiStoreError`；未注册 unary 方法、未挂 UI（T038），未改服务槽与 `config.test.ts`。
+  - 验收对应：`tests/unit/api-store/` 3 文件 / 26 用例——redact（7：auth 三类、敏感行、URL、JSON/text/form/multipart、整体无明文且仍是合法 spec）、collection（10：落盘往返、按名列出与 skipped、写盘脱敏、文件字节不落盘、非法集合拒绝、超上限、复制新 id 且源不变、缺源复制、删除幂等、非法 id、`.vibe` junction 越界）、history（9：最新在前与响应字段、显式时间戳、写盘脱敏、200 条封顶、搜索与 limit、清空、坏文档自愈、坏条目跳过、非法 query/请求拒绝）。
+  - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/api-store` 3 文件 / 26 用例通过；`pnpm test` 68 文件 / 614 用例（基线 65 / 588）；`pnpm build` host 253.4 / client 211.9 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t037-{typecheck,test,build,e2e}.log`。
+  - 限制：未接 unary/UI（T038），没有“运行中请求记录自动写入”的调用方；多部件文件字节与文本型 body 的原样内容不落盘/不深度脱敏（变量 `{{name}}` 原样保留，只在发送时展开）；文件夹只支持一层。
 
-### - [ ] T038 请求构建 UI
+### - [x] T038 请求构建 UI
 
 - **目标**：method/URL/query/headers/body/auth；发送/取消；校验与错误提示。
 - **验收**：常见 JSON/form/multipart 可发；错误可读；组件测试通过。
 - **验证**：`pnpm test -- tests/component/api-request` + 手动。
 - **文件**：`src/client/api/{RequestBuilder,RequestForm}.tsx`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 契约：`src/contracts/api.ts` 追加 `API_HTTP_SEND_METHOD = 'api.http.send'`。
+  - Host 接线：新增 `src/host/api/service.ts`（`ApiService.send` → `resolveHttpRequest`（`{{var}}` 展开、密钥一次 resolve）→ `HttpExecutor.execute`，返回 `{result, unresolved}`；参数与环境文档不合法抛 `invalid_input` + `details.field`），`registerApiMethods()` 在 `apply()` 里以 `ctx.effect(..., 'vibe-studio: api methods')` 注册，客户端中止信号直接成为执行器的 `signal`；`store-files.ts` 新增 `toApiStoreStudioError()`（`invalid_id|invalid_data|too_large → invalid_input`、`path_outside_project → permission_denied`、`not_found → not_found`、`io → internal`，消息不含本机路径，`details.reason` 保留原码）。`VibeStudioService` 服务槽未改，未改 `tests/unit/config.test.ts`。
+  - 客户端：`src/client/api/request-model.ts` 纯函数草稿模型（`buildRequestSpec` 校验 URL 绝对 http(s)、拒绝 URL 内凭证、行名缺失/header 非法/重复、JSON 体解析、auth 必填、multipart 字段名；禁用行原样保留但不过校验；`readFileAsBase64`/`fieldNameForFile`）；`RequestForm.tsx` 表单（查询/请求头/请求体/认证四个分区、JSON/text/form/multipart、文件选择）；`RequestBuilder.tsx` 容器（发送/取消、`AbortController`、卸载中止、`TransportError` → 可读标题、未解析变量提示、结果行“HTTP 200 OK · 12 ms · 4 B”）；`StudioShell` 的 API 页签改为渲染 `RequestBuilder`；`api.request.*` 中英各约 60 键。
+  - 验收对应：`tests/component/api-request/` 2 文件 / 15 用例（model 9：URL/行校验/header/JSON/auth/multipart/文件读取；builder 6：POST+query+header 生成精确 spec 与结果行、非法 URL 不发、超时可读、取消传递 signal、multipart 文件 base64、zh-CN 文案）；`tests/unit/api-send/` 1 文件 / 5 用例（host 侧展开密钥且不回传、未解析占位符仍发送、非法参数/环境、blocked host → 403 `permission_denied`、中止 → `network_error|cancelled`）；`tests/unit/api-store/store-errors.test.ts` 3 用例（映射与不泄露路径）。`tests/integration/transport/host.test.ts` 补 `'vibe-studio: api methods'` 与 `transport.has('api.http.send')`。
+  - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/api-store tests/unit/api-send tests/component/api-request` 7 文件 / 49 用例通过；`pnpm test` 72 文件 / 637 用例（基线 68 / 614）；`pnpm build` host 256.3 / client 251.4 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t038-{typecheck,test,build,e2e}.log`。
+  - 限制：unary envelope 上限 64 KiB，multipart 实际可传文件约 48 KiB（契约允许 4 MiB/文件），大文件上传需后续专用通道；历史/集合尚未在发送后自动写入（T044）；T039 才有响应体查看，当前只显示状态/耗时/字节数。
 
-### - [ ] T039 响应查看 UI（基础）
+### - [x] T039 响应查看 UI（基础）
 
 - **目标**：状态/耗时/大小/headers/body；raw/文本/JSON 基础美化；大响应虚拟化。
 - **验收**：10 MB 响应不冻结；错误状态可读；组件测试通过。
 - **验证**：`pnpm test -- tests/component/api-response` + 手动。
 - **文件**：`src/client/api/{ResponseView,ResponseHeaders}.tsx`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 组件：新增 `ResponseView.tsx`（状态徽标按 2xx/3xx/4xx/5xx 着色、`{elapsed} ms · {bytes}`、content type、重定向次数、截断徽标；`body|headers` 页签；`pretty|raw` 仅在 JSON 可解析时出现；按 `RESPONSE_PAGE_BYTES = 64 KiB` 分页，>256 KiB 的 JSON 不美化并提示；二进制/空响应不渲染文本；`buildBodyContent`/`formatResponseBytes` 导出供测试与 T040 复用）；`ResponseHeaders.tsx`（逐行 `data-vibe-response-header`、空态、Host 侧脱敏说明）。
+  - 接线：`RequestBuilder` 的已发送分支改为渲染 `ResponseView`，删除 T038 的重复结果行与本地 `formatBytes`；移除已无引用的 `api.request.result.summary` / `api.request.result.truncated` 两个键，新增 17 个 `api.response.*` 键（中英同步）。
+  - 验收对应：`tests/component/api-response/response-view.test.tsx` 10 用例（200 状态/耗时/字节 + 默认美化、raw 切换、500 + 截断徽标、**10 MB 体**只渲染 65536 字符且 `Page 1 of 160` 并可前后翻页、二进制/空体说明、响应头两行 + 脱敏说明、300 KiB JSON 保持 raw 并提示、zh-CN 文案、从文本识别 JSON、字节格式化）；`tests/component/api-request` 的 T038 断言改指向 `ResponseView`。
+  - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/component/api-response tests/component/api-request` 3 文件 / 25 用例；`pnpm test` 73 文件 / 647 用例（基线 72 / 637）；`pnpm build` host 256.3 / client 263.8 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t039-{typecheck,test,build,e2e}.log`。
+  - 手动（真实载体）：`.tmp/t039-manual.mjs` — dsh `vibe-dev` + 无头 Edge，本地 echo 服务返回 10 MB 与 500。结果 `.tmp/logs/t039-web.json`：`HTTP 200 OK`、`87 ms · 4.0 MB`、截断徽标“已按大小上限截断”、DOM 仅 65536 字符、`第 1 / 64 页` 翻页耗时 1.1 ms、500 页面 `HTTP 500 Internal Server Error` + 32 B 可读、0 控制台错误。**注意**：执行器 `maxResponseBytes` 默认 4 MiB，服务端 10 MB 到面板时已截断；10 MB 视图内分页由组件测试覆盖。
+  - 修复（手动启动发现）：`apply()` 直接读 `ctx.credentials` 但 `inject` 只声明 `connection`，Cordis 拒绝未声明服务访问，导致插件在真实 carrier 中 `cannot get property "credentials" without inject` 完全不激活（单测用裸 ctx 无法覆盖）。`src/host/index.ts` 改为 `export const inject = ['connection', 'credentials']` 后启动无告警；重跑 typecheck / 647 用例 / e2e 9/9 全绿。
+  - 限制：二进制、HTML、图片预览与下载是 T040；响应体仍受执行器 `maxResponseBytes`（默认 4 MiB）截断；分页按字符切分，超长单行会跨页断开。
 
-### - [ ] T040 富响应体（JSON 树/HTML/图片/二进制）
+### - [x] T040 富响应体（JSON 树/HTML/图片/二进制）
 
 - **目标**：可折叠 JSON 树、HTML 沙箱 iframe、图片预览、二进制下载；深度/节点上限。
 - **验收**：XSS 沙箱；大 JSON 不卡；图片正确；组件测试。
 - **验证**：`pnpm test -- tests/component/api-rich-response` + 手动。
 - **文件**：`src/client/api/{JsonTree,HtmlPreview,ImagePreview}.tsx`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 组件：`JsonTree.tsx`（`buildJsonTree` 先建有限模型：`JSON_TREE_MAX_NODES = 2000`、`JSON_TREE_MAX_DEPTH = 16`、`JSON_TREE_INITIAL_DEPTH = 2`；超预算 `truncated`、触顶 `deep`+`omitted`+`depthLimited` 各有说明行；值只走 React 文本节点，`text` 变化重置展开状态）；`HtmlPreview.tsx`（`sandbox=""` + `csp="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:"`，`csp` 因缺类型用 ref 设属性）；`ImagePreview.tsx`（8 种图片 MIME 白名单 → `data:` URI，`<img>` 内 SVG 不执行脚本）。
+  - `ResponseView.tsx` 集成：默认模式 JSON→`tree`、HTML→`html`、其余 `raw`；JSON 额外 `pretty`/`raw`，HTML 额外 `raw`；二进制优先内联图片（仅未截断且 base64 非空），否则大小说明；有 base64 即可下载（`Blob` + 对象 URL + `<a download>`，MIME→扩展名，点击后 revoke）。新增 9 个 `api.response.*` 键（中英同步），`api.response.binary` 文案改为“该类型暂无内联预览”。
+  - 验收对应：`tests/component/api-rich-response/rich-response.test.tsx` 17 用例（节点/深度上限、初始折叠与展开、字符串不当 HTML、无效 JSON、zh-CN、iframe `sandbox=""`+CSP+srcdoc、`window.__xss` 未执行、data URI 与白名单、扩展名映射、Blob 字节/文件名、空体不下载、HTML/图片/PDF 集成）；T039 默认模式断言改为“默认树 + 点美化看 `<pre>`”。
+  - 静态检查与构建：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/component/api-rich-response tests/component/api-response tests/component/api-request` 4 文件 / 43 用例；`pnpm test` 74 文件 / 665 用例（基线 73 / 647）；`pnpm build` host 256.3 / client 279.0 KiB；`pnpm test:e2e` 9/9。日志 `.tmp/logs/t040-*.log`。
+  - 手动（真实载体）：`.tmp/t040-manual.mjs` — dsh `vibe-dev` + 无头 Edge，本地服务 `/json`、`/html`（内嵌 `<script>window.__xss=1</script>`）、`/png`（1×1）、`/pdf`。结果 `.tmp/logs/t040-web.json` **`ok:true`**：JSON 默认树、4 个折叠开关、展开后 `admin` 出现；iframe `sandbox=""` + CSP 正确、`srcdoc` 含脚本但 `window.__xss` 未定义、面板文本不含 `<h1>`、raw 可见源码；图片 `naturalWidth 1`；PDF 下载 `response.pdf` 59 B 与服务端一致；0 其他控制台错误。
+  - 限制：下载整段 base64 解码，尺寸仍受执行器 `maxResponseBytes`（默认 4 MiB）限制；图片只按 MIME 判断不校验文件头；HTML 预览固定 280 px 高。
 
-### - [ ] T041 S7 OpenAPI spike [P]
+### - [x] T041 S7 OpenAPI spike [P]
 
 - **目标**：500 端点、远程 ref、循环 ref、SSRF 限制、导入耗时。
 - **验收**：< 5 s；远程 ref 拦截；错误可读；报告。
 - **验证**：`pnpm tsx spikes/s7/run.ts`；`spikes/s7/REPORT.md`。
 - **文件**：`spikes/s7/{run.ts,REPORT.md}`。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 脚本：`spikes/s7/run.ts` 零新增依赖（Node 内置 + `src/contracts`），生成 100 路径 × 5 方法 = 500 操作的 OpenAPI 3.0.3 样例（327,748 B，10 tag，server 变量、allOf/自引用 schema、query/header/cookie、300 个 JSON 体），按 parse / bundle / map / serialize 分段计时，每个映射结果用真实 `isHttpRequestSpec` 校验；远程 `$ref` 只访问自起 `127.0.0.1` fixture，允许清单用假 fetch。
+  - 耗时（`pnpm tsx spikes/s7/run.ts`，36/36 检查 PASS，原始数据 `.tmp/logs/s7-results.json`）：500 端点冷启动 **28.67 ms**（parse 12.76 / bundle 3.47 / map 12.45 / serialize 1.31），热启动中位数 **16.15 ms**（min 12.62 / max 18.57）；规模 250 / 1000 操作中位数 6.69 / 29.26 ms，约 0.03 ms/操作；1000 操作最慢 32.21 ms，远低于 5 s。
+  - 映射：500/500 契约有效，0 skipped；10 个 tag 分组；体 none 200 / json 300；认证 bearer 350 / basic 50 / api-key 50 / none 50；`{id}` → `{{id}}`、server 变量代入默认值；唯一警告 `cookie_param_unsupported` 30。
+  - 远程 `$ref`/SSRF：默认策略下公网 ref `remote_ref_blocked` 且 **0 次网络调用**；13/13 策略矩阵（loopback 需显式开关、显式 origin 精确端口、169.254/元数据/`file:`/URL 凭据/RFC1918/阿里云元数据一律拒绝）；loopback fetch 1 次、同文档去重 1 次；302 → 元数据 `remote_ref_redirect` 不跟随；content-length 与 chunked 两种 2 MiB 超限均 `remote_ref_too_large`；非法 JSON / 404 可读。
+  - 循环 `$ref`：纯别名环 `PureA -> PureB -> PureA` 抛 `ref_cycle`（消息含完整链），映射时体降级 `none` 并保留警告；结构环 A↔B 4/4 端点有效（`{"b":{}}`）；自引用数组示例 `{"id":"n1","children":[]}`（25 B）。
+  - 其他失败路径：缺失 ref `ref_unresolved`、>8 MiB `document_too_large`、非法 JSON `invalid_json`、缺 paths `invalid_document`、1005 操作 `too_many_operations`；17/17 错误单行 ≤ 300 字符；示例数据里的 `$ref` 字符串 0 fetch 原样保留。
+  - Swagger 2.0 冒烟：host/basePath/schemes + body 参数 + basic auth，3/3 有效。
+  - 报告：`spikes/s7/REPORT.md` 含环境/耗时/映射/SSRF/循环/失败路径/依赖调研（swagger-parser MIT、json-schema-ref-parser MIT、yaml ISC）与 T042 实现建议。
 
-### - [ ] T042 OpenAPI 导入
+### - [x] T042 OpenAPI 导入
 
 - **目标**：Swagger 2.0/OpenAPI 3.x；tag 分组；示例 body；远程 ref 限制；端点上限。
 - **验收**：500 端点可用；循环 ref 不崩；导入结果可保存；单测通过。
-- **验证**：`pnpm test -- tests/integration/openapi`。
+- **验证**：`pnpm exec vitest run tests/integration/openapi`（`pnpm test -- <path>` 不过滤）。
 - **文件**：`src/host/api/openapi/{parser,resolver,mapper}.ts`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 命令与结果：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/openapi` 5 文件 / 36 用例全通过；`pnpm test` 79 文件 / 702 用例全通过（首次全量跑时 `api-rich-response` 的 4000 节点用例 5.6 s 超时，单独重跑 17/17 通过，再跑全量全绿，判定为并行负载抖动）；`pnpm build` host 257.1 KiB / client 279.0 KiB；`pnpm test:e2e` 9/9。
+  - 结构：`parser` 只做形状检查/操作清点/结构 `$ref` 扫描，不做 I/O；`resolver` 先 `resolveRemotePolicy` 再 `bundleRemoteRefs`（默认 0 fetch），`OpenApiRefResolver` 懒解引用；`mapper` 生成示例并逐条 `isHttpRequestSpec` 校验，最后 `isApiCollection` 兜底。
+  - 映射：OpenAPI 3.x tag → 文件夹、path 参数 → `{{name}}`、可选行 `enabled:false`、cookie/GET body/禁用 header 只警告不失败、auth → `{{scheme}}` 占位符；Swagger 2.0 host/basePath/schemes、body/formData、basic/apiKey 均覆盖；缺 server → `{{baseUrl}}` 前缀。
+  - 远程：默认公网 ref `remote_ref_blocked` 且 fetch 0 次；loopback 需 `allowLoopback`；同文档去重 1 次；302 `remote_ref_redirect`；`maxBytes` 超限 `remote_ref_too_large`；嵌套 ref 走同一策略；元数据地址即使显式允许也拒绝；相对 ref 拒绝；缺失 fragment `ref_unresolved`。
+  - 循环：别名环映射时降级 `body none` 并保留 `ref_cycle:` 警告，`resolveRef` 直接调用抛 `ref_cycle`；自引用 schema 展开一层后停（`{"id":"string","child":{"id":"string"}}`），互引用 A↔B 有界（`{"b":{}}`），体 < 4 KiB。
+  - 规模/保存：500 端点（100 路径 × 5 方法）导入 < 5 s、500/500 契约有效、0 skipped、10 组；`ApiCollectionStore.save` 后 `read` 与原结果深度相等（占位符未被脱敏）。
+  - 上限：1001 操作 `too_many_operations`；单 tag 250 端点拆成 200 + 50 两个文件夹（`one`、`one (2)`）以满足 `API_COLLECTION_ITEMS_MAX`；集合文件上限由 256 KiB 提到 2 MiB。
+  - 配套契约改动：脱敏保留整值 `{{placeholder}}`（header/query/auth/JSON/URL，URL 里 `%7B%7Bname%7D%7D` 还原为 `{{name}}`），新增 1 条单测；`tests/unit/api-store/collection-store.test.ts` 的超限样例改为 2.5 MiB。
 
-### - [ ] T043 抓包回放
+### - [x] T043 抓包回放
 
 - **目标**：`NetworkEntry` → 请求草稿；method/url/headers/body；不自动发送非幂等。
 - **验收**：回放与原请求一致；DELETE/PUT/PATCH 需确认；避免自动重放。
 - **验证**：`pnpm test -- tests/integration/capture-replay` + 手动。
 - **文件**：`src/host/api/replay.ts`、`src/client/api/ReplayButton.tsx`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 命令与结果：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/capture-replay` 4 文件 / 45 用例全通过；`pnpm test` 83 文件 / 747 用例全通过（`.tmp/logs/t043-full-test.log`）；`pnpm build` host 264.7 KiB / client 295.7 KiB（`.tmp/logs/t043-build.log`）；`pnpm test:e2e` 9/9（`.tmp/logs/t043-e2e.log`）。
+  - host：`prepareReplay(entry,{confirm})` 是纯转换，不执行任何请求（测试用假 fetch 断言 0 次调用）；URL 逐字节保留；header 跳过 HTTP/2 伪头（静默）、运行时自有头（`host`/`content-length`/…）、`content-encoding`、已脱敏值（`REDACTED`）、含 CR/LF 值、超长值与非法名，大小写不敏感去重，被略去的真实名经 `omittedHeaders` 返回；JSON 体仅在声明的 content-type 匹配 `^application/(?:[A-Za-z0-9.+-]+\+)?json\b` 且 `JSON.parse` 成功时按 json 重建，否则原文 + 原 content-type 走 text；GET/HEAD 丢弃 body 并给 `body_dropped`；超过 16 KiB 的 body 拒绝；warning 顺序固定 `body_truncated`→`body_unavailable`→`body_dropped`→`url_redacted`→`headers_omitted`。
+  - 非幂等：`REPLAY_SAFE_METHODS=['GET','HEAD','OPTIONS']`，其余（含 POST/PUT/PATCH/DELETE）未显式 `confirm:true` 时抛 `permission_denied` + `details.reason='confirmation_required'`；确认后也只返回 `requiresConfirmation:true` 的草稿，从不发送；确认值只认布尔 `true`。
+  - 采集侧（T024 增量）：`NetworkEntry.requestBody` 上限 16 KiB（超出 `requestBodyTruncated` + 尾部 `…`），`hasPostData` 无数据 → `requestBodyUnavailable`；重定向 hop 307/308 保留 body、303/改 GET 清除 body。
+  - 客户端：`ReplayButton` 对非幂等方法先弹确认框（取消/确认），载入草稿后只显示“还没有发送”提示、略去头与 warnings，必须用户点“发送”；`RequestBuilder` 消费 pending replay 并经 `draftFromRequestSpec` 往返一致（json/text/form/auth/query 行不改写）。
+  - 手动（`.tmp/t043-manual.mjs` → `.tmp/logs/t043-web.json`，`ok:true`）：真实 `vibe-dev` + 无头 Edge，站点依次发起 GET / POST(json) / PUT(text) / DELETE；四个回放的 method/path/body/content-type 在站点侧与原请求完全一致；POST/PUT/DELETE 均先出确认框（弹窗期间 0 请求），取消后保持预览且不发；GET 无弹框；草稿载入后均未自动发送，只有点“发送”才发出；0 其他 console 错误。
+  - 发现并记录（不属于 T043 范围，未改产品代码）：`src/host/preview/session.ts` 在 `target.start()` 完成导航之后才启动 network 采集器，首屏加载的请求不在缓冲里；手测改为先开抽屉再点刷新触发请求。建议在后续任务（T044 或单独立项）把采集器启动提前到导航前。
 
-### - [ ] T044 集合/历史 UI
+### - [x] T044 集合/历史 UI
 
 - **目标**：集合树、保存/重开、历史搜索/重放/清空；空状态。
 - **验收**：抓包 → 回放 → 保存 → 重开 ≤ 3 次点击；组件测试。
 - **验证**：`pnpm test -- tests/component/api-collections` + 手动。
 - **文件**：`src/client/api/{CollectionTree,HistoryList}.tsx`、tests。
+- **验证结果（2026-10-29，`task/m4-api-workbench`）**：
+  - 命令与结果：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/component/api-collections` 3 文件 / 21 用例全通过；`pnpm exec vitest run tests/unit/api-send/api-service-stores.test.ts` 10 用例全通过；`pnpm test` 87 文件 / 778 用例全通过（基线 83/747，`.tmp/logs/2026-10-29-t044-test.log`）；`pnpm build` host 272.1 KiB / client 331.7 KiB（`.tmp/logs/2026-10-29-t044-build.log`）；`pnpm test:e2e` 9/9、20.0 s（`.tmp/logs/2026-10-29-t044-e2e.log`）。
+  - host：新增 `api.collection.{list,get,add,remove}` 与 `api.history.{list,clear}`；`list` 只回摘要（`requestCount` 含文件夹）/`skipped`，展开才 `get`；`add` 在 Host 侧读-改-写**一条**请求（unary 体 64 KiB 装不下整份大集合），首次保存用 `collectionName` 建集合，超过 `API_COLLECTION_ITEMS_MAX` 抛 `invalid_input` + `details.reason='collection_full'`；`get` 缺失 → `not_found`；`remove` 回 `{removed}`；`history.list` 支持 `query`（Host 侧过滤、最新在前、`limit` 默认 50），`history.clear` 回 `{cleared}` 并删除文件；发送失败也记一条无 status/elapsedMs 的历史，写历史失败不影响发送结果。
+  - 脱敏：历史与集合存**未展开**的请求；`authorization: Bearer plain-token` → `REDACTED`，`x-api-key: {{apiKey}}` 与普通 header 保留。
+  - 修复：`withCollections`/`withHistory` 原先把服务自己抛的 `StudioError` 交给 `toApiStoreStudioError`，被压平成 `internal`（单测先红后绿）；现在 `isStudioError` 命中直接透传。
+  - 客户端：`CollectionTree`（摘要行 + 计数、展开读、两步删除、空/错误/重试/跳过态、中文标签）、`HistoryList`（最新在前、Host 侧搜索与“清空搜索”、两步清空、打开不回填即不发送、中文标签）、`ApiWorkbench` 组合表单/集合/历史；保存后自动展开默认集合 `saved` 并高亮新行。
+  - 组件测试：`api-collections/` 用注入的假 Host（不碰 `.vibe`、不碰 transport）；workbench 验收从 `openDraftInBuilder`（T043 回放点击）起数点击，Save 调用参数为 `{collectionId:'saved',collectionName:'Saved requests',name:'GET /items',request}`，重开只回填 1 次 `add`、0 次发送；另有保存失败与 `collection_full` 两条错误路径。
+  - 手动（`.tmp/t044-manual.mjs` → `.tmp/logs/t044-web.json`，`ok:true`）：真实 `vibe-dev` + 无头 Edge；回放（第 1 击）→ 保存（第 2 击，写 `.vibe/api/collections/saved.json`、集合自动展开）→ 点新行（第 3 击，提示“已载入保存的请求”），三次点击期间站点请求数 4 → 4；整页 reload 后集合与条目仍在；点发送得 `HTTP 200 OK` 并写入 1 条历史；搜索 `zzz` 0 行 / `items` 1 行；从历史重开不重发；清空历史与删除集合均先确认、确认后列表与磁盘文件都清空；0 其他 console 错误；DSH/Edge/站点进程已清理。
+  - 未做（范围外）：T024 采集器晚于首屏导航的问题未修（手测仍先开抽屉再刷新）；保存固定落到 `saved` 集合，暂不支持选集合/改名；历史无分页，超出只提示“还有 N 条”。
 
-### - [ ] T045 断言（P1）
+### - [x] T045 断言（P1）
 
 - **目标**：状态码/header/JSONPath/耗时；pass/fail；不执行任意 JS。
 - **验收**：四类断言可用；错误可读；单测通过。
 - **验证**：`pnpm test -- tests/unit/assertions`。
 - **文件**：`src/host/api/assertions.ts`、`src/client/api/AssertionsEditor.tsx`、tests。
+- **验证结果（2026-10-30，`task/m4-api-workbench`）**：
+  - 命令与结果：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/assertions tests/component/api-request/assertions-editor.test.tsx` 2 文件 / 17 用例全通过（`.tmp/logs/2026-10-30-t045-focused.log`）；`pnpm test` 89 文件 / 795 用例全通过（基线 87/778，`.tmp/logs/2026-10-30-t045-test.log`）；`pnpm build` host 278.8 KiB / client 349.4 KiB（`.tmp/logs/2026-10-30-t045-build.log`）；`pnpm test:e2e` 9/9、51.5 s。
+  - 契约：`ApiAssertion` 四种形状——status 100–599；header name 1–256 + equals/contains；json path 1–200 + equals/contains；duration maxMs 0–`HTTP_TIMEOUT_MAX_MS`；`API_ASSERTIONS_MAX=50`、期望值 ≤1000 字符、回显实际值 ≤500 字符；`isApiAssertion` 拒绝未知 kind 与越界值。
+  - host：`evaluateAssertions` 是纯函数（无 `eval`/`Function`）；JSONPath 只支持 `$` + `.key` + `['k']`/`["k"]`（支持 `\` 转义）+ `[n]`，其余一律 `path_syntax`；header 名大小写不敏感；比较文本化（字符串原样、null/number/boolean 字面量、对象/数组紧凑 JSON）。`api.http.send` 新增可选 `assertions`：先校验（坏列表 → `invalid_input` + `details.field='assertions'`，不发请求），发送后按序求值，`ApiSendOutcome.assertions` 与输入等长；未提交时不返回该字段。
+  - 可读失败：`status_mismatch` / `header_missing` / `body_not_json` / `path_syntax` / `path_missing` / `value_mismatch` / `duration_exceeded`；坏路径只让该条失败，不中断其余检查。
+  - 客户端：`AssertionsEditor` 用草稿行（数值先存文本），`buildAssertions` 预校验（`status_invalid`/`duration_invalid`/`name_empty`/`path_invalid`/`value_too_long`/`too_many`），任一行有问题就**不发送**；每行显示 pass/fail + 实际值，顶部汇总“通过 x/y”；改任意行即清除旧结论；载入回放/集合/历史草稿时保留检查、清除结论；有空状态与 50 条上限。
+  - 手动（`.tmp/t045-manual.mjs` → `.tmp/logs/t045-web.json`，`ok:true`）：真实 `vibe-dev` + 无头 Edge；对本地站点加四类检查（status 200 / header content-type contains json / `$.items[0].id` equals item-1 / duration ≤5000）→ 一次发送，站点只收到 1 次请求，四行全 pass、汇总“通过 4/4”；把 status 改成 201 再发 → 该行 fail 且文案“期望状态码 201，实际 200。”，其余三行仍 pass；期望值填 `abc` 再点发送 → 不发请求并显示“状态码须为三位数字（100–599）”；0 其他 console 错误；DSH/Edge/站点进程已清理。
+  - 未做（范围外）：断言不随请求进入集合/历史（`HttpRequestSpec` 未扩展）；JSONPath 无通配/递归/filter；单条无“跳过”开关。
 
-### - [ ] T046 G4 API 评审 [GATE]
+### - [x] T046 G4 API 评审 [GATE]
 
 - **目标**：验证 API 工作台闭环与安全。
 - **验收**：抓包 → 回放 → 保存 → 重开；500 端点导入；密钥不泄漏；SPEC 相关条目通过。
 - **验证**：手动 + `pnpm test`；记录结果。
 - **文件**：无。
+- **初评结果（2026-10-30，`task/m4-api-workbench`，NO-GO，未改产品代码）**：
+  - 基线：`pnpm typecheck` 0 error；`pnpm test` 89 文件 / 795 用例通过（26.04 s）；`pnpm build` host 278.8 / client 349.4 KiB；`pnpm test:e2e` 9/9（18.6 s）。日志 `.tmp/logs/g4-{typecheck,test,build,e2e}.log`。
+  - ✅ **抓包 → 回放 → 保存 → 重开**（真实载体）：`.tmp/g4/flow.mjs` + `vibe-dev` + 无头 Edge，Host 以隔离临时项目为 cwd，不写仓库 `.vibe`；`.tmp/logs/g4-flow.json` `ok:true`。回放 GET `/api/items`、保存显示“已保存。”、重开显示“已载入保存的请求…”并提示发送前不会发出请求；3 次点击；保存/重开期间站点请求数保持 4；整页 reload 后 1 集合 / 1 请求仍在；发送 1 次得 `HTTP 200 OK`、历史 1 条；0 其他 console 错误。
+  - ⚠️ **500 端点导入**（仅模块级）：`.tmp/g4/evidence.ts`（`.tmp/logs/g4-evidence.out`）47,712 B、100 路径 × 5 方法 = 500 端点、18.27 ms、10 分组、0 跳过、逐条 `isHttpRequestSpec` 通过、整份 `isApiCollection` 通过、save→read 逐字节相等。但 repo 内没有 unary/UI 调用 `importOpenApi`，用户无法从工作台导入（对应 FR-API-08 缺口），因此不能记为闭环通过。
+  - ❌ **密钥不泄漏**：bearer/basic/header api-key 正常（响应不含密钥、历史/集合落盘不含密钥、环境视图不含密钥、字面量落盘为 `REDACTED`、历史保留 `{{token}}`），但 **query 场景泄漏**：`api-key in=query` 与普通 `{{token}}` query 变量都会把解析后的密钥拼进最终 URL，`api.http.send` 返回的 `result.url`（以及重定向 hop 的 `url`/`location`）原样带回客户端。证据：`flows.queryKey.sent.url=/query-key?api_key=g4-secret-abc123`、`flows.queryVar.sent.url=/query-var?token=g4-secret-abc123`，两者 `outcomeHasSecret:true`。根因：`src/host/api/request.ts:190` 把 auth 值 append 到 URL、`:128` append query 行，`:349` 返回拼好的 `url`；`src/host/api/executor.ts:303-304` 原样返回 `url` 与 `redirects`；`src/host/api/service.ts:170` 未脱敏就返回。与 T038“解析后的密钥不进响应”的约定冲突；现有 `tests/unit/api-send/api-service.test.ts` 只覆盖 bearer header，未覆盖 query secret。
+  - **SPEC 矩阵**：FR-API-01/02/03/09/10/12 通过；FR-API-11 按 D8 延后（手动 Cookie header 可用）；FR-API-04 部分——展开与未解析提示可用，但 `EnvironmentEditor` 从未挂载、客户端从不提交 `environment`，没有变量值来源与持久化；FR-API-05 部分——保存/重开/删除/持久化可用，无改名，`duplicate` 只在 store 层、无 unary/UI；FR-API-06 部分——搜索/重开/清空可用，N 固定 200 不可配置；FR-API-07 **未实现**（repo 无 cURL 导入/导出，MUST）；FR-API-08 部分——mapper 可用但无入口（MUST）。
+  - **结论：NO-GO**。3 项专项验收 1 项通过、1 项仅模块级、1 项失败；SPEC 有 1 个 MUST 完全缺失（FR-API-07）、4 个 MUST 部分缺失（FR-API-04/05/06/08）。待用户选择返工范围后另开任务并复评；本节保持未勾选。
+- **返工计划（用户已选“补齐全部 M4 缺口”，2026-10-30）**：
+  - [x] **R1 密钥回传修复**：`resolveHttpRequest` 新增 host-only `secretValues`；新增 `src/host/api/result-redaction.ts`，`api.http.send` 返回前清洗 `result.url` 与每个重定向 hop 的 `url`/`location`（精确值 + percent-encoded + `+` 空格形式，再套 `redactUrl` 兜底字面量敏感键）；断言仍对真实响应求值。验证：`pnpm typecheck` 0；`pnpm test` 90 文件 / 806 用例通过；`pnpm build` host 280.4 / client 349.4 KiB；`.tmp/g4/evidence.ts` 复跑 `ok:true`，三条 flow 均 `outcomeHasSecret:false`。提交 `3195a85`。
+  - [x] **R2 FR-API-07 cURL 导入/导出**：前端纯函数转换（不经 Host、不上网）——`src/client/api/curl.ts` 的 `parseCurl`/`toCurl` 覆盖 `-X/-H/-d/--data-raw/--data-urlencode/-u/--url/-F/-G/-I/-m`、bash 单双引号/ANSI-C、`\` 与 `^` 续行、`--flag=value`/`-XPOST` 紧凑写法；`--compressed` 等无副作用参数忽略，代理/证书/文件上传（`-F @file`）与未知参数报稳定错误码；占位符双向原样保留。UI 为请求表单下的可折叠 cURL 面板（导入文本域 + 导出命令/复制/丢失去向提示），导入只填表不发送（新增 `DraftSource 'curl'` 与载入提示）。验证：`pnpm typecheck` 0；`pnpm test` 92 文件 / 825 用例通过（含 `curl.test.ts` 13 例、`curl-panel.test.tsx` 6 例含往返与真实 `RequestBuilder` 集成）；`pnpm build` host 280.7 / client 385.4 KiB。
+  - [x] **R3 FR-API-08 导入入口**：unary `api.openapi.import`（`ApiService.importOpenApi`）host 侧解析并 `ApiCollectionStore.save`（落盘再脱敏），返回集合摘要 + 版本/标题/端点数/分组数/跳过数/文档级警告条数；**不覆盖**已有集合（slug 占用则分配 `-2`/`-3`…，主体截断到 64 字符以内）；默认远程策略不允许任何 origin，文档里的远程 `$ref` 直接以 `permission_denied` + `reason:remote_ref_blocked` 拒绝，不发起请求；`OpenApiError` 映射为稳定 `reason`（`invalid_json`/`invalid_document`/`ref_unresolved`/…）。64 KiB 上限的处理：客户端 `importEnvelopeBytes` 精确计算 `{method,params}` 包体，超限本地提示“单次导入 64 KB，请拆分或去掉内联示例”，Host 侧再按 `MAX_UNARY_BODY_BYTES` 兜底（`reason:document_too_large`）。UI 为集合树下的可折叠 OpenAPI 面板（粘贴 + 选 JSON 文件、导入中/成功摘要/本地化失败原因），成功后刷新并展开新集合。验证：`pnpm typecheck` 0；`pnpm test` 94 文件 / 841 用例通过（`api-service-openapi.test.ts` 9 例、`openapi-import.test.tsx` 7 例）；`pnpm build` host 334.6 / client 399.2 KiB（host 增幅来自 OpenAPI parser/mapper 进入 Host 入口，属功能本身）。
+  - [x] **R4 FR-API-04 环境编辑与持久化**：新增 `src/host/api/environment-store.ts`（`.vibe/api/environments`，一环境一文件，原子写 + 2 MiB 上限 + 项目内校验，坏/外来文件计入 `skipped` 而非抛错）与四个 unary `api.env.list/get/save/remove`（save 校验名字长度、`{{}}` 变量语法、重复名、密钥行必须是凭据名；id 由名字 slug 生成，占用则 `-2`…`-99`，不覆盖）；`api.http.send` 新增 `environmentId`，Host 侧读取文档再展开，文档与凭据引用不过线，与内联 `environment` 互斥（同时给出 → `invalid_input`，未知 id → `not_found`）；读取只回 `ApiEnvironmentDetail{document, view}`，view 中密钥仅 `configured/writable/source`。client 新增模块级 `environment-store.ts`，`EnvironmentPanel` 持有草稿并挂到 `ApiWorkbench`，`EnvironmentEditor` 增加编辑模式（选择器/新建/名字/增删行/密钥引用/保存/删除/状态），只读模式保留 T036 行为；`RequestBuilder` 有选中环境时把 `environmentId` 传给发送。验证：`pnpm typecheck` 0；`pnpm test` 97 文件 / **868 用例通过**（`api-service-environments.test.ts` 12、`environment-store.test.ts` 7、`environment-panel.test.tsx` 8）；`pnpm build` host 345.5 / client 422.3 KiB。
+  - [x] **R5 FR-API-05 集合改名/复制**：store 新增 `rename`（原地改名，id 与所有请求/文件夹 id 不变，空白名以 `invalid_data` 拒绝）；新增 unary `api.collection.rename`（`{id,name}`，名字 trim + 200 字符上限 + 空名 `invalid_input`，未知 id `not_found`）与 `api.collection.duplicate`（沿用 store `duplicate`，嵌套 id 全部新生成、源不变；名字默认 `<原名> copy`，id 由名字 slug 生成，占用则 `-2`…`-99`，绝不覆盖），两者都返回 `{collection: 摘要}`。UI 集合行新增“重命名”“复制”：重命名行内输入（Enter 保存 / Esc 取消，空名禁用保存，失败行内提示且保留原名），复制后自动刷新并展开副本。验证：`pnpm typecheck` 0；`pnpm test` 98 文件 / **882 用例通过**（`api-service-collections.test.ts` 6、`collection-store.test.ts` +2、`collection-tree.test.tsx` +5）；`pnpm build` host 348.9 / client 427.7 KiB。
+  - [x] **R6 FR-API-06 历史 N 可配置**：client `history-store` 新增 `limit`（默认 50，`setApiHistoryLimit` 夹到 1..200，改后保留搜索词重载，重置回 50），`queryOf` 始终携带 `limit` 调 `api.history.list`；`HistoryList` 头部新增 50/100/200 选择器（`data-vibe-send-history-limit`，i18n `api.history.limitLabel`），换大后“还有 N 条未显示”消失。Host 侧校验与默认值原已支持。验证：`pnpm typecheck` 0；`pnpm test` 98 文件 / **885 用例通过**（`history-list.test.tsx` +3：默认 50 且保留搜索、提到 200 后 60 行全显示、500 夹到 200）；`pnpm build` host 348.9 / client 429.6 KiB。
+  - [x] **R7 G4 复评（GO）**：四类基线全绿——`pnpm typecheck` 0；`pnpm test` 98 文件 / **885 用例通过**（37.6 s）；`pnpm build` host 348.9 / client 429.6 KiB（gzip host 78.5 / client 86.2 KiB）；`pnpm test:e2e` **9/9**（16.5 s）。证据脚本扩展后 `.tmp/logs/g4-evidence-r7.out` `ok:true`：500 端点 **12.14 ms**；三条密钥 flow `outcomeHasSecret:false`；R4 存储环境发送 `storedSendReachedServerWithSecret:true` 且 `storedSendHasSecret:false`、环境文件无密钥、双来源 `field:environmentId`、未知 id `not_found`；R5 改名保 id、复制 `g4-literal-renamed-copy` 换新嵌套 id 且源不变；R6 `limit:2`/`limit:200` 均按页返回（总数 4）；R8 服务层导入 500 端点，二次导入 `g4-big-api-2`→`g4-big-api-3` 不覆盖。真实载体 `.tmp/g4/flow.mjs`（`.tmp/logs/g4-flow.json`，旧结果备份 `g4-flow-r6-backup.json`）`ok:true`：3 击回放→保存→重开，保存/重开期间站点请求数保持 4，reload 后 1 集合/1 请求，发送 1 次 `HTTP 200 OK` + 历史 1 条，0 其他 console 错误。SPEC 矩阵：FR-API-01/02/03/04/05/06/07/08/09/10/12 通过，FR-API-11 按 D8 延后。结论：**GO**；T046 已勾选；未推送、未合并，等待用户批准后再推送/合并。
+
+### - [x] U04 界面整改（M4 界面审查，2026-10-30）
+
+- **依据**：`界面审查/M4修改意见.docx`（用户本地审查材料，未入库、不提交）。三项已确认设计（2026-10-30）：①默认 **新手模式** 并记住上次选择；②示例端点用 **插件内置本地 loopback 服务**；③术语在本插件**所有界面统一**。
+- **目标**：首屏只留“方法 + URL + 发送”一行核心操作；响应区是视觉中心；断言/环境/收藏/OpenAPI/历史收进默认关闭的抽屉；术语口语化；Basic 认证有可见标签。
+- **验收**：打开页面不改任何输入即可点“发送”并看到结果；断言、cURL、环境、收藏、OpenAPI、历史默认不可见；`pnpm typecheck` / `test` / `build` / `test:e2e` 全绿。
+- **文件**：`src/client/api/{ApiWorkbench,RequestBuilder,RequestForm,ui-mode}.tsx|ts`、`src/host/api/{sample-server,service}.ts`、`src/host/index.ts`、`src/contracts/api.ts`、`src/client/locales/{en,zh-CN}.json`、tests。
+- **验证结果（2026-10-30，`task/m4-api-workbench`）**：
+  - `pnpm typecheck` 0 error；`pnpm test` **100 文件 / 897 用例全通过**（基线 R7 98/885）；`pnpm build` host 354.0 / client 440.5 KiB；`pnpm test:e2e` **9/9**（34.3 s）。
+  - 新增 `tests/unit/api-send/api-sample.test.ts`（6 例：loopback JSON、单监听复用与 dispose 后拒绝、404/405、`ApiService.sampleInfo` 注入/缺失/非法、unary 注册）与 `tests/component/api/api-workbench-u04.test.tsx`（5 例：默认新手、专业模式持久化、抽屉默认关闭、空 URL 填示例、已有草稿不被覆盖）。
+  - 布局：`RequestBuilder` 核心行 = 方法 + URL + 发送（`data-vibe-send`，深色强调、600 字重、34 px 高）；保存/取消/请求状态/保存状态降为无边框下划线小字；响应区（`data-vibe-response-area`）常驻，未发送时显示“发送后，结果会显示在这里。”；cURL 与断言只在 `mode === 'pro'` 渲染。
+  - 折叠：`RequestForm` 默认只展开「URL 参数」，「更多配置」（`data-vibe-more-config`）内是标头/请求内容/身份验证三个分区；`ApiWorkbench` 的“更多工具”抽屉（`data-vibe-drawer`）默认 `display:none`，内含收藏、历史、环境、OpenAPI 四个面板（保持挂载以维持既有测试与状态）。
+  - 模式：`ui-mode.ts` 用 `localStorage['vibe-studio.api-mode']`，默认 `beginner`，右上角分段按钮 `data-vibe-mode="beginner|pro"`。
+  - 示例端点：`src/host/api/sample-server.ts` 只绑 `127.0.0.1:0`、`GET|HEAD /sample` 返回固定 JSON、其余 404、写方法 405 + `allow: GET, HEAD`；懒启动、`ctx.effect` 释放后终态拒绝；unary `api.sample.info`（`API_SAMPLE_INFO_METHOD`）返回 `{url, method}`，`isApiSampleInfo` 只接受 `http:` + `127.0.0.1`。panel 只在 URL 未被用户触碰时填入（`urlTouchedRef`），已载入的集合/历史草稿永不被覆盖。
+  - 术语（中/英统一）：查询参数→URL 参数、认证→身份验证、断言→结果校验、集合→我的收藏/收藏。
+  - Basic 认证：用户名/密码均加可见 `<span>` 标签与占位（`例如 admin` / `例如 密码或 {{password}}`）。
+  - 反向影响：英文文案改为 “Saved requests” 等后，`collection-tree`/`history-list`/`workbench` 三处既有断言同步更新（8 条），未回退文案。
+  - 未做（范围外）：抽屉内四个面板的进一步合并/重排；未在真实载体做像素级视觉复核（组件测试 + e2e 覆盖行为）。
 
 ---
 
@@ -676,9 +799,10 @@
 | M2.5 UI Layout v2 | 1 | U01（2026-10-28 插入，阻塞 T027） |
 | M3 Inspect | 8 | T027–T034 |
 | M4 API | 12 | T035–T046 |
+| M4.5 UI 整改 | 1 | U04（2026-10-30 插入，M4 界面审查返工） |
 | M5 Agent | 8 | T047–T054 |
 | M6 Hardening | 7 | T055–T061 |
-| **合计** | **62** | 不含 B/C backlog |
+| **合计** | **63** | 不含 B/C backlog |
 
 **关键路径：**
 
@@ -716,4 +840,5 @@ T001–T004 → T005 → T006 → T007/T008/T009 → T010/T011/T012/T013/T014 �
 
 - 2026-10-25：用户回复“批准”，接受 61 个任务、依赖顺序与 G0–G6 评审门禁。
 - 2026-10-28：按用户界面反馈（本地 `M1阶段界面审查/M1界面修改意见.docx`，未入库）新增 **U01 预览界面精简（Layout v2）**，置于 T027 之前；依据与产品方向见 `docs/2026-10-28-界面与项目方向.md`。其余任务范围不变，总数 62。
+- 2026-10-30：按 M4 人工审核意见（本地 `界面审查/M4修改意见.docx`，未入库）新增 **U04 界面整改**，属 T046 之后、M4 合并前的界面返工；三项设计已由用户确认（新手模式默认并记忆、内置 loopback 示例端点、术语全插件统一）。总数 63。
 - 执行规则：按任务顺序推进；发现计划假设不成立时先更新 `plan.md`/SPEC，再继续。

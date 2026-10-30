@@ -5,6 +5,13 @@
  * T011 adds the authenticated `/api/vibe` transport (health + unary methods);
  * later preview features register methods on the same registry.
  */
+import { createApiCollectionStore } from './api/collection-store'
+import { createApiEnvironmentStore } from './api/environment-store'
+import { createApiHistoryStore } from './api/history-store'
+import { createApiSampleServer } from './api/sample-server'
+import type { ApiSecretStore, CredentialProviderLike } from './api/secrets'
+import { createApiSecretStore } from './api/secrets'
+import { ApiService, registerApiMethods } from './api/service'
 import { Config, resolveConfig, type VibeStudioConfig } from './config'
 import {
   AnnotationHistoryService,
@@ -46,7 +53,7 @@ export {
   registerTransport,
   UnaryRegistry,
 } from './transport'
-export type { UnaryCallContext, UnaryHandler } from './transport'
+export type { UnaryCallContext, UnaryDispatchResult, UnaryHandler } from './transport'
 export {
   AnnotationHistoryService,
   createAnnotationHistoryService,
@@ -54,6 +61,97 @@ export {
   toAnnotationHistoryError,
 } from './inspect/history'
 export type { AnnotationHistoryServiceOptions } from './inspect/history'
+export {
+  describeEnvironment,
+  parseApiEnvironment,
+  resolveHttpRequest,
+  secretReferences,
+} from './api/environment'
+export type {
+  ResolveHttpRequestOptions,
+  ResolvedHttpRequest,
+} from './api/environment'
+export {
+  API_ENVIRONMENT_DIR_NAME,
+  API_ENVIRONMENT_FILE_EXT,
+  ApiEnvironmentStore,
+  createApiEnvironmentStore,
+  summarizeEnvironment,
+} from './api/environment-store'
+export type { ApiEnvironmentListResult } from './api/environment-store'
+export { createApiSecretStore, CREDENTIAL_NAME_PATTERN, isCredentialName } from './api/secrets'
+export { createApiSampleServer } from './api/sample-server'
+export type { ApiSampleServer } from './api/sample-server'
+export type {
+  ApiSecretStore,
+  ApiSecretStoreOptions,
+  CredentialDescription,
+  CredentialProviderLike,
+} from './api/secrets'
+export { createHttpExecutor, HttpExecutor } from './api/executor'
+export type { HttpExecuteOptions, HttpExecutorOptions } from './api/executor'
+export {
+  API_COLLECTION_DIR_NAME,
+  API_COLLECTION_FILE_EXT,
+  ApiCollectionStore,
+  createApiCollectionStore,
+  redactCollection,
+} from './api/collection-store'
+export type { ApiCollectionListResult } from './api/collection-store'
+export {
+  API_HISTORY_FILE_NAME,
+  API_HISTORY_VERSION,
+  ApiHistoryStore,
+  createApiHistoryStore,
+} from './api/history-store'
+export type {
+  ApiHistoryAppendDetails,
+  ApiHistoryListResult,
+  ApiHistoryStoreOptions,
+} from './api/history-store'
+export { ApiStoreError, toApiStoreStudioError } from './api/store-files'
+export type { ApiStoreErrorCode, ApiStoreFileOptions } from './api/store-files'
+export {
+  API_COLLECTION_ADD_METHOD,
+  API_COLLECTION_GET_METHOD,
+  API_COLLECTION_LIST_METHOD,
+  API_COLLECTION_REMOVE_METHOD,
+  API_ENV_GET_METHOD,
+  API_ENV_LIST_METHOD,
+  API_ENV_REMOVE_METHOD,
+  API_ENV_SAVE_METHOD,
+  API_HISTORY_CLEAR_METHOD,
+  API_HISTORY_LIST_METHOD,
+  API_HTTP_SEND_METHOD,
+  API_OPENAPI_IMPORT_METHOD,
+  API_REPLAY_PREPARE_METHOD,
+  API_SAMPLE_INFO_METHOD,
+  ApiService,
+  registerApiMethods,
+  summarizeCollection,
+} from './api/service'
+export type { ApiSendOutcome, ApiServiceOptions } from './api/service'
+export { prepareReplay } from './api/replay'
+export type { ReplayPrepareOptions } from './api/replay'
+export {
+  importOpenApi,
+  OPENAPI_IMPORT_BODY_BUDGET_BYTES,
+} from './api/openapi/mapper'
+export type {
+  OpenApiEndpoint,
+  OpenApiImportOptions,
+  OpenApiImportResult,
+} from './api/openapi/mapper'
+export {
+  OPENAPI_MAX_DOCUMENT_BYTES,
+  OPENAPI_MAX_OPERATIONS,
+  OpenApiError,
+} from './api/openapi/parser'
+export type { OpenApiErrorCode, OpenApiVersion } from './api/openapi/parser'
+export { evaluateAssertions, findHeader, formatAssertionValue, parseJsonPath } from './api/assertions'
+export type { JsonPathSegment } from './api/assertions'
+export { isBlockedHost, normalizeHttpRequest } from './api/request'
+export type { NormalizedHttpRequest, NormalizeRequestOptions } from './api/request'
 export { createTargetAdapterRegistry } from './targets/registry'
 export type { TargetAdapterRegistry } from './targets/registry'
 export { validateTargetConfig } from './targets/validate'
@@ -166,7 +264,9 @@ export type {
 } from './targets/process/logs'
 
 export const name = 'dsh-vibecode-studio'
-export const inject = ['connection']
+// `credentials` is read in `apply` for the API secret seam (T036); Cordis throws
+// on undeclared service access, so it must be in the inject map.
+export const inject = ['connection', 'credentials']
 
 /** The service this plugin exposes to later host modules (T011+). */
 export interface VibeStudioService {
@@ -181,11 +281,15 @@ export interface VibeStudioService {
   readonly preview: PreviewService
   /** Persisted annotation history under `.vibe/annotations` (T033). */
   readonly annotationHistory: AnnotationHistoryService
+  /** Credential seam for API environments (T036); never returns secret values. */
+  readonly apiSecrets: ApiSecretStore
 }
 
 /** Minimal Cordis surface used at this stage. */
 export interface HostContext extends TransportHostContext {
   provide(name: string, value: unknown): void
+  /** DSH's `ctx.credentials`; absent in bare test hosts. */
+  readonly credentials?: CredentialProviderLike
 }
 
 export function apply(ctx: HostContext, config: VibeStudioConfig = new Config()): void {
@@ -232,6 +336,42 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
   }
   registerPreviewRoutes(ctx, preview)
 
+  // T036: secrets live only in `ctx.credentials`. A host without the seam
+  // reports every reference as unconfigured rather than storing values here.
+  const apiSecrets = createApiSecretStore({ credentials: ctx.credentials })
+
+  // T038: the request builder sends through one unary method; expansion and
+  // execution stay host-side so resolved secrets never reach the panel.
+  // T044: collections and history live beside it under `.vibe/api`; the panel
+  // saves through `api.collection.add` and reads one page of history at a time.
+  const apiCollections = createApiCollectionStore(process.cwd())
+  const apiHistory = createApiHistoryStore(process.cwd())
+  // T046 R4: environments are edited and persisted under `.vibe/api`; a send
+  // names one by id and the Host loads it, so secret references stay host-side.
+  const apiEnvironments = createApiEnvironmentStore(process.cwd())
+  // U04: a loopback-only sample endpoint so the first Send works without typing
+  // a URL or reaching the internet. It starts lazily on the first panel request.
+  const apiSample = createApiSampleServer()
+  const api = new ApiService({
+    secrets: apiSecrets,
+    collections: apiCollections,
+    history: apiHistory,
+    environments: apiEnvironments,
+    sample: () => apiSample.info(),
+  })
+  const setupApi = () => {
+    const disposeMethods = registerApiMethods(registry, api)
+    return async () => {
+      disposeMethods()
+      await apiSample.dispose()
+    }
+  }
+  if (typeof ctx.effect === 'function') {
+    ctx.effect(setupApi, 'vibe-studio: api methods')
+  } else {
+    void setupApi()
+  }
+
   ctx.provide('vibeStudio', {
     config: resolved,
     transport: registry,
@@ -239,5 +379,6 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
     targets,
     preview,
     annotationHistory,
+    apiSecrets,
   } satisfies VibeStudioService)
 }
