@@ -850,6 +850,23 @@
 - 已知限制：工具可见性仍是 T052 门禁，在此之前 skill 的建议可能指向未注册的工具（正文已要求“工具不可用就如实告知用户、不要猜”）；profile 重启后的 UI 内实测留到 G5。
 - 提交：`4242819`（实现 + 测试 + 文档；`task/m5-agent-integration`，未推送、未合并）；归档 `F:\Project\claudecode修改优化\2026-10-30-T051-bundled-skill.md`。
 
+### T052 — `Vibe Studio` preset（2026-10-30，`task/m5-agent-integration`）
+
+- 目标：新增可选 preset `Vibe Studio`——最小工具集（fs / fs-search / bash / pwsh / jobs / web / skill / plan / todo / ask-user / compaction）+ 四个 vibe 工具；**standard 不受影响**。
+- 文件：新增 `presets/vibe-studio/cordis.patch.yml`、`src/host/agent/preset.ts`、`tests/integration/preset/vibe-preset.test.ts`（16 用例）；改 `package.json`（`exports['./agent']`、`files` 加 `presets`、`dsh.bundle.patch` 改数组）、`scripts/build-host.mjs`（多入口）、`src/host/index.ts`（服务加 `artifacts`）、`tests/unit/config.test.ts`（精确对象断言补 `artifacts`）。
+- 形态：preset 行（`@deepseek-ai/dsh-agent-preset`，`order: 5`）的 `plugins` 里放**本包第二个入口** `dsh-vibecode-studio/agent`。不在这里重挂宿主插件：`apply()` 会再次 `registerTransport`/`registerPreviewRoutes`，同一进程里重复注册传输路由；而 agent 入口只做两件事——注册四个工具、挂 `tools/pre-execute` 审批门禁。
+- 可见性（为什么能只给这个 preset）：DSH 的 `preset-registry` 为每个 preset revision 在 `createScope` 下挂一棵 `PresetTree`，agent 把自己的 scope 父级绑到 generation key；`ctx.tools.register()` 写入的是**调用者的 scope 层**，所以 `vibe-tools` 在 mount scope 里注册的工具只被该 preset 的 agent 继承。宿主 patch 一行 agent-plane 工具都不加（`cordis.patch.yml` 至今没有 `dsh-agent-preset` 行），standard 的工具集合因此按构造不变。
+- 门禁：`apply()` 里 `ctx.on('tools/pre-execute', createPreviewApprovalGate())` 沿用 T049 的监听器；`tools/pre-execute` 是 waterfall，按 `scopeTarget(this, exec.agent)` 匹配——监听器的 ctx 在 preset scope 内，是被门禁 agent 的祖先 scope，所以只对这些 agent 生效。
+- 依赖与失效方式：`inject: ['tools', 'vibeStudio']`（`ctx.provide` 是真服务，注入即可保证顺序）；`vibeStudio` 缺席时**直接抛错**而不是静默空转——preset 装错时会话起不来，比四个工具凭空消失好排查。`apply()` 返回 disposer，工具与监听器一起释放。
+- 内容取舍：刻意**不放** goal / schedule / subagent / workflow / plugin-manager / present——面向初学者，复杂度留给 DSH 本体；bash 与 pwsh 按 `process.platform` 二选一（Windows 上是 pwsh）；`tool-fs-search` 关掉 `sampleOverCapGlobResults` 少给噪音；plan/compaction 用 `isolate` 分组（`planMode` / `compaction`+`toolResultPruner`），与 standard 的隔离方式一致。
+- 校验：`package.json` 的 `dsh.bundle.patch` 改成数组 `[./cordis.patch.yml, ./presets/vibe-studio/cordis.patch.yml]`（`dsh-web-app` 本身就是数组写法的先例），宿主 patch 先、preset patch 后；`build-host.mjs` 每产出一个入口就 import 一次，坏 ESM 在构建期就炸。
+- 真机校验：`F:\Deepseek-Harness\DH\bin\dsh.cmd --profile vibe-dev --dump-config` 退出码 0、stderr 空，1392 行落 `.tmp/logs/dump-vibe-dev-t052.txt`——`preset-vibe-studio` 在 L1260（与 standard L632 / ptc L796 / minimal L966 / cordis L1063 并列第五个），`vibe-tools → dsh-vibecode-studio/agent` 在 L1391–1392；`createRequire(profile/noop.js).resolve('dsh-vibecode-studio/agent')` 能解析到 `lib/agent.js`，说明 profile 里子路径导出可用。
+- 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/preset/vibe-preset.test.ts` 1 文件 / 16 用例；`pnpm test` **113 文件 / 1048 用例**（T051 基线 112/1032）；`pnpm build:host` **429.7** + **56.7 KiB**（`lib/index.js`、`lib/agent.js`），"host entries import cleanly"；`pnpm test:e2e` **9/9**（26.3 s）。
+- 未验证（如实记录）：**没有跑真实 Cordis mount**（要 agent scope + 完整宿主树），`--dump-config` 只证明组合与解析；preset 选择器里的可见性、会话内四个工具是否真的出现在工具列表，留给 G5/T054 手测。标准会话不受影响这一点，目前由“宿主 patch 无工具行 + scope 分层”的构造保证，而不是实测。
+- 坑：`pnpm test -- <path>` 不过滤，聚焦测试必须 `pnpm exec vitest run <path>`；`src/host/index.ts` 的服务对象是精确对象断言（`tests/unit/config.test.ts`），加 `artifacts` 字段必须同步补 `expect.anything()`，否则一个无关的红灯会掩盖真实回归。
+- 已知限制：preset 里的工具名是硬编码列表，T053 若增删工具需同步 `presets/vibe-studio/cordis.patch.yml`；`vibe_preview` 的截图落盘依赖宿主把 `process.cwd()` 当项目根（与 settings/annotations 同一假设，M1 起一致）。
+- 提交：`c439d8e`（实现 + 测试；`task/m5-agent-integration`，未推送、未合并）；归档 `F:\Project\claudecode修改优化\2026-10-30-T052-Vibe-Studio-preset.md`。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -1085,6 +1102,7 @@ pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 - 工具 schema 与注册：`src/host/agent/tools/{definitions,register}.ts`、`tests/unit/tools/`、`.tmp/t047-schema-check.mjs`、DSH 校验结果 `.tmp/logs/t047-schema-check.json`。
 - 工具实现（状态/观察/标注）：`src/host/agent/tools/{status,observe,annotation,preview-data}.ts`、`src/host/preview/dom.ts`（`PreviewService.domSnapshot`）、`tests/integration/tools/`。
 - 预览工具与门禁：`src/host/agent/tools/preview.ts`（`createPreviewHandler`/`previewApprovalDecision`/`createPreviewApprovalGate`）、`src/host/artifacts/store.ts`、`src/host/preview/url.ts`、`tests/integration/preview-tool/`、`tests/unit/artifacts/`。
+- Vibe Studio preset：`presets/vibe-studio/cordis.patch.yml`（preset 行与工具集）、`src/host/agent/preset.ts`（agent 入口，`lib/agent.js`）、`tests/integration/preset/vibe-preset.test.ts`、`package.json`（`exports['./agent']` 与 `dsh.bundle.patch` 数组）、`scripts/build-host.mjs`（多入口）、组合证据 `.tmp/logs/dump-vibe-dev-t052.txt`（L1260 preset 行、L1391 `vibe-tools`）。
 - Web 预览：`src/host/targets/web/{adapter,launch}.ts`、`tests/integration/web-adapter/`、`tests/helpers/png.ts`。
 - 预览生命周期：`src/host/preview/session.ts`、`src/client/preview/{Toolbar.tsx,lifecycle.ts,local-url.ts}`、`tests/integration/preview/session-lifecycle.test.ts`、`.tmp/logs/t025-{host,desktop}.json`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。

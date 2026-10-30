@@ -739,12 +739,24 @@
   - 未做（范围外）：profile 重启后的 UI 内实测（需启动 `vibe-dev`，留给 G5 手测；bundle 通过 link 生效，无需重装）；工具可见性仍由 T052 门禁，在此之前 skill 的建议可能指向尚未注册的工具（skill 文本已要求“工具缺失时如实告知用户”）。
   - 提交：`4242819`（实现 + 测试 + 文档；`task/m5-agent-integration`，未推送、未合并）。
 
-### - [ ] T052 `Vibe Studio` preset
+### - [x] T052 `Vibe Studio` preset
 
 - **目标**：最小工具集 preset（fs/fs-search/bash/pwsh/jobs/web/skill/plan/todo/ask-user/compaction + vibe 工具）；不改 standard。
 - **验收**：preset 可选；工具可见；standard 不受影响；`--dump-config` 正常。
 - **验证**：手动 + `dsh --profile vibe-dev --dump-config`。
 - **文件**：`presets/vibe-studio/*`、`src/host/agent/preset.ts`。
+- **验证结果（2026-10-30，`task/m5-agent-integration`）**：
+  - 命令与结果：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/preset/vibe-preset.test.ts` **1 文件 / 16 用例**通过；`pnpm test` **113 文件 / 1048 用例**通过（T051 基线 112/1032）；`pnpm build:host` **`lib/index.js` 429.7 KiB + `lib/agent.js` 56.7 KiB**，`host entries import cleanly`；`pnpm test:e2e` **9/9**（26.3 s）；`dsh --profile vibe-dev --dump-config` **exit 0、stderr 空**，输出存 `.tmp/logs/dump-vibe-dev-t052.txt`（1392 行）。
+  - preset 可选：dump 中出现五个 preset 行——`preset-standard`(L632)/`preset-ptc`(L796)/`preset-minimal`(L966)/`preset-cordis`(L1063)/**`preset-vibe-studio`(L1260)**，本行 `config.id: vibe-studio`、`name: Vibe Studio`、`order: 5`，`plugins` 按 YAML 原样展开（含平台门控 `!!js process.platform`）。
+  - 工具可见（注册路径）：`src/host/agent/preset.ts` 是**第二个包入口**（`dsh-vibecode-studio/agent` → `lib/agent.js`），以 `agent-preset` 的 `vibe-tools` 行挂载；`ctx.tools.register` 落在**调用方 scope 层**（DSH 文档与 `dsh-tools` 实现一致），所以四个工具只属于该 preset 的 scope 链，不进全局层。测试用假 registry 断言：注册正好 `vibe_status`/`vibe_observe`/`vibe_annotation_get`/`vibe_preview`，`vibe_status`/`vibe_annotation_get`/`vibe_preview screenshot` 走通真实 handler（截图返回 artifact id，结果里没有 base64 或字节数组）。
+  - 审批门禁随 preset 挂载：`apply` 另注册一个 `tools/pre-execute` 监听器（`createPreviewApprovalGate`），测试断言 `start` 返回 `{kind:'ask',reason:'vibe_preview start'}` 且不调用 `next()`，`reload` 走 `next()`；disposer 同时释放工具与监听器；缺 `vibeStudio` 时抛错。
+  - standard 不受影响：dump 的 `preset-standard` 段（L632–795）无任何 `vibe` 字样；宿主 patch `cordis.patch.yml` 不含 `dsh-agent-preset`，仍只有 `vibe-studio` + `vibe-skill-bundled` 两行（L1242–1258）；上游 `presets/standard.patch.yml` 未改动（不在本仓库）。
+  - 解析证据：从 `~/.dsh/profiles/vibe-dev` 用 `createRequire` 解析，`dsh-vibecode-studio/agent` → `F:\Project\DSH_vibecode_studio\lib\agent.js`（profile 为 link，改动即时生效，无需重装）。
+  - 接线：`package.json` 的 `dsh.bundle.patch` 改为数组 `["./cordis.patch.yml","./presets/vibe-studio/cordis.patch.yml"]`（与 `dsh-web-app` 同形），新增 `"./agent"` 导出与 `files` 里的 `presets`；`scripts/build-host.mjs` 改为多入口并逐个 import；`src/host/index.ts` 新增 `artifacts`（`createArtifactStore(process.cwd())`）并挂到 `vibeStudio` 服务，供 preset 的截图路径使用；工具配置读**活对象** `vibeStudio.config`（settings 就地改同一对象），面板改 allowedOrigins/screenshotEnabled/retentionDays 立即生效。
+  - 支持性偏差：任务文件清单外改动 `package.json`、`scripts/build-host.mjs`、`src/host/index.ts`（`artifacts` 服务字段）、`tests/unit/config.test.ts`（服务断言新增 `artifacts`）——没有第二入口就无法把工具限定在 preset scope，没有 `artifacts` 字段 preset 的截图路径无落点。
+  - **未验证（如实记录）**：真实 Cordis mount（需要启动 `vibe-dev` 并开会话）未执行；`--dump-config` 只证明组合树可解析，不证明 preset 挂载成功。因此“preset 在 UI 可选 + 工具在会话中可见”仍留给 G5 手测（T054）。scope 层限定由实现机制保证，未做活体观测。
+  - 未做（范围外）：T053 hooks（`stale` 提示、越权拦截）、goal/schedule/delegation/plugin-manager 行（按最小集刻意排除，测试断言这些行不存在）。
+  - 提交：`c439d8e`（`task/m5-agent-integration`，未推送、未合并）。
 
 ### - [ ] T053 Hooks（过期提示/越权拦截）
 
