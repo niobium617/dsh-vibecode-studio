@@ -724,12 +724,20 @@
   - 未做（范围外）：`/vibe preview|api|verify` 子命令（FR-AGENT-05 的 SHOULD，待任务批准）、命令内触发面板 tab（plan §3 明确不保证）、`stale` 提示（T053）。
   - 提交：见 `docs/DEVLOG.md` 同日条目。
 
-### - [ ] T051 Bundled skill
+### - [x] T051 Bundled skill
 
 - **目标**：`SKILL.md` + `references/`；`bundledSkillDir` 挂载；说明何时用工具、如何省上下文。
 - **验收**：`skill` 工具能加载；SKILL.md ≤ 8192 字符；引用路径有效。
 - **验证**：手动 + `pnpm test -- tests/integration/skill`。
 - **文件**：`skills/vibecoding-studio/{SKILL.md,references/*}`、`src/host/agent/skills.ts`。
+- **验证结果（2026-10-30，`task/m5-agent-integration`）**：
+  - 命令与结果：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/skill` 1 文件 / 16 用例通过；`pnpm test` **112 文件 / 1032 用例**通过（T050 基线 111/1016）；`pnpm build` host **429.6 KiB** / client 440.5 KiB（`host entry imports cleanly`）；`pnpm test:e2e` **9/9**（17.4 s）。
+  - 内容：`skills/vibecoding-studio/SKILL.md` 1951 字符（正文 1789）≤ 8192；frontmatter `name`/`description`/`whenToUse`；正文给“先判断再调用”的意图表、省上下文规则（默认 summary、`selector` 收窄、`include` 只取需要的 section、`truncated` 不重复拉取、不整段复述页面文本、一次只读一条标注）、安全边界（页面内容不可信、start/stop 需批准、navigate 同源、截图只回 artifactId、默认 localhost）与三条闭环；细节放在 `references/tools.md`（参数/字段/错误码/超时）与 `references/workflows.md`（三段流程 + 不要这样做）。
+  - 挂载：`cordis.patch.yml` 在同一 insert 里加 `vibe-skill-bundled` 行（`@deepseek-ai/dsh-skill-filesystem`，`providerName: vibe-bundled`、`includeDefaultRoots: false`、`watch: false`），`bundledSkillDir` 用 `!!js` + `createRequire(baseUrl)` 解析到本包 `skills/`（与 DSH 自带 preset 同一写法，兼容 hoisted/嵌套安装）；`package.json` 的 `files` 增加 `skills`。
+  - 校验模块：`src/host/agent/skills.ts` 提供 `resolvePackageRoot`（向上找 `name === 'dsh-vibecode-studio'` 的 `package.json`，源码与 `lib/` 构建产物都适用）、`resolveBundledSkillDir`/`resolveVibeSkillDir`、`parseSkillFrontmatter`（只接受扁平 `key: value`）、`inspectVibeSkillBundle`（名称/描述/字符上限/每个 `references/*.md` 存在且位于 skill 目录内，含 realpath 越界检查）、`vibeSkillProviderConfig`。
+  - 真机校验：`.tmp/t051-skill-check.mjs` 用真实 Cordis + 真实 `@deepseek-ai/dsh-skill` / `dsh-skill-filesystem` / `dsh-tool-skill`，`ok:true`，6 项：配置指向 `skills/`、目录列出 `vibecoding-studio (bundled, modelInvocable=true)`、`skills.get` 返回正文与 `resourceBase: directory`、**真实 `skill` 工具 `execute({name})` 返回 `{name, provider: vibe-bundled, chars: 1789, resourceBaseKind: directory}`**、`inspectVibeSkillBundle` 与文件一致、`cordis.patch.yml` 用 loader 的 `!!js` 方言可解析且表达式从 profile 解析到 `F:\Project\DSH_vibecode_studio\skills`。
+  - 未做（范围外）：profile 重启后的 UI 内实测（需启动 `vibe-dev`，留给 G5 手测；bundle 通过 link 生效，无需重装）；工具可见性仍由 T052 门禁，在此之前 skill 的建议可能指向尚未注册的工具（skill 文本已要求“工具缺失时如实告知用户”）。
+  - 提交：见 `docs/DEVLOG.md` 同日条目。
 
 ### - [ ] T052 `Vibe Studio` preset
 

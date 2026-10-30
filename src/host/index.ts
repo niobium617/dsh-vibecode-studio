@@ -261,6 +261,23 @@ export type {
   VibeCommandResult,
 } from './agent/commands/vibe'
 export {
+  inspectVibeSkillBundle,
+  parseSkillFrontmatter,
+  resolveBundledSkillDir,
+  resolvePackageRoot,
+  resolveVibeSkillDir,
+  VIBE_SKILL_MAX_CHARS,
+  VIBE_SKILL_NAME,
+  VIBE_SKILL_PATCH_ROW_ID,
+  VIBE_SKILL_PROVIDER,
+  vibeSkillProviderConfig,
+} from './agent/skills'
+export type {
+  VibeSkillBundle,
+  VibeSkillFrontmatter,
+  VibeSkillProviderConfig,
+} from './agent/skills'
+export {
   asVibeToolError,
   createVibeToolDefinitions,
   registerVibeTools,

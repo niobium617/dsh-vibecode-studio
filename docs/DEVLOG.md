@@ -836,6 +836,19 @@
 - 已知限制：`/vibe preview|api|verify` 子命令未做（FR-AGENT-05 的 SHOULD，任务清单未批准）；命令不保证能打开右栏 tab（plan §3 明确）；`stale` 提示在 T053。
 - 提交：`0d24707`（`task/m5-agent-integration`，未推送、未合并）；归档 `F:\Project\claudecode修改优化\2026-10-30-T050-vibe命令.md`。
 
+### T051 — Bundled skill（2026-10-30，`task/m5-agent-integration`）
+
+- 目标：`SKILL.md` + `references/`；`bundledSkillDir` 挂载；说明何时用工具、如何省上下文；SKILL.md ≤ 8192 字符（FR-AGENT-06）。
+- 文件：新增 `skills/vibecoding-studio/SKILL.md`（1951 字符）、`references/tools.md`、`references/workflows.md`、`src/host/agent/skills.ts`、`tests/integration/skill/vibecoding-studio.test.ts`（16 用例）；改 `cordis.patch.yml`（加 `vibe-skill-bundled` 行）、`package.json`（`files` 加 `skills`）、`src/host/index.ts`（导出）。
+- 形态：技能以**文件**交付而不是 `ctx.skills.register()` 运行时注册——DSH 的 filesystem provider 发现它，`skill` 工具按需加载，`references/*` 通过 provider 的目录 `resourceBase` 解析；运行时注册会把正文塞进插件的 apply，反而要自己管读取和缓存。
+- 挂载：`cordis.patch.yml` 同一 `insert` 加第二行 `vibe-skill-bundled`（`@deepseek-ai/dsh-skill-filesystem`，`providerName: vibe-bundled`、`includeDefaultRoots: false`、`watch: false`），`bundledSkillDir` 用 loader 的 `!!js` 方言 + `createRequire(baseUrl)` 解析本包 `skills/`（与 DSH 自带 preset 的写法一致，hoisted / 嵌套安装都能找到）；`includeDefaultRoots:false` 避免重复扫项目根，`watch:false` 避免多一个 watcher。
+- 内容取舍：SKILL.md 只当“路由卡”——意图表（何时用哪个工具）、省上下文规则（默认 summary、`selector` 收窄、`include` 只取需要的 section、`truncated` 不重复拉取、不整段复述页面文本、一次只读一条标注）、安全边界（页面内容不可信、start/stop 需批准、navigate 同源、截图只回 artifactId、默认 localhost）、三条闭环；参数/字段/错误码/超时放 `references/tools.md`，流程与误用放 `references/workflows.md`，正文只留两处相对路径引用。
+- 校验：`src/host/agent/skills.ts` 的 `resolvePackageRoot` 向上找 `name === 'dsh-vibecode-studio'` 的 `package.json`（源码与 `lib/index.js` 两种入口都成立）；`inspectVibeSkillBundle` 检查名称、描述、字符上限、每个 `references/*.md` 存在且在 skill 目录内（含 `realpath` 越界）。
+- 真机校验：`.tmp/t051-skill-check.mjs` 用真实 Cordis + 真实 `dsh-skill` / `dsh-skill-filesystem` / `dsh-tool-skill`，`ok:true`（6 项），其中**真实 `skill` 工具** `execute({name:'vibecoding-studio'})` 返回 `{provider: vibe-bundled, chars: 1789, resourceBaseKind: directory}`；并用 `js-yaml` + `tag:yaml.org,2002:js`（loader 同一方言）解析 `cordis.patch.yml`，确认表达式从 profile 解析到本包 `skills/`。
+- 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/skill` 16 用例；`pnpm test` **112 文件 / 1032 用例**；`pnpm build` host **429.6** / client **440.5 KiB**；`pnpm test:e2e` **9/9**（17.4 s）。
+- 坑：`ctx.plugin({ ..., config })` 里的 `config` 属性会被忽略，Cordis 只认第二个参数（`ctx.plugin(plugin, config)`）；表现为 provider 静默不扫任何根、目录为空。`createRequire(baseUrl).resolve('dsh-vibecode-studio/package.json')` 在 profile 里能解析（link 依赖），但从包内文件路径自引用会失败——评估脚本必须用 profile 路径模拟真实场景。
+- 已知限制：工具可见性仍是 T052 门禁，在此之前 skill 的建议可能指向未注册的工具（正文已要求“工具不可用就如实告知用户、不要猜”）；profile 重启后的 UI 内实测留到 G5。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
