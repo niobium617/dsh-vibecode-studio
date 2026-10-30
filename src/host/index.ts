@@ -12,6 +12,10 @@ import { createApiSampleServer } from './api/sample-server'
 import type { ApiSecretStore, CredentialProviderLike } from './api/secrets'
 import { createApiSecretStore } from './api/secrets'
 import { ApiService, registerApiMethods } from './api/service'
+import {
+  registerVibeCommand,
+  type VibeCommandRegistry,
+} from './agent/commands/vibe'
 import { Config, resolveConfig, type VibeStudioConfig } from './config'
 import {
   AnnotationHistoryService,
@@ -239,6 +243,24 @@ export type {
   VibeToolSpec,
 } from './agent/tools/definitions'
 export {
+  createVibeCommand,
+  createVibeCommandHandler,
+  registerVibeCommand,
+  renderVibeStatus,
+  suggestNextStep,
+  VIBE_COMMAND_BUDGET_BYTES,
+  VIBE_COMMAND_NAME,
+  VIBE_COMMAND_USAGE,
+} from './agent/commands/vibe'
+export type {
+  VibeCommandDefinition,
+  VibeCommandDeps,
+  VibeCommandHandler,
+  VibeCommandInvocation,
+  VibeCommandRegistry,
+  VibeCommandResult,
+} from './agent/commands/vibe'
+export {
   asVibeToolError,
   createVibeToolDefinitions,
   registerVibeTools,
@@ -384,6 +406,28 @@ export interface HostContext extends TransportHostContext {
   provide(name: string, value: unknown): void
   /** DSH's `ctx.credentials`; absent in bare test hosts. */
   readonly credentials?: CredentialProviderLike
+  /**
+   * Cordis' inject-free service read. `/vibe` registers through this slot so
+   * a host without the `commands` plugin keeps the rest of the studio working.
+   */
+  get?(name: string): unknown
+  /** The command registry itself, when a host exposes it directly. */
+  readonly commands?: VibeCommandRegistry
+}
+
+/**
+ * Read DSH's command registry without making it a hard dependency:
+ * `ctx.commands` throws in a Cordis context that did not `inject` the service,
+ * so real hosts resolve through `ctx.get`, while bare test hosts may expose the
+ * registry as a plain property.
+ */
+function resolveCommandRegistry(ctx: HostContext): VibeCommandRegistry | undefined {
+  const service =
+    typeof ctx.get === 'function' ? ctx.get('commands') : ctx.commands
+  if (!service || typeof (service as { register?: unknown }).register !== 'function') {
+    return undefined
+  }
+  return service as VibeCommandRegistry
 }
 
 export function apply(ctx: HostContext, config: VibeStudioConfig = new Config()): void {
@@ -429,6 +473,20 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
     void setupPreview()
   }
   registerPreviewRoutes(ctx, preview)
+
+  // T050: `/vibe` reads the same host-owned state as `vibe_status` and answers
+  // with one next step; it never starts, stops or navigates a preview. The
+  // command is user-facing only, so unlike the tools it is not preset-gated.
+  const commands = resolveCommandRegistry(ctx)
+  if (commands) {
+    const setupCommand = () =>
+      registerVibeCommand(commands, { preview, annotations: annotationHistory })
+    if (typeof ctx.effect === 'function') {
+      ctx.effect(setupCommand, 'vibe-studio: /vibe command')
+    } else {
+      void setupCommand()
+    }
+  }
 
   // T036: secrets live only in `ctx.credentials`. A host without the seam
   // reports every reference as unconfigured rather than storing values here.

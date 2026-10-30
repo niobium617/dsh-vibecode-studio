@@ -709,12 +709,20 @@
   - 未做（范围外）：`apply()` 未接线（T052 preset/wiring）；文件名预留/过期清理与 artifact 读取入口（T050+ 按需）；T048 留下的 `vibe_observe` artifact id 接入未在此任务回填。
   - 提交：`f2ecf60`（实现）、`c1e7565`（文档）；归档 `F:\Project\claudecode修改优化\2026-10-30-T049-preview工具与门禁.md`。
 
-### - [ ] T050 `/vibe` 命令
+### - [x] T050 `/vibe` 命令
 
 - **目标**：注册命令；返回状态 + 下一步建议；不执行危险动作。
 - **验收**：命令可见；输出 ≤ 2 KB；无副作用；单测通过。
 - **验证**：`pnpm test -- tests/integration/command` + 手动。
 - **文件**：`src/host/agent/commands/vibe.ts`、tests。
+- **验证结果（2026-10-30，`task/m5-agent-integration`）**：
+  - 命令与结果：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/command` 1 文件 / 14 用例通过；`pnpm test` **111 文件 / 1016 用例**通过（T049 基线 110/1002）；`pnpm build` host **424.8 KiB** / client **440.5 KiB**（`host entry imports cleanly`）；`pnpm test:e2e` **9/9**（16.9 s）。
+  - 实现：`src/host/agent/commands/vibe.ts` 结构化镜像 DSH `commands` 注册表（`register({name,description,input?,recordInput?,handler})`），`VIBE_COMMAND_NAME='vibe'`、`recordInput:false`。处理器复用 `createStatusHandler`（与 `vibe_status` 同一数据源），输出三行：预览状态（含 URL/帧率）· 控制台错误/网络失败/已保存标注计数 · 一条“下一步”建议（失败→重启；未启动→面板启动或 `vibe_preview start`；有报错→`vibe_observe` console/network；有标注→`vibe_annotation_get`；全好→点选标注或 `vibe_observe`）。URL 截断 200 字符，整体再经 `truncateUtf8` 限 2 KB。
+  - 无副作用：只调用 `preview.status()`、`consoleList()`、`networkList()`（仅 ready 时）与 `annotations.list({limit:1})`；不 start/stop/navigate/screenshot；带任何参数（`/vibe xxx`）直接返回用法错误且**不读任何状态**（用例断言 `calls` 全 0）。
+  - 接线：`apply()` 通过 `resolveCommandRegistry(ctx)` 取 `ctx.get('commands')`（Cordis 无 inject 读服务；裸测试宿主回退到 `ctx.commands` 属性）。**有意不加 `inject: ['commands']`**——命令是 SHOULD 且面向用户，命令服务缺席时面板其余功能仍可用；命令按 DSH 自身惯例（`/feedback`、`/compact`）全局注册，不做 preset 门禁（与工具不同，工具门禁在 T052）。
+  - 真机校验：`.tmp/t050-command-check.mjs` 用真实 Cordis + 真实 `@deepseek-ai/dsh-commands` 的 `CommandRuntime` 加载构建产物，`ok:true`，4 项检查：commands 服务在活、`vibeStudio` 已提供、`commands.find({}, 'vibe')` 命中（`vibe: 查看 Vibe Studio 预览状态和下一步建议`）、处理器返回 208 B 文本（`预览：未启动…`）；同时验证插件 fiber dispose 后 `/vibe` 被移除。
+  - 未做（范围外）：`/vibe preview|api|verify` 子命令（FR-AGENT-05 的 SHOULD，待任务批准）、命令内触发面板 tab（plan §3 明确不保证）、`stale` 提示（T053）。
+  - 提交：见 `docs/DEVLOG.md` 同日条目。
 
 ### - [ ] T051 Bundled skill
 
