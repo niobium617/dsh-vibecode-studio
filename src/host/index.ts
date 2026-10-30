@@ -164,8 +164,13 @@ export type {
   ValidatedTargetConfig,
 } from './targets/types'
 export { registerPreviewMethods, registerPreviewRoutes } from './preview/route'
-export { createPreviewService } from './preview/session'
-export type { PreviewService, PreviewServiceOptions } from './preview/session'
+export { createPreviewService, PREVIEW_TARGET_ID } from './preview/session'
+export type {
+  PreviewScreenshot,
+  PreviewService,
+  PreviewServiceOptions,
+} from './preview/session'
+export { isLoopbackHost } from './preview/url'
 export { createPreviewFrameBuffer, PreviewFrameBuffer } from './preview/frame-buffer'
 export type { FrameListener, PreviewFrame } from './preview/frame-buffer'
 export { createScreencastSource } from './preview/screencast'
@@ -263,6 +268,38 @@ export type {
   ObserveToolDeps,
   ObserveToolOutput,
 } from './agent/tools/observe'
+export {
+  createPreviewApprovalGate,
+  createPreviewHandler,
+  PREVIEW_ACTIONS,
+  PREVIEW_TOOL_NAME,
+  previewApprovalDecision,
+} from './agent/tools/preview'
+export type {
+  PreviewAction,
+  PreviewArtifactSink,
+  PreviewAskDecision,
+  PreviewGateExecution,
+  PreviewToolConfig,
+  PreviewToolDeps,
+  PreviewToolOutput,
+  PreviewToolSource,
+} from './agent/tools/preview'
+export {
+  ARTIFACT_DIR_NAME,
+  ArtifactStore,
+  ArtifactStoreError,
+  createArtifactStore,
+  isArtifactId,
+  MAX_ARTIFACT_BYTES,
+  SCREENSHOT_FILE_EXT,
+  toArtifactStudioError,
+} from './artifacts/store'
+export type {
+  ArtifactStoreOptions,
+  SaveScreenshotOptions,
+  StoredArtifact,
+} from './artifacts/store'
 export { createAnnotationGetHandler, toAnnotationToolOutput } from './agent/tools/annotation'
 export type {
   AnnotationElementOutput,

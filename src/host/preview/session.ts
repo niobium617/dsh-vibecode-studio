@@ -64,11 +64,22 @@ import {
   type DomSnapshot,
 } from './dom'
 
-const PREVIEW_TARGET_ID = 'preview'
+export const PREVIEW_TARGET_ID = 'preview'
 const PREVIEW_TARGET_NAME = 'Preview'
 const DEFAULT_PREVIEW_KIND: TargetKind = 'web'
 /** Only used to satisfy config validation when a URL is already known. */
 const PLACEHOLDER_URL = 'http://127.0.0.1/'
+
+/**
+ * One captured PNG plus the viewport it was taken at (CSS pixels). The bytes
+ * stay on the host: callers store them as an artifact and hand out its id
+ * (FR-AGENT-09).
+ */
+export interface PreviewScreenshot {
+  readonly bytes: Uint8Array
+  readonly width: number | null
+  readonly height: number | null
+}
 
 export interface PreviewService {
   readonly buffer: PreviewFrameBuffer
@@ -92,6 +103,11 @@ export interface PreviewService {
    * screencast or input sessions.
    */
   domSnapshot(params?: unknown): Promise<DomSnapshot>
+  /**
+   * One PNG of the live page (T049). Capability-gated; the adapter decodes no
+   * pixels here, so the result is exactly what the browser renders.
+   */
+  captureScreenshot(): Promise<PreviewScreenshot>
   /** Registered adapters for the toolbar's target select (T025). */
   listTargets(): PreviewTargetsResult
   /** Navigates the live page after validating the URL (T025). */
@@ -506,6 +522,34 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     return parsed.snapshot
   }
 
+  /**
+   * Screenshot through the adapter. Failures come back already mapped to a
+   * Studio error by the adapter, so only shape problems are added here.
+   */
+  async function captureScreenshot(): Promise<PreviewScreenshot> {
+    const active = requireReady()
+    if (!active.capabilities.screenshot || typeof active.screenshot !== 'function') {
+      throw studioError('unsupported', 'vibe-studio: the target does not support screenshots', {
+        capability: 'screenshot',
+      })
+    }
+    let bytes: Uint8Array
+    try {
+      bytes = await active.screenshot()
+    } catch (error) {
+      throw toPreviewError(error)
+    }
+    if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
+      throw studioError('preview_failed', 'vibe-studio: the screenshot capture returned no image')
+    }
+    const size = viewport
+    return {
+      bytes,
+      width: size?.width ?? null,
+      height: size?.height ?? null,
+    }
+  }
+
   function listTargets(): PreviewTargetsResult {
     return {
       targets: options.targets.list().map((entry) => ({ id: entry.id, kind: entry.kind })),
@@ -675,6 +719,7 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     networkClear,
     networkBody,
     domSnapshot,
+    captureScreenshot,
     listTargets,
     navigate,
     reload,

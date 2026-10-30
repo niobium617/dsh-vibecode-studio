@@ -11,6 +11,7 @@ import type { Browser, BrowserContext, Page } from 'playwright-core'
 import { isStudioError, studioError, type StudioError } from '../../../contracts/errors'
 import { asSessionId } from '../../../contracts/ids'
 import type { TargetCapabilities, TargetSession, TargetViewport } from '../../../contracts/target'
+import { isLoopbackHost } from '../../preview/url'
 import type {
   ScreencastPageLike,
   ScreencastSessionLike,
@@ -70,13 +71,6 @@ export interface WebTargetAdapter extends TargetAdapter {
 }
 
 const DEFAULT_NAVIGATION_TIMEOUT_MS = 15_000
-
-function isLoopbackHost(hostname: string): boolean {
-  const host = hostname.toLowerCase()
-  if (host === 'localhost' || host.endsWith('.localhost')) return true
-  if (host === '::1' || host === '[::1]') return true
-  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)
-}
 
 function parsePreviewUrl(
   raw: string,
