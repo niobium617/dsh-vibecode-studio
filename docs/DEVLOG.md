@@ -9,7 +9,7 @@
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，M1 已完成，M2 已完成）**。
 - 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）、T023 Console 采集与抽屉、T024 Network 采集与抽屉、T025 预览工具栏与生命周期、T026 G2 Preview 评审（通过）、T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 三框架源码适配、T030 标注模型与存储、T031 标注气泡与队列。
-- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），**T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 源码适配（React/Vue/Svelte）、T030 标注模型与存储、T031 标注气泡与队列、T032 Composer handoff、T033 标注历史 已完成**；**T034 G3 评审完成（GO）**：初评“≤3 步”实测 4–5 个动作，经用户批准在保存通知加“发送到对话”后为 3 个动作（点元素 → 保存 → 发送），复测四项验收全过（源码 100%、标注 4,095 B ≤ 4 KB、不自动发送），M3 完成；手动复测入口见 `docs/2026-10-29-M3手动测试手册.md`（M2 见 `docs/2026-10-28-手动测试手册.md`）。**M3.5/U02 界面优化（气泡直达发送、状态归位、删除弹窗）与 U03 拾取注入修复已完成并合并入 `main`**（合并提交 `a1c7577`，2026-10-29；依据 `界面审查/M3修改意见.docx` 与用户实测反馈）。**M4 API Workbench 进行中（分支 `task/m4-api-workbench`，未推送、未合并）**：T035 HTTP 执行器、T036 环境/变量/密钥、T037 集合与历史持久化、T038 请求构建 UI、T039 响应查看 UI、T040 富响应体、T041 S7 OpenAPI spike、T042 OpenAPI 导入、T043 抓包回放、T044 集合/历史 UI、T045 断言已完成；下一项 T046 G4 评审。
+- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），**T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 源码适配（React/Vue/Svelte）、T030 标注模型与存储、T031 标注气泡与队列、T032 Composer handoff、T033 标注历史 已完成**；**T034 G3 评审完成（GO）**：初评“≤3 步”实测 4–5 个动作，经用户批准在保存通知加“发送到对话”后为 3 个动作（点元素 → 保存 → 发送），复测四项验收全过（源码 100%、标注 4,095 B ≤ 4 KB、不自动发送），M3 完成；手动复测入口见 `docs/2026-10-29-M3手动测试手册.md`（M2 见 `docs/2026-10-28-手动测试手册.md`）。**M3.5/U02 界面优化（气泡直达发送、状态归位、删除弹窗）与 U03 拾取注入修复已完成并合并入 `main`**（合并提交 `a1c7577`，2026-10-29；依据 `界面审查/M3修改意见.docx` 与用户实测反馈）。**M4 API Workbench 进行中（分支 `task/m4-api-workbench`，未推送、未合并）**：T035 HTTP 执行器、T036 环境/变量/密钥、T037 集合与历史持久化、T038 请求构建 UI、T039 响应查看 UI、T040 富响应体、T041 S7 OpenAPI spike、T042 OpenAPI 导入、T043 抓包回放、T044 集合/历史 UI、T045 断言、T046 G4 评审与 R1–R7 返工已完成（**GO**，2026-10-30）；手动复测入口 `docs/2026-10-30-M4手动测试手册.md`（配套本机目标服务 `tools/m4-manual-server.mjs`）。分支未推送、未合并。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
 - T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T026 已提交并推送到 `origin/task/m2-target-model`（`ebee1e5`，文档至 `92ecc32`），尚未合并入 `main`；其后 `9c19501..88a4070`（方向/手册文档、U01 实现、去重复标题）已推送到 `origin/task/m2-target-model`（`92ecc32..88a4070`，2026-10-28）；`f64e928`（清理残留 locale key 与过期布局引用）推送后，以 `--no-ff` 合并入 `main`（合并提交 `768e129`，`main` 树与分支一致），功能分支保留。手动复测入口见 `docs/2026-10-28-手动测试手册.md`；界面/产品方向见 `docs/2026-10-28-界面与项目方向.md`。S3/S4/T010/T014/T015/T020/T021/T022/T025 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
@@ -748,6 +748,19 @@
 - 手动：`.tmp/t045-manual.mjs` → `.tmp/logs/t045-web.json` `ok:true`。真实 `vibe-dev` + 无头 Edge：对本地站点加四类检查（status 200 / header `content-type` contains `json` / `$.items[0].id` equals `item-1` / duration ≤ 5000 ms）→ 一次发送，站点只收到 1 次请求，四行全 pass、汇总“通过 4/4”（耗时 5 ms）；把 status 改成 201 再发 → 该行 fail 且文案“期望状态码 201，实际 200。”，其余三行仍 pass；期望值填 `abc` 再点发送 → 不发请求并提示“状态码须为三位数字（100–599）”；0 其他 console 错误。
 - 已知限制：断言不随请求保存（`HttpRequestSpec` 没有该字段，集合/历史只存请求本身）；JSONPath 无通配/递归/filter；单条没有“跳过”开关。
 
+### T046 — G4 评审与 R1–R7 返工（2026-10-30，`task/m4-api-workbench`，GO）
+
+- 初评（只读，NO-GO）：真实载体“抓包 → 回放 → 保存 → 重开”3 次点击闭环通过、500 端点模块级导入通过；但 query api-key / query 变量把解析后的密钥经 `api.http.send` 的 `result.url`（及重定向 hop）回传客户端（`outcomeHasSecret:true`），FR-API-07 cURL 缺失，FR-API-04/05/06/08 无入口或部分缺失。用户选“补齐全部 M4 缺口”。
+- R1 密钥回传：`resolveHttpRequest` 额外回 host-only `secretValues`，`src/host/api/result-redaction.ts` 在返回前清洗最终 URL 与每个 hop 的 `url`/`location`（精确值、percent-encoded、`+` 空格，最长优先），再 `redactUrl` 兜底；响应体是目标数据，不重写。
+- R2 cURL：前端纯函数 `curl.ts`（`parseCurl`/`toCurl`，占位符双向保留，不经 Host、不上网）+ 折叠面板 `CurlPanel.tsx`；导入只填表，含丢失/警告去向。
+- R3 OpenAPI 入口：unary `api.openapi.import` 在 Host 解析并落盘成新集合（不覆盖，slug 占用 `-2`/`-3`），远程 `$ref` 默认拒绝且 0 fetch；客户端先按 64 KiB unary 包体精确计算并本地提示；集合树下折叠面板（粘贴/选文件）。
+- R4 环境：`environment-store.ts`（`.vibe/api/environments`，一环境一文件、原子写、2 MiB）+ `api.env.{list,get,save,remove}`，`api.http.send` 支持 `environmentId`（与内联 `environment` 互斥），读取只回文档 + `view`；`EnvironmentPanel` 可编辑（选择/新建/增删行/保存/删除）。
+- R5 集合：store `rename` 原地保留 id；`api.collection.{rename,duplicate}`；UI 行内重命名（Enter/Esc、空名禁用）与复制（自动展开副本）。
+- R6 历史：客户端 `limit`（默认 50，可 50/100/200，`setApiHistoryLimit` 夹取并保留搜索词）+ `HistoryList` 选择器；Host 侧本就支持 `limit`，未改。
+- R7 复评 GO：四类基线全绿——`pnpm typecheck` 0；`pnpm test` **98 文件 / 885 用例**（37.6 s）；`pnpm build` host 348.9 / client 429.6 KiB（gzip 78.5 / 86.2 KiB）；`pnpm test:e2e` **9/9**（16.5 s）。扩写证据 `.tmp/logs/g4-evidence-r7.out` `ok:true`（500 端点 12.14 ms；bearer/query-key/query-var 三条 flow `outcomeHasSecret:false`；环境按 id 发送且文件/视图无密钥；改名保 id、复制换新嵌套 id；`limit:2`/`limit:200` 分页；二次导入不覆盖）。真实载体 `.tmp/logs/g4-flow.json` `ok:true`。SPEC：FR-API-01–10、12 通过，FR-API-11 按 D8 延后。
+- 手动测试手册：`docs/2026-10-30-M4手动测试手册.md`（结构同 M3 手册：准备/启动/分组流程/R·V·E·C·H·U·O·A·P·S·L 共 90 项/G4 与 T035–T046 映射/易误判/排障/结果模板）。配套 `tools/m4-manual-server.mjs`（`127.0.0.1:4325`，逐条打印命中；不是产品依赖）。手册明确：未解析变量只在发送后出现；最终 URL 不在 UI 展示，R1 由证据脚本覆盖；密钥路径只用进程级 `M4_TEST_TOKEN`，不碰真实 `DEEPSEEK_API_KEY`；unary 64 KiB 使多部件文件与 OpenAPI 文档实际受此上限。
+- 分支状态：`task/m4-api-workbench` 未推送、未合并，推送/合并需用户批准。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -955,6 +968,7 @@ pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 - G0 评审：[G0.md](../spikes/G0.md)。
 - S8 进程生命周期：[REPORT](../spikes/s8/REPORT.md)、[run.ts](../spikes/s8/run.ts)；原始数据 `.tmp/logs/s8-results.json`。
 - 任务与验收：[todo.md](../tasks/todo.md)。
+- M4 手动测试：[手册](./2026-10-30-M4手动测试手册.md)、目标服务 `tools/m4-manual-server.mjs`、G4 证据 `.tmp/logs/g4-evidence-r7.out` 与 `.tmp/logs/g4-flow.json`。
 - 测试 harness：`vitest.config.ts`、`playwright.config.ts`、`fixtures/vite-basic/`、`tests/e2e/fixture.spec.ts`。
 - 源码适配：`src/host/inspect/source/`、`fixtures/source/{react,vue,svelte}/`、`tests/e2e/source-adapters.spec.ts`、`tests/unit/inspect-context/source.test.ts`。
 - 配置存储：`src/host/studio/store.ts`、`tests/unit/studio-store.test.ts`。
