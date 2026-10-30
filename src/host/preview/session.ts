@@ -57,6 +57,12 @@ import { createPreviewInputDispatcher } from './input'
 import type { PreviewNetworkCollector } from './network'
 import { createPreviewNetworkCollector } from './network'
 import { createScreencastSource, type ScreencastSource } from './screencast'
+import {
+  buildDomOutlineExpression,
+  isDomSnapshotParams,
+  parseDomOutlineResult,
+  type DomSnapshot,
+} from './dom'
 
 const PREVIEW_TARGET_ID = 'preview'
 const PREVIEW_TARGET_NAME = 'Preview'
@@ -80,6 +86,12 @@ export interface PreviewService {
   networkClear(): PreviewNetworkClearResult
   /** Fetches one response body on demand. */
   networkBody(params: unknown): Promise<PreviewNetworkBody>
+  /**
+   * Bounded DOM outline of the live page (T048). Read-only; it opens its own
+   * short-lived CDP session so a page evaluation never shares state with the
+   * screencast or input sessions.
+   */
+  domSnapshot(params?: unknown): Promise<DomSnapshot>
   /** Registered adapters for the toolbar's target select (T025). */
   listTargets(): PreviewTargetsResult
   /** Navigates the live page after validating the URL (T025). */
@@ -436,6 +448,64 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     return requireNetwork().body(params)
   }
 
+  /**
+   * Evaluate one bounded serializer in the live page. The CDP session is
+   * created per call and detached in `finally`: a failed or aborted read must
+   * not leave a handle behind, and the page may navigate between calls.
+   */
+  async function domSnapshot(params: unknown): Promise<DomSnapshot> {
+    if (params !== undefined && !isDomSnapshotParams(params)) {
+      throw studioError('invalid_input', 'vibe-studio: invalid DOM snapshot params', {
+        field: 'params',
+      })
+    }
+    const options = params ?? {}
+    const active = requireReady()
+    const page = typeof active.screencastPage === 'function' ? active.screencastPage() : undefined
+    if (!page) {
+      throw studioError('target_unavailable', 'vibe-studio: the preview page is not available', {
+        capability: 'dom',
+      })
+    }
+
+    let session: Awaited<ReturnType<typeof page.createCdpSession>>
+    try {
+      session = await page.createCdpSession()
+    } catch (error) {
+      throw toPreviewError(error)
+    }
+
+    let raw: unknown
+    try {
+      const result = (await session.send('Runtime.evaluate', {
+        expression: buildDomOutlineExpression(options),
+        returnByValue: true,
+        awaitPromise: false,
+      })) as { result?: { value?: unknown }; exceptionDetails?: unknown } | undefined
+      if (result && result.exceptionDetails) {
+        throw studioError('preview_failed', 'vibe-studio: the page failed to describe its DOM')
+      }
+      raw = result?.result?.value
+    } catch (error) {
+      throw toPreviewError(error)
+    } finally {
+      await session.detach().catch(() => undefined)
+    }
+
+    const parsed = parseDomOutlineResult(raw, options)
+    if (parsed.kind === 'invalid_selector') {
+      throw studioError('invalid_input', 'vibe-studio: invalid CSS selector', {
+        field: 'selector',
+      })
+    }
+    if (parsed.kind === 'not_found') {
+      throw studioError('not_found', 'vibe-studio: the selector matched no element', {
+        field: 'selector',
+      })
+    }
+    return parsed.snapshot
+  }
+
   function listTargets(): PreviewTargetsResult {
     return {
       targets: options.targets.list().map((entry) => ({ id: entry.id, kind: entry.kind })),
@@ -604,6 +674,7 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     networkList,
     networkClear,
     networkBody,
+    domSnapshot,
     listTargets,
     navigate,
     reload,

@@ -32,6 +32,11 @@ export interface FakeAdapterOptions {
   readonly failNavigateWith?: string
   readonly failReloadWith?: string
   readonly failViewportWith?: string
+  /**
+   * T048 DOM read seam: when set, `Runtime.evaluate` resolves to this value so
+   * the preview service's `domSnapshot` can be exercised without a page.
+   */
+  readonly evaluateResult?: unknown
 }
 
 export interface FakeTargetAdapter extends Omit<TargetAdapter, 'start'> {
@@ -185,7 +190,10 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): FakeTargetA
           : { width: lastViewport.width, height: lastViewport.height },
       async createCdpSession() {
         return {
-          async send() {
+          async send(method: string) {
+            if (method === 'Runtime.evaluate' && 'evaluateResult' in options) {
+              return { result: { value: options.evaluateResult } }
+            }
             return {}
           },
           on() {

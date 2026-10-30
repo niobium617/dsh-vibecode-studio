@@ -249,6 +249,34 @@ export type {
   VibeToolRegistry,
   VibeToolRunContext,
 } from './agent/tools/register'
+export { createStatusHandler } from './agent/tools/status'
+export type {
+  StatusAnnotationSource,
+  StatusPreviewSource,
+  StatusToolDeps,
+  StatusToolOutput,
+} from './agent/tools/status'
+export { createObserveHandler, OBSERVE_SECTIONS } from './agent/tools/observe'
+export type {
+  ObservePreviewSource,
+  ObserveSection,
+  ObserveToolDeps,
+  ObserveToolOutput,
+} from './agent/tools/observe'
+export { createAnnotationGetHandler, toAnnotationToolOutput } from './agent/tools/annotation'
+export type {
+  AnnotationElementOutput,
+  AnnotationToolDeps,
+  AnnotationToolOutput,
+} from './agent/tools/annotation'
+export {
+  buildDomOutlineExpression,
+  collectDomOutline,
+  DOM_OUTLINE_MAX_BYTES,
+  isDomSnapshotParams,
+  parseDomOutlineResult,
+} from './preview/dom'
+export type { DomSnapshot, DomSnapshotParams } from './preview/dom'
 export { createWebTargetAdapter, WEB_TARGET_CAPABILITIES } from './targets/web/adapter'
 export type {
   WebTargetAdapter,
