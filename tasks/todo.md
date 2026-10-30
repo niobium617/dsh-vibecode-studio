@@ -781,6 +781,16 @@
 - **验收**：preset 工具可用；standard 不受影响；越权被拒；skill 加载；结果 ≤ 8 KB。
 - **验证**：手动 + `pnpm test`；记录结果。
 - **文件**：无。
+- **自动化证据（2026-10-31，`task/m5-agent-integration`；真实 `vibe-dev` + Playwright，脚本与输出在 `.tmp/t054-*.mjs`、`.tmp/logs/t054-*.json`）**：
+  - `pnpm test` **115 文件 / 1075 用例**通过（`e90a91b` 之后未改产品代码）；`pnpm build` 已产出最新 `lib/agent.js` 59.1 KiB。
+  - preset 可选：模式菜单（`[role=menu]`）列出标准/PTC/极简/创造 + **Vibe Studio** 及其描述；选中后输入框上方按钮文案变为 `Vibe Studio`（`t054-preset-probe.json`、`t054-select.json`）。
+  - 工具可用：Vibe Studio 会话里模型不调工具直接列出 **`vibe_annotation_get`、`vibe_observe`、`vibe_preview`、`vibe_status`** 四个；实际调用 `vibe_status` 返回 `{"preview":{"state":"closed","fps":30},"consoleErrors":0,"networkFailures":0,"annotations":{"queued":0,"saved":0},"summary":"..."}`（约 208 字节）；`vibe_observe detail=full` 在未启动预览时返回约 270 字节（`t054-live.json`、`t054-tools-skill.json`、`t054-preview-flow.json`）。
+  - standard 不受影响：标准模式新会话被问四个工具是否存在，逐个回答“没有”（`t054-standard.json`）。
+  - 越权被拒：Vibe Studio 会话 `vibe_preview start http://example.com/` 返回 `vibe-studio: preview target "example.com" is not local; only loopback targets are allowed`，**页面无任何审批对话框**（脚本轮询 `[role=dialog]` 为空）；`start http://127.0.0.1:4320/` 返回 `origin http://127.0.0.1:4320 is not in allowedOrigins`（符合设计：默认名单不带端口），说明 guard 在审批之前生效（`t054-guard-skill.json`、`t054-preview-flow.json`）。
+  - skill 加载：Vibe Studio 会话内调用 `skill` 工具 `name=vibecoding-studio`，返回 `<skill_content name="vibecoding-studio">` 与技能 base 目录（`t054-tools-skill.json`）。
+  - 结果 ≤ 8 KB：已测得真实结果 208 B / 270 B，远低于 8192 字节上限；上限本身由 T047/T048 的渲染预算单测覆盖。
+  - **未覆盖（需用户手测）**：真实预览启动一整套链路（start 走审批 → 工具栏 Live → `vibe_observe` 真实 DOM 结果 → 改源码后 stale 徽标）需要在 UI 里配置 allowedOrigins 后操作；步骤见 `docs/2026-10-31-M5手动测试手册.md`。
+  - 待用户在真实 UI 手测确认后勾选本任务；评审期间未改产品代码。
 
 ---
 
