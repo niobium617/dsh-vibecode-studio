@@ -758,12 +758,22 @@
   - 未做（范围外）：T053 hooks（`stale` 提示、越权拦截）、goal/schedule/delegation/plugin-manager 行（按最小集刻意排除，测试断言这些行不存在）。
   - 提交：`c439d8e`（`task/m5-agent-integration`，未推送、未合并）。
 
-### - [ ] T053 Hooks（过期提示/越权拦截）
+### - [x] T053 Hooks（过期提示/越权拦截）
 
 - **目标**：文件编辑后标记预览“可能过期”；`tools/pre-execute` 拦截越权预览动作。
 - **验收**：编辑后 UI 有提示；越权被 deny；不误伤 standard；单测通过。
 - **验证**：`pnpm test -- tests/integration/hooks`。
 - **文件**：`src/host/agent/hooks/{stale,guard}.ts`、tests。
+- **验证结果（2026-10-31，`task/m5-agent-integration`）**：
+  - 命令与结果：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/hooks tests/integration/preview/session-lifecycle.test.ts` **3 文件 / 27 用例**通过；`pnpm test` **115 文件 / 1075 用例**通过（T052 基线 113/1048）；`pnpm build` **`lib/index.js` 430.6 KiB + `lib/agent.js` 59.1 KiB + `lib/client.js` 441.3 KiB**，`host entries import cleanly`；`pnpm test:e2e` **9/9**（44.0 s）。聚焦测试用 `pnpm exec vitest run <path>`（`pnpm test -- <path>` 不过滤，任务原文的命令写法作废）。
+  - 过期提示（stale）：`PreviewService` 新增 `markStale()`，只在一页 ready 时记 `stale`；`reload`/`navigate`/新 `start`（先 `release` 再加载）/`stop` 都清掉，只读调用（`setViewport`）保留。快照字段 `stale?: boolean` 只在为 true 时出现，已有 snapshot 精确断言不受影响。**ready 状态下重复 `start` 是 no-op，不会重载，因此不会清 stale**（测试明确断言这一点）。
+  - 标记时机：`src/host/agent/hooks/stale.ts` 挂 `tools/post-execute`，先 `next()` 拿最终决定，只有 `accept` + `!isError` + 工具名属于 `{write, edit}` 才 `markStale()`。刻意不含 `bash`/`pwsh`——shell 命令改文件无法判定，会把每个会话永久置成 stale；`block`（被改写的结果）与失败结果都不标。
+  - 三处可见提示：`vibe_status` 输出 `stale: true` + 一句“文件已改动…重载预览”；`/vibe` 预览行加 `· 可能过期（文件已改动）`，且下一步改成“先点「更多 → 刷新」重载，再看报错是否还在”（排在控制台错误之前，因为旧页面的报错可能早已修掉）；客户端 `Toolbar` 状态行多一个 `data-vibe-stale` 徽标（文案 `files changed` / `文件已改动`，tooltip 指向重载），只在 `ready` 且 `stale` 时渲染，i18n 两份目录键集一致。
+  - 越权拦截（guard）：`src/host/agent/hooks/guard.ts` 挂 `tools/pre-execute`，**注册在审批门禁之前**，所以越权调用直接 `deny`（`info.code: permission_denied`，reason 以 `vibe-studio:` 开头），不会先弹审批。决策表：截图开关关闭时的 `screenshot` → deny；`start`/`navigate` 的 url 非 loopback → deny；loopback 但 origin 不在 `allowedOrigins` → deny；已有页时 `navigate` 到不同 origin → deny。畸形参数（无 url、非字符串、不可解析、`file:` 等）一律**委托**给 schema/工具体，交给 `invalid_input` 报得更准；`reload`/`stop` 永不拦；非 `vibe_preview` 调用不动。
+  - 不误伤 standard：两个监听器都注册在 preset 的 `apply()` 里，`tools/pre-execute` / `tools/post-execute` 按 `scopeTarget(this, exec.agent)` 匹配，standard 会话拿不到这两个监听器——由构造保证；测试在预设 harness 上断言监听器顺序为 `['tools/pre-execute','tools/pre-execute','tools/post-execute']`、guard 在 0 位、stale 在 2 位。顺手把 `tools/preview.ts` 的 `parseHttpUrl`/`requireLoopback`/`requireAllowedOrigin`/`snapshotOrigin` 导出复用策略，未复制第二套 URL 判断。
+  - 清单外改动：`src/contracts/transport.ts`（快照加 `stale?`）、`src/host/preview/session.ts`（`markStale` + 各生命周期清位）、`src/host/agent/tools/status.ts`、`src/host/agent/commands/vibe.ts`、`src/client/preview/Toolbar.tsx`、`src/client/locales/{en,zh-CN}.json`——没有这层字段透传，提示到不了 UI。
+  - **未验证（如实记录）**：真实 Cordis mount 与 UI 内实测仍未做，G5/T054 一起做；`bash`/`pwsh` 改文件不触发提示是刻意限制，不是遗漏。
+  - 提交：`e90a91b`（`task/m5-agent-integration`，未推送、未合并）。
 
 ### - [ ] T054 G5 Agent 评审 [GATE]
 
