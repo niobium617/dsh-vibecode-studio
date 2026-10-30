@@ -834,6 +834,7 @@
 - 真机校验：`.tmp/t050-command-check.mjs`（只读，无 profile、无浏览器、无模型）用真实 Cordis 加载真实 `@deepseek-ai/dsh-commands` 的 `CommandRuntime`，再挂载构建产物 `lib/index.js`，`ok:true`：①commands 服务在活；②`vibeStudio` 已提供；③`commands.find({}, 'vibe')` 命中；④处理器返回 208 B 中文文本；⑤dispose 插件 fiber 后 `/vibe` 从注册表移除。
 - 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/command` 1 文件 / 14 用例；`pnpm test` **111 文件 / 1016 用例**（T049 基线 110/1002）；`pnpm build` host **424.8** / client **440.5 KiB**；`pnpm test:e2e` **9/9**（16.9 s）。
 - 已知限制：`/vibe preview|api|verify` 子命令未做（FR-AGENT-05 的 SHOULD，任务清单未批准）；命令不保证能打开右栏 tab（plan §3 明确）；`stale` 提示在 T053。
+- 提交：`0d24707`（`task/m5-agent-integration`，未推送、未合并）；归档 `F:\Project\claudecode修改优化\2026-10-30-T050-vibe命令.md`。
 
 ## 3. 踩坑与已验证经验
 

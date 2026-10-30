@@ -349,7 +349,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 - 接线：`apply()` 用 `ctx.get('commands')`（Cordis 无 inject 读服务）装配，缺失即跳过；**不加 `inject: ['commands']`**（否则缺命令服务的宿主会让整个插件不激活，预览面板一起失效）。命令按 DSH 惯例（`/feedback`、`/compact`）全局注册，不做 preset 门禁；工具有意仍未接线（T052）。
 - 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/command` 1 文件 / 14 用例；`pnpm test` **111 文件 / 1016 用例**（基线 110/1002）；`pnpm build` host **424.8** / client 440.5 KiB；`pnpm test:e2e` 9/9（16.9 s）。真机：`.tmp/t050-command-check.mjs` 用真实 Cordis + `@deepseek-ai/dsh-commands` 加载 `lib/index.js`，`ok:true`（5 项：commands 在活、`vibeStudio` 已提供、`find({}, 'vibe')` 命中、处理器返回 208 B、dispose 后移除）。
 - 未做（范围外）：`/vibe preview|api|verify` 子命令、命令开面板 tab、`stale` 提示（T053）。
-- 提交：见 `docs/DEVLOG.md` 同日条目。归档 `F:\Project\claudecode修改优化\2026-10-30-T050-vibe命令.md`。
+- 提交：`0d24707`（实现 + 测试 + HANDOFF/todo/DEVLOG）。归档 `F:\Project\claudecode修改优化\2026-10-30-T050-vibe命令.md`。
 
 ### T026 遗留
 
