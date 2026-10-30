@@ -362,7 +362,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 - 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/skill` 1 文件 / 16 用例；`pnpm test` **112 文件 / 1032 用例**（基线 111/1016）；`pnpm build` host **429.6** / client 440.5 KiB；`pnpm test:e2e` 9/9（17.4 s）。
 - 坑：`ctx.plugin({ ..., config })` 里的 `config` 属性会被忽略，Cordis 只认第二个参数（`ctx.plugin(plugin, config)`），表现是 provider 静默不扫任何根；`createRequire(baseUrl).resolve('dsh-vibecode-studio/package.json')` 在 profile 里能解析（link 依赖），从包内自引用会失败——校验脚本必须用 profile 路径模拟真实场景。
 - 未做（范围外）：工具可见性门禁在 T052，在此之前 skill 的建议可能指向未注册的工具（正文已要求“工具不可用就如实告知用户、不要猜”）；`vibe-dev` 重启后的 UI 内实测留 G5。
-- 提交：待回填。归档 `F:\Project\claudecode修改优化\2026-10-30-T051-bundled-skill.md`。
+- 提交：`4242819`（实现 + 测试 + 文档；`task/m5-agent-integration`，未推送、未合并）。归档 `F:\Project\claudecode修改优化\2026-10-30-T051-bundled-skill.md`。
 
 ### T026 遗留
 

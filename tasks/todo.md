@@ -722,7 +722,7 @@
   - 接线：`apply()` 通过 `resolveCommandRegistry(ctx)` 取 `ctx.get('commands')`（Cordis 无 inject 读服务；裸测试宿主回退到 `ctx.commands` 属性）。**有意不加 `inject: ['commands']`**——命令是 SHOULD 且面向用户，命令服务缺席时面板其余功能仍可用；命令按 DSH 自身惯例（`/feedback`、`/compact`）全局注册，不做 preset 门禁（与工具不同，工具门禁在 T052）。
   - 真机校验：`.tmp/t050-command-check.mjs` 用真实 Cordis + 真实 `@deepseek-ai/dsh-commands` 的 `CommandRuntime` 加载构建产物，`ok:true`，4 项检查：commands 服务在活、`vibeStudio` 已提供、`commands.find({}, 'vibe')` 命中（`vibe: 查看 Vibe Studio 预览状态和下一步建议`）、处理器返回 208 B 文本（`预览：未启动…`）；同时验证插件 fiber dispose 后 `/vibe` 被移除。
   - 未做（范围外）：`/vibe preview|api|verify` 子命令（FR-AGENT-05 的 SHOULD，待任务批准）、命令内触发面板 tab（plan §3 明确不保证）、`stale` 提示（T053）。
-  - 提交：见 `docs/DEVLOG.md` 同日条目。
+  - 提交：`0d24707`（实现 + 测试 + 文档；`task/m5-agent-integration`，未推送、未合并）。
 
 ### - [x] T051 Bundled skill
 
@@ -737,7 +737,7 @@
   - 校验模块：`src/host/agent/skills.ts` 提供 `resolvePackageRoot`（向上找 `name === 'dsh-vibecode-studio'` 的 `package.json`，源码与 `lib/` 构建产物都适用）、`resolveBundledSkillDir`/`resolveVibeSkillDir`、`parseSkillFrontmatter`（只接受扁平 `key: value`）、`inspectVibeSkillBundle`（名称/描述/字符上限/每个 `references/*.md` 存在且位于 skill 目录内，含 realpath 越界检查）、`vibeSkillProviderConfig`。
   - 真机校验：`.tmp/t051-skill-check.mjs` 用真实 Cordis + 真实 `@deepseek-ai/dsh-skill` / `dsh-skill-filesystem` / `dsh-tool-skill`，`ok:true`，6 项：配置指向 `skills/`、目录列出 `vibecoding-studio (bundled, modelInvocable=true)`、`skills.get` 返回正文与 `resourceBase: directory`、**真实 `skill` 工具 `execute({name})` 返回 `{name, provider: vibe-bundled, chars: 1789, resourceBaseKind: directory}`**、`inspectVibeSkillBundle` 与文件一致、`cordis.patch.yml` 用 loader 的 `!!js` 方言可解析且表达式从 profile 解析到 `F:\Project\DSH_vibecode_studio\skills`。
   - 未做（范围外）：profile 重启后的 UI 内实测（需启动 `vibe-dev`，留给 G5 手测；bundle 通过 link 生效，无需重装）；工具可见性仍由 T052 门禁，在此之前 skill 的建议可能指向尚未注册的工具（skill 文本已要求“工具缺失时如实告知用户”）。
-  - 提交：见 `docs/DEVLOG.md` 同日条目。
+  - 提交：`4242819`（实现 + 测试 + 文档；`task/m5-agent-integration`，未推送、未合并）。
 
 ### - [ ] T052 `Vibe Studio` preset
 
