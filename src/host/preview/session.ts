@@ -112,6 +112,12 @@ export interface PreviewService {
   listTargets(): PreviewTargetsResult
   /** Navigates the live page after validating the URL (T025). */
   navigate(params: unknown): Promise<PreviewSessionSnapshot>
+  /**
+   * Marks the running page as possibly outdated after source files changed
+   * (T053). No-op while no page runs; the flag clears on start/reload/navigate
+   * and on stop.
+   */
+  markStale(): void
   /** Reloads the live page (T025). */
   reload(): Promise<PreviewSessionSnapshot>
   /** Resizes the live viewport; DPR needs a restart (T025). */
@@ -190,6 +196,9 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
   let viewport: TargetViewport | null = null
   let capabilities: TargetCapabilities | null = null
   let lastError: StudioError | undefined
+  // T053: files changed since this page loaded. Cleared whenever a fresh
+  // document takes over, so a reload makes the page current again.
+  let stale = false
   let startPromise: Promise<PreviewSessionSnapshot> | undefined
   let stopPromise: Promise<PreviewSessionSnapshot> | undefined
 
@@ -219,7 +228,17 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
       fps: source?.fps ?? fps,
       quality: source?.quality ?? quality,
     }
-    return lastError === undefined ? base : { ...base, lastError }
+    const withError = lastError === undefined ? base : { ...base, lastError }
+    return stale ? { ...withError, stale: true } : withError
+  }
+
+  /**
+   * T053: the agent edited a source file after this page loaded. The flag is
+   * advisory only — it never blocks input, and the next reload clears it.
+   */
+  function markStale(): void {
+    if (state !== 'ready') return
+    stale = true
   }
 
   async function release(): Promise<void> {
@@ -278,6 +297,8 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     // them before reusing the adapter so a restart cannot leak a browser.
     await release()
     lastError = undefined
+    // A new document loads fresh files, so any staleness from the old page ends.
+    stale = false
     targetId = null
     kind = null
     url = null
@@ -572,6 +593,7 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     url = params.url.trim()
     // The new document runs a fresh, idle picker script.
     picker?.reset()
+    stale = false
     return snapshot()
   }
 
@@ -587,6 +609,7 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
       })
     }
     picker?.reset()
+    stale = false
     return snapshot()
   }
 
@@ -688,6 +711,7 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     await release()
     state = 'idle'
     lastError = undefined
+    stale = false
     targetId = null
     kind = null
     url = null
@@ -723,6 +747,7 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     listTargets,
     navigate,
     reload,
+    markStale,
     setViewport,
     pickStart,
     pickStop,

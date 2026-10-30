@@ -8,9 +8,10 @@
  * surface (FR-PRESET-02). Re-mounting the whole host plugin per preset would
  * re-register the transport routes, hence a second package entry.
  *
- * The approval gate is registered here for the same reason: a
- * `tools/pre-execute` listener dispatches on the agent's scope chain, so
- * `vibe_preview start|stop` asks a human only inside this preset (T049).
+ * The tool hooks are registered here for the same reason: a `tools/pre-execute`
+ * listener dispatches on the agent's scope chain, so `vibe_preview start|stop`
+ * asks a human only inside this preset (T049), the overreach guard denies only
+ * here (T053), and the stale marker after an edit stays inside this preset too.
  *
  * Everything host-owned (`config`, `preview`, `annotationHistory`,
  * `artifacts`) arrives through the `vibeStudio` service so the preset never
@@ -19,6 +20,8 @@
 import type { VibeStudioConfig } from '../config'
 import type { AnnotationHistoryService } from '../inspect/history'
 import type { PreviewService } from '../preview/session'
+import { createPreviewGuard } from './hooks/guard'
+import { createStaleHook } from './hooks/stale'
 import { createAnnotationGetHandler } from './tools/annotation'
 import { createObserveHandler } from './tools/observe'
 import {
@@ -55,6 +58,7 @@ export type VibeToolPreviewSource = Pick<
   | 'start'
   | 'stop'
   | 'captureScreenshot'
+  | 'markStale'
 >
 
 /** The `vibeStudio` service fields the tools read (structural subset). */
@@ -101,7 +105,13 @@ export interface VibeAgentContext {
   readonly tools: VibeToolRegistry
   /** Inject-free read: `vibeStudio` is provided by the host row. */
   get(name: string): unknown
-  on(event: string, listener: ReturnType<typeof createPreviewApprovalGate>): () => void
+  on(
+    event: string,
+    listener:
+      | ReturnType<typeof createPreviewGuard>
+      | ReturnType<typeof createPreviewApprovalGate>
+      | ReturnType<typeof createStaleHook>,
+  ): () => void
 }
 
 export const name = 'vibe-studio-agent-tools'
@@ -117,9 +127,23 @@ export function apply(ctx: VibeAgentContext): () => void {
     )
   }
   const disposeTools = registerVibeTools(ctx.tools, createVibeToolHandlers(studio))
+  // Guard first: a denied call must not reach the approval prompt.
+  const disposeGuard = ctx.on(
+    'tools/pre-execute',
+    createPreviewGuard({
+      config: () => previewToolConfig(studio.config),
+      currentUrl: () => studio.preview.status().url,
+    }),
+  )
   const disposeGate = ctx.on('tools/pre-execute', createPreviewApprovalGate())
+  const disposeStale = ctx.on(
+    'tools/post-execute',
+    createStaleHook({ markStale: () => studio.preview.markStale() }),
+  )
   return () => {
+    disposeStale()
     disposeGate()
+    disposeGuard()
     disposeTools()
   }
 }

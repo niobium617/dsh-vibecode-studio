@@ -155,6 +155,18 @@ describe('/vibe command', () => {
     expect(text).toContain('已保存标注 3')
   })
 
+  it('marks a stale page and points at reloading before reading errors (T053)', async () => {
+    const { deps } = harness({
+      session: snapshot({ stale: true }),
+      console: [consoleEntry('c1', 'error')],
+    })
+    const text = textOf(await createVibeCommand(deps).handler({ rawInput: '' }))
+    expect(text).toContain('可能过期（文件已改动）')
+    expect(text).toContain('刷新')
+    // Errors from an outdated page may already be fixed; reload comes first.
+    expect(text).not.toContain('vibe_observe')
+  })
+
   it('reads only status, buffers and one annotation count', async () => {
     const { deps, calls, annotationQueries } = harness({ saved: 1 })
     await createVibeCommand(deps).handler({ rawInput: '' })

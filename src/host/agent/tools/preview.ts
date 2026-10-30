@@ -96,7 +96,7 @@ function parseOptionalString(value: unknown, field: string): string | undefined 
   return value
 }
 
-function parseHttpUrl(raw: string, field: string): URL {
+export function parseHttpUrl(raw: string, field: string): URL {
   if (raw.length > PREVIEW_URL_MAX_CHARS) {
     invalidInput(`url must be at most ${PREVIEW_URL_MAX_CHARS} characters`, field)
   }
@@ -115,7 +115,7 @@ function parseHttpUrl(raw: string, field: string): URL {
   return url
 }
 
-function requireLoopback(url: URL): void {
+export function requireLoopback(url: URL): void {
   if (isLoopbackHost(url.hostname)) return
   throw studioError(
     'permission_denied',
@@ -124,7 +124,7 @@ function requireLoopback(url: URL): void {
   )
 }
 
-function requireAllowedOrigin(url: URL, allowedOrigins: readonly string[]): void {
+export function requireAllowedOrigin(url: URL, allowedOrigins: readonly string[]): void {
   if (allowedOrigins.includes(url.origin)) return
   throw studioError(
     'permission_denied',
@@ -133,7 +133,7 @@ function requireAllowedOrigin(url: URL, allowedOrigins: readonly string[]): void
   )
 }
 
-function snapshotOrigin(url: string | null): string | null {
+export function snapshotOrigin(url: string | null): string | null {
   if (url === null) return null
   try {
     return new URL(url).origin

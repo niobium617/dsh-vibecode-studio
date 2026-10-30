@@ -195,3 +195,46 @@ describe('vibe_status (T048)', () => {
     })
   })
 })
+
+describe('vibe_status staleness (T053)', () => {
+  const READY: PreviewSessionSnapshot = {
+    status: 'ready',
+    targetId: 'fixture',
+    kind: 'web',
+    url: 'http://127.0.0.1:4320/',
+    viewport: { width: 1280, height: 720, deviceScaleFactor: 1 },
+    capabilities: null,
+    frame: null,
+    fps: 15,
+    quality: 60,
+  }
+
+  it('surfaces the flag and one reload sentence only while ready', async () => {
+    const { deps } = harness({ session: { ...READY, stale: true } })
+    const output = await createStatusHandler(deps)({}, {})
+    expect(output.stale).toBe(true)
+    expect(output.summary).toContain(
+      'Files changed since this page loaded; reload the preview to see the latest code.',
+    )
+  })
+
+  it('ignores the flag on a closed preview', async () => {
+    const { deps } = harness({
+      session: {
+        status: 'idle',
+        targetId: null,
+        kind: null,
+        url: null,
+        viewport: null,
+        capabilities: null,
+        frame: null,
+        fps: 15,
+        quality: 60,
+        stale: true,
+      },
+    })
+    const output = await createStatusHandler(deps)({}, {})
+    expect(output.stale).toBeUndefined()
+    expect(output.summary).not.toContain('Files changed')
+  })
+})

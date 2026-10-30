@@ -52,7 +52,7 @@ export interface StatusToolOutput {
   consoleErrors: number
   networkFailures: number
   annotations: { readonly queued: number; readonly saved: number }
-  /** T053 adds file-change staleness; nothing marks files today. */
+  /** T053: files changed after the page loaded; reload to see the latest code. */
   stale?: boolean
   summary: string
 }
@@ -87,6 +87,7 @@ function summarize(
   counts: BufferCounts,
   saved: number,
   lastError: string | undefined,
+  stale: boolean,
 ): string {
   const sentences: string[] = []
   if (state === 'ready') {
@@ -106,6 +107,10 @@ function summarize(
   }
   if (problem.length > 0) sentences.push(`${problem.join(' and ')} buffered.`)
   else if (state === 'ready') sentences.push('No console errors or failed requests buffered.')
+
+  if (stale) {
+    sentences.push('Files changed since this page loaded; reload the preview to see the latest code.')
+  }
 
   sentences.push(`${saved} saved annotation${saved === 1 ? '' : 's'}.`)
   if (state !== 'ready') {
@@ -131,6 +136,9 @@ export function createStatusHandler(deps: StatusToolDeps): StatusHandler {
     const snapshot = deps.preview.status()
     const state = toToolPreviewState(snapshot.status)
     const counts = readBuffers(deps.preview, snapshot.status === 'ready')
+    // The flag is only meaningful on a live page; a closed preview will load
+    // fresh files the next time it starts.
+    const stale = state === 'ready' && snapshot.stale === true
     let saved = 0
     try {
       saved = (await deps.annotations.list({ limit: 1 })).total
@@ -157,7 +165,8 @@ export function createStatusHandler(deps: StatusToolDeps): StatusHandler {
       consoleErrors: counts.errors,
       networkFailures: counts.failures,
       annotations: { queued: 0, saved },
-      summary: summarize(state, snapshot.url, counts, saved, snapshot.lastError?.message),
+      ...(stale ? { stale: true } : {}),
+      summary: summarize(state, snapshot.url, counts, saved, snapshot.lastError?.message, stale),
     }
   }
 }

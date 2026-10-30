@@ -124,6 +124,18 @@ const statusTextStyle: React.CSSProperties = {
   whiteSpace: 'nowrap',
 }
 
+/** T053: advisory "files changed" chip next to the ready label. */
+const staleChipStyle: React.CSSProperties = {
+  flex: '0 0 auto',
+  padding: '0 5px',
+  borderRadius: 999,
+  border: '1px solid var(--dsw-warning-color, #d29922)',
+  color: 'var(--dsw-warning-color, #d29922)',
+  fontSize: 11,
+  lineHeight: '16px',
+  whiteSpace: 'nowrap',
+}
+
 const addressRowStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -351,6 +363,11 @@ export function Toolbar({
             {stateLabel}
             {ready ? ` · ${snapshot?.fps ?? 0} fps` : ''}
           </span>
+          {ready && snapshot?.stale ? (
+            <span data-vibe-stale="1" title={t('preview.stale.hint')} style={staleChipStyle}>
+              {t('preview.stale.badge')}
+            </span>
+          ) : null}
         </button>
 
         <div ref={menuRef} style={{ position: 'relative', flex: '0 0 auto' }}>

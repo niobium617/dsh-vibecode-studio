@@ -205,6 +205,22 @@ describe('preview toolbar (U01 layout v2)', () => {
     expect(document.querySelector('[data-vibe-status-details]')).toBeNull()
   })
 
+  it('shows a files-changed chip only on a stale live page (T053)', () => {
+    renderToolbar({ snapshot: snapshot({ stale: true }) })
+    const chip = document.querySelector('[data-vibe-stale]')
+    expect(chip?.textContent).toBe('files changed')
+    expect(chip?.getAttribute('title')).toContain('Reload')
+
+    cleanup()
+    renderToolbar()
+    expect(document.querySelector('[data-vibe-stale]')).toBeNull()
+
+    cleanup()
+    // The flag is only meaningful on a live page.
+    renderToolbar({ snapshot: snapshot({ status: 'failed', stale: true }) })
+    expect(document.querySelector('[data-vibe-stale]')).toBeNull()
+  })
+
   it('only offers external open for loopback http(s) URLs', () => {
     renderToolbar({ snapshot: snapshot({ url: 'https://example.com/' }) })
     openMenu()

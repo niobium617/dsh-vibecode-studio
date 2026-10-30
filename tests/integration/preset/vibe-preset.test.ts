@@ -71,6 +71,7 @@ function previewStub(overrides: Partial<VibeToolPreviewSource> = {}): VibeToolPr
     start: async () => READY,
     stop: async () => ({ ...READY, status: 'idle', targetId: null, kind: null, url: null }),
     captureScreenshot: async () => screenshot,
+    markStale: () => undefined,
     ...overrides,
   } as VibeToolPreviewSource
 }
@@ -190,28 +191,66 @@ describe('Vibe Studio preset handlers (T052)', () => {
 })
 
 describe('Vibe Studio preset mount (T052)', () => {
-  it('registers four tools and one tools/pre-execute listener', () => {
+  it('registers four tools, two pre-execute listeners and one post-execute listener', () => {
     const { studio } = studioHarness()
     const harness = registryHarness()
     const mount = applyCtx(studio, harness.registry)
 
     expect([...harness.definitions.keys()].sort()).toEqual([...VIBE_TOOL_NAMES].sort())
-    expect(mount.listenerEvents()).toEqual(['tools/pre-execute'])
+    // T053: the guard runs before the approval gate, and the stale marker is a
+    // post-execute listener.
+    expect(mount.listenerEvents()).toEqual([
+      'tools/pre-execute',
+      'tools/pre-execute',
+      'tools/post-execute',
+    ])
   })
 
   it('asks for approval on start and delegates every other action', async () => {
     const { studio } = studioHarness()
     const harness = registryHarness()
     const mount = applyCtx(studio, harness.registry)
-    const listener = mount.listener()
+    const gate = mount.listener(1)
 
     const next = vi.fn(async () => ({ kind: 'allow' as const }))
-    const asked = await listener({ name: 'vibe_preview', arguments: { action: 'start' } }, next)
+    const asked = await gate({ name: 'vibe_preview', arguments: { action: 'start' } }, next)
     expect(asked).toMatchObject({ kind: 'ask', reason: 'vibe_preview start' })
     expect(next).not.toHaveBeenCalled()
 
-    await listener({ name: 'vibe_preview', arguments: { action: 'reload' } }, next)
+    await gate({ name: 'vibe_preview', arguments: { action: 'reload' } }, next)
     expect(next).toHaveBeenCalledTimes(1)
+  })
+
+  it('denies overreach before the approval gate can ask', async () => {
+    const { studio } = studioHarness()
+    const harness = registryHarness()
+    const mount = applyCtx(studio, harness.registry)
+    const guard = mount.listener(0)
+
+    const next = vi.fn(async () => ({ kind: 'allow' as const }))
+    const denied = await guard(
+      { name: 'vibe_preview', arguments: { action: 'start', url: 'http://example.com/' } },
+      next,
+    )
+    expect(denied).toMatchObject({ kind: 'deny' })
+    expect(next).not.toHaveBeenCalled()
+  })
+
+  it('marks the preview stale after a successful edit and nothing else', async () => {
+    const markStale = vi.fn()
+    const preview = previewStub({ markStale })
+    const { studio } = studioHarness({ preview })
+    const harness = registryHarness()
+    const mount = applyCtx(studio, harness.registry)
+    const stale = mount.listener(2)
+    const next = async () => ({ kind: 'accept' as const })
+
+    await stale({ name: 'edit' }, { isError: false }, next)
+    expect(markStale).toHaveBeenCalledTimes(1)
+
+    await stale({ name: 'read' }, { isError: false }, next)
+    await stale({ name: 'write' }, { isError: true }, next)
+    expect(markStale).toHaveBeenCalledTimes(1)
   })
 
   it('fails loudly when the host service is absent', () => {
@@ -235,12 +274,18 @@ describe('Vibe Studio preset mount (T052)', () => {
   })
 })
 
-/** `tools/pre-execute` listener shape the preset registers. */
-type PreviewApprovalListener = Parameters<VibeAgentContext['on']>[1]
+/** Hook listener shape the preset registers. */
+type HookListener = Parameters<VibeAgentContext['on']>[1]
+
+/** One listener call, typed loosely enough to invoke from a test. */
+type CallableHook = (
+  exec: { name: string; arguments?: unknown },
+  ...rest: unknown[]
+) => Promise<unknown>
 
 /** Fake Cordis context: a tool registry, `get('vibeStudio')` and `on()`. */
 function applyCtx(studio: VibeAgentStudio, tools: VibeAgentContext['tools']) {
-  const listeners: Array<{ event: string; listener: PreviewApprovalListener }> = []
+  const listeners: Array<{ event: string; listener: HookListener }> = []
   const ctx: VibeAgentContext = {
     tools,
     get: (name) => (name === 'vibeStudio' ? studio : undefined),
@@ -255,10 +300,11 @@ function applyCtx(studio: VibeAgentStudio, tools: VibeAgentContext['tools']) {
   const dispose = apply(ctx)
   return {
     dispose: () => dispose,
-    listener: (): PreviewApprovalListener => {
-      const entry = listeners[0]
-      if (!entry) throw new Error('no tools/pre-execute listener was registered')
-      return entry.listener
+    /** Listener `index` in registration order (`0` guard, `1` gate, `2` stale). */
+    listener: (index: number): CallableHook => {
+      const entry = listeners[index]
+      if (!entry) throw new Error(`no listener was registered at index ${index}`)
+      return entry.listener as unknown as CallableHook
     },
     listenerEvents: () => listeners.map((entry) => entry.event),
     listenerDisposed: () => listeners.length === 0,

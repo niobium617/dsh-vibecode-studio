@@ -79,8 +79,10 @@ function clipUrl(url: string): string {
 function previewLine(status: StatusToolOutput): string {
   const label = STATE_LABELS[status.preview.state]
   const fps = status.preview.state === 'ready' ? ` · ${status.preview.fps} fps` : ''
+  // T053: the hint shares the status line instead of adding a fourth line.
+  const stale = status.stale ? ' · 可能过期（文件已改动）' : ''
   const url = status.target?.url
-  return url ? `预览：${label}${fps} · ${clipUrl(url)}` : `预览：${label}${fps}`
+  return url ? `预览：${label}${fps}${stale} · ${clipUrl(url)}` : `预览：${label}${fps}${stale}`
 }
 
 function countsLine(status: StatusToolOutput): string {
@@ -104,6 +106,9 @@ export function suggestNextStep(status: StatusToolOutput): string {
       return '下一步：等预览启动完成后再运行 /vibe；若长时间无响应，在面板里重启。'
     default:
       break
+  }
+  if (status.stale) {
+    return '下一步：文件改动后预览还是旧页面，先在面板里点「更多 → 刷新」重载，再看报错是否还在。'
   }
   if (status.consoleErrors > 0) {
     return '下一步：让 agent 调用 vibe_observe（include 设为 ["console"]）查看报错。'

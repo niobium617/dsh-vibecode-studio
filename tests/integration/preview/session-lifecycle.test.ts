@@ -288,3 +288,49 @@ describe('preview session toolbar (T025)', () => {
     expect(navigations).toEqual([URL])
   })
 })
+
+describe('preview staleness (T053)', () => {
+  it('marks a ready page stale and clears it on reload', async () => {
+    const { service } = harness()
+    const started = await service.start({ url: URL })
+    expect(started.stale).toBeUndefined()
+
+    service.markStale()
+    expect(service.status().stale).toBe(true)
+
+    const reloaded = await service.reload()
+    expect(reloaded.stale).toBeUndefined()
+    expect(service.status().stale).toBeUndefined()
+  })
+
+  it('clears staleness on navigate; a start on a live page keeps it', async () => {
+    const { service } = harness()
+    await service.start({ url: URL })
+    service.markStale()
+    expect((await service.navigate({ url: NEXT_URL })).stale).toBeUndefined()
+
+    // `start` on a ready session is a no-op: it does not reload the document.
+    service.markStale()
+    expect((await service.start({ url: URL })).stale).toBe(true)
+  })
+
+  it('drops the flag on stop and ignores markStale while nothing runs', async () => {
+    const { service } = harness()
+    service.markStale()
+    expect(service.status().stale).toBeUndefined()
+
+    await service.start({ url: URL })
+    service.markStale()
+    const stopped = await service.stop()
+    expect(stopped.stale).toBeUndefined()
+    expect(service.status().stale).toBeUndefined()
+  })
+
+  it('keeps the flag across read-only calls', async () => {
+    const { service } = harness()
+    await service.start({ url: URL })
+    service.markStale()
+    await service.setViewport({ viewport: { width: 800, height: 600 } })
+    expect(service.status().stale).toBe(true)
+  })
+})
