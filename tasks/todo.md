@@ -690,6 +690,7 @@
   - **artifact id 未做（有意）**：仓库只有 `ArtifactRef` 契约，没有 artifact 存储/读取实现；`vibe_observe` 的二次读取用 `detail:'full'` 承载 FR-AGENT-10，`artifactId` 留到 T049 截图/artifact 路径落地后再接入。
   - 支持性偏差：T048 文件清单外新增 `src/host/preview/dom.ts`、`src/host/agent/tools/preview-data.ts`、`PreviewService.domSnapshot`，因为 DOM 读取无既有通道；`apply()` 仍未调用 `registerVibeTools`（T052 门禁）。
   - 未做（范围外）：preview 工具与审批、`/vibe`、skill、preset、hooks（T049–T053）。
+  - 提交：`7b4e56a`（实现）、`6aed5c0`（文档）（`task/m5-agent-integration`，未推送、未合并）。
 
 ### - [ ] T049 preview 工具与门禁
 

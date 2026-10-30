@@ -325,6 +325,7 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 - DOM 读取：`PreviewService.domSnapshot(params?)` 每次新建 CDP 会话、页内 `collectDomOutline`、`finally` detach；页内上限 4 KB / 400 节点 / 14 层，跳过 script/style/noscript/template/meta/link/head 与 hidden；宿主再归一化（删控制字符、按字节截断、nodeCount ≤ 400）；畸形回包 `preview_failed`、坏选择器 `invalid_input`、无匹配 `not_found`。
 - **artifact id 未做（有意）**：仓库只有 `ArtifactRef` 契约，没有 artifact 存储/读取；FR-AGENT-10 二次读取暂由 `detail:'full'` 承载，等 T049 截图/artifact 路径落地后再接。
 - 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/tools` 4 文件 / 31 用例；`pnpm exec vitest run tests/unit/tools` 2 文件 / 22 用例；`pnpm test` **106 文件 / 950 用例**；`pnpm build` host **398.7** / client 440.5 KiB；`pnpm test:e2e` 9/9（21.4 s）。
+- 提交：`7b4e56a`（实现）、`6aed5c0`（文档）。
 - 分支：`task/m5-agent-integration`（未推送、未合并）。归档 `F:\Project\claudecode修改优化\2026-10-30-T048-三个工具实现.md`。
 
 ### T026 遗留
