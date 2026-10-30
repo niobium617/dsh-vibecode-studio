@@ -651,6 +651,8 @@
   - 反向影响：英文文案改为 “Saved requests” 等后，`collection-tree`/`history-list`/`workbench` 三处既有断言同步更新（8 条），未回退文案。
   - 未做（范围外）：抽屉内四个面板的进一步合并/重排；未在真实载体做像素级视觉复核（组件测试 + e2e 覆盖行为）。
 
+> **M4 已于 2026-10-30 推送并合并入 `main`**（合并提交 `35962e4`，用户手测后批准）：T035–T046 + U04，共 28 个提交；推送前回归 typecheck 0 / 100 文件 897 用例 / build host 354.0 client 440.5 KiB / e2e 9/9。分支 `task/m4-api-workbench` 远端保留，不再提交新工作。M5 请从 `main` 新建分支。
+
 ---
 
 ## M5：Agent Integration
