@@ -12,6 +12,7 @@ import { createApiSampleServer } from './api/sample-server'
 import type { ApiSecretStore, CredentialProviderLike } from './api/secrets'
 import { createApiSecretStore } from './api/secrets'
 import { ApiService, registerApiMethods } from './api/service'
+import { createArtifactStore, type ArtifactStore } from './artifacts/store'
 import {
   registerVibeCommand,
   type VibeCommandRegistry,
@@ -414,6 +415,8 @@ export interface VibeStudioService {
   readonly preview: PreviewService
   /** Persisted annotation history under `.vibe/annotations` (T033). */
   readonly annotationHistory: AnnotationHistoryService
+  /** Screenshot artifacts under `.vibe/artifacts` (T052, used by `vibe_preview`). */
+  readonly artifacts: ArtifactStore
   /** Credential seam for API environments (T036); never returns secret values. */
   readonly apiSecrets: ApiSecretStore
 }
@@ -477,6 +480,10 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
 
   // T020 preview: unary lifecycle methods plus the stream/pull frame routes.
   const preview = createPreviewService({ targets })
+  // T052: `vibe_preview screenshot` stores PNG bytes under `.vibe/artifacts` and
+  // returns only the artifact id, so the model never receives image data. The
+  // preset reads this store through the `vibeStudio` service.
+  const artifacts = createArtifactStore(process.cwd())
   const setupPreview = () => {
     const disposeMethods = registerPreviewMethods(registry, preview)
     return async () => {
@@ -548,6 +555,7 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
     targets,
     preview,
     annotationHistory,
+    artifacts,
     apiSecrets,
   } satisfies VibeStudioService)
 }
