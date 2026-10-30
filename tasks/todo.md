@@ -673,6 +673,7 @@
   - 渲染预算：`renderToolResult` 单个 text block，紧凑 JSON 超 `OBSERVE_BUDGET_BYTES`（8 KB）时用 `truncateUtf8` 截断并以 `…` 结尾；循环引用退化为 `{"error":"unserializable tool result"}` 而不抛错。
   - **未接线（有意）**：`apply()` 未调用 `registerVibeTools`——四个工具的实现体在 T048/T049、preset 可见性门禁在 T052；现在注册会把无实现的工具暴露给标准会话。
   - 未做（范围外）：工具实现体、审批/门禁、skill、preset、hooks（T048–T053）。
+  - 提交：`9f8cfb0`（`task/m5-agent-integration`，未推送、未合并）。
 
 ### - [ ] T048 status/observe/annotation 实现
 

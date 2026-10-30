@@ -794,6 +794,7 @@
 - 踩坑：`JsonSchemaObject` 起初写成 `interface`，TS2322（缺 string 索引签名）拒收为 `Record<string, unknown>`；改为 `type` 别名后自动获得隐式索引签名，无需 cast。
 - 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/tools` 2 文件 / 22 用例；`pnpm test` **102 文件 / 919 用例**（基线 100/897）；`pnpm build` host **372.8** / client **440.5 KiB**；`pnpm test:e2e` **9/9**（15.1 s）。
 - 已知限制：四个工具没有实现体（T048/T049）；preset 可见性、审批与 hooks 未做（T052/T053）；schema 只覆盖当前契约字段，后续字段变更需同步 `definitions.ts` 与 `tests/unit/tools`。
+- 提交：`9f8cfb0`（`task/m5-agent-integration`，未推送、未合并）。
 
 ## 3. 踩坑与已验证经验
 
