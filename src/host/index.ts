@@ -220,6 +220,35 @@ export type {
 } from './inspect/annotation-store'
 export { buildSelector } from './inspect/selector'
 export type { SelectorResult } from './inspect/selector'
+export {
+  isVibeToolName,
+  VIBE_TOOL_NAMES,
+  VIBE_TOOL_SPECS,
+  validateToolArguments,
+  validateToolSpecs,
+} from './agent/tools/definitions'
+export type {
+  JsonSchemaNode,
+  JsonSchemaObject,
+  VibeToolName,
+  VibeToolSpec,
+} from './agent/tools/definitions'
+export {
+  asVibeToolError,
+  createVibeToolDefinitions,
+  registerVibeTools,
+  renderToolResult,
+  VibeToolError,
+} from './agent/tools/register'
+export type {
+  VibeTextBlock,
+  VibeToolContent,
+  VibeToolDefinition,
+  VibeToolHandler,
+  VibeToolHandlers,
+  VibeToolRegistry,
+  VibeToolRunContext,
+} from './agent/tools/register'
 export { createWebTargetAdapter, WEB_TARGET_CAPABILITIES } from './targets/web/adapter'
 export type {
   WebTargetAdapter,

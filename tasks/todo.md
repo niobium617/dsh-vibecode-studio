@@ -659,12 +659,20 @@
 
 > 依赖：G3/G4 的公开接口。T047 先做；T048 依赖 T020/T030；T049 依赖 T020；T050 依赖 T047；T051 依赖 T047；T052 依赖 T047/T051；T053 依赖 T020/T030；T054 汇总。
 
-### - [ ] T047 工具 schema 与注册
+### - [x] T047 工具 schema 与注册
 
 - **目标**：`vibe_status`/`vibe_observe`/`vibe_annotation_get`/`vibe_preview` 的 schema、注册、假服务测试。
 - **验收**：schema 可被模型调用；preset 中可见；错误码统一；单测通过。
 - **验证**：`pnpm test -- tests/unit/tools`。
 - **文件**：`src/host/agent/tools/{definitions,register}.ts`、tests。
+- **验证结果（2026-10-30，`task/m5-agent-integration`）**：
+  - 命令与结果：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/tools` 2 文件 / 22 用例通过；`pnpm test` **102 文件 / 919 用例**通过（基线 100/897）；`pnpm build` host **372.8 KiB** / client **440.5 KiB**（`host entry imports cleanly`）；`pnpm test:e2e` **9/9**（15.1 s）。
+  - schema：四个工具与 `VIBE_TOOL_SPECS` 单一定义源；参数/输出均为 object 根、`additionalProperties:false`；只使用 DSH 强制子集（标量 `type`、`enum`/`const`、`properties`/`required`、`items`、独占 `oneOf`、注解），`validateToolSpecs` 在注册前拒绝子集外关键字（`minimum`/`anyOf`/错误嵌套/未声明的 `required`/歧义 `oneOf`）。
+  - 真实 DSH 校验：`.tmp/t047-schema-check.mjs` 用 DSH 自带 `assertObjectJsonSchema` + `validateJsonSchemaValue` 校验构建产物，`.tmp/logs/t047-schema-check.json` 为 `ok:true`，16/16 检查通过（4 工具 × 参数/输出 schema + 有效/无效示例参数）。
+  - 注册与错误码：`createVibeToolDefinitions` 产出 `{name,description,parameters,output:{schema,render},timeoutMs,execute}`；`registerVibeTools` 返回幂等 disposer；未接实现 → `unsupported`；参数不合法在调 handler 前 → `invalid_input`（`details.violations`）；`StudioError` 码原样保留，普通 `Error`/未知值 → `internal`。
+  - 渲染预算：`renderToolResult` 单个 text block，紧凑 JSON 超 `OBSERVE_BUDGET_BYTES`（8 KB）时用 `truncateUtf8` 截断并以 `…` 结尾；循环引用退化为 `{"error":"unserializable tool result"}` 而不抛错。
+  - **未接线（有意）**：`apply()` 未调用 `registerVibeTools`——四个工具的实现体在 T048/T049、preset 可见性门禁在 T052；现在注册会把无实现的工具暴露给标准会话。
+  - 未做（范围外）：工具实现体、审批/门禁、skill、preset、hooks（T048–T053）。
 
 ### - [ ] T048 status/observe/annotation 实现
 
