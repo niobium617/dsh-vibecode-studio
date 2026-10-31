@@ -7,12 +7,12 @@
 </p>
 
 <p align="center">
-  <a href="docs/USAGE.zh-CN.md">
-    <img src="docs/images/feature-pick-and-annotate.png" alt="Preview the app inside DSH, click an element, and write a change note next to it" width="920">
+  <a href="docs/USAGE.zh-CN.md#3-功能导览">
+    <img src="docs/images/feature-interface-tour.png" alt="Vibe Studio interface tour: Studio tab, five tabs, status row, address bar, preview canvas, picker banner and element card, annotation bubble, bottom drawers" width="920">
   </a>
 </p>
 
-<p align="center"><em>点图直达图文使用说明：预览 → 点选元素 → 发送到对话。</em></p>
+<p align="center"><em>界面导览（点图看完整说明）：① Studio 标签页 ② 五个页签 ③ 状态行/更多 ④ 地址栏 ⑤ 预览画布 ⑥ 拾取提示/元素卡片 ⑦ 批注气泡 ⑧ 底部抽屉。</em></p>
 
 <p align="center"><strong>The killer feature: live preview + click-to-annotate.</strong><br>
 Point at the exact element, describe the change, and send it to the agent as structured context —

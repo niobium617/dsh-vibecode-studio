@@ -627,6 +627,6 @@ dsh --profile vibe-dev --dump-config
 ### 界面导览标注图（2026-11-01，`main`）
 
 - 新增 `docs/images/feature-interface-tour.png`：基于真实点选批注截图叠加 8 个编号，标注 Studio 标签页、五个页签、状态行、地址栏、预览画布、拾取提示/元素卡片、批注气泡、底部抽屉。
-- `docs/USAGE.zh-CN.md` §3 顶部加入导览图与编号说明表；README 顶部入口文案补充“界面导览”。
+- `docs/USAGE.zh-CN.md` §3 顶部加入导览图与编号说明表；README 首屏主视觉换成导览图（点击进入 §3），原图保留在 §1。
 - 验证：导览图 1440×900；相对链接 0 缺失；`git diff --check` 通过。
 - 待办：提交并推送后等 CI。

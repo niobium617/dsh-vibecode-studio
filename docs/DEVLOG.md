@@ -1028,7 +1028,7 @@
 
 - 目标：给第一次打开 Vibe Studio 的用户一张“哪个区域做什么”的直观截图，直接对应界面功能。
 - 新增：`docs/images/feature-interface-tour.png`，基于真实 `feature-pick-and-annotate.png` 叠加 8 个编号，分别指向 Studio 标签页、五个页签、状态行、地址栏、预览画布、拾取提示/元素卡片、批注气泡、底部抽屉；原图不改。
-- 文档：`docs/USAGE.zh-CN.md` §3 顶部加入导览图与编号说明表；README 顶部图文入口文案补充“界面导览”。
+- 文档：`docs/USAGE.zh-CN.md` §3 顶部加入导览图与编号说明表；README 首屏主视觉换成同一张导览图（点击进入 §3），原干净点选截图保留在 §1。
 - 验证：导览图 1440×900；编号与说明表一一对应；Markdown 相对链接 0 缺失；`git diff --check` 通过。
 
 ## 3. 踩坑与已验证经验
