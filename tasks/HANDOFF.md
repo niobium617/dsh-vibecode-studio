@@ -622,4 +622,4 @@ dsh --profile vibe-dev --dump-config
 - 6 张 `docs/images/*.png` 已移除左下角 DSH 个人昵称/头像，替换为中性「开发者」标签；原图备份 `.tmp/logs/images-backup/`。
 - README 首屏新增置顶图文入口，主视觉截图可点击直达 `docs/USAGE.zh-CN.md`；导航把图文说明提到首位。
 - 验证：图片尺寸不变，`grep -a '蜡笔小新' docs/images/*.png` 无命中，`git diff --check` 通过。
-- 待办：提交并合并到 `main` 后等 CI；公开可见性仍需用户最终确认。
+- 结果：`957d231` 已推送，CI run `41222051663` success；2026-11-01 仓库已切为 public（用户批准），npm 包保持 `private`、未发布。
