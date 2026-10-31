@@ -8,19 +8,31 @@ repo); this page records how to install, configure and remove it.
 
 ## 1. Build and install
 
-Run from the repository root:
+Run from the repository root. There are two install modes; use the tarball to
+check what users actually get, and `link:` while iterating.
 
 ```bash
 pnpm install
-pnpm build
+pnpm build          # lib/index.js + lib/agent.js + lib/client.js
+
+# (a) package contents, as shipped
+npm pack            # → dsh-vibecode-studio-0.1.0.tgz
+dsh plugin --profile vibe-dev add file:<absolute-path>/dsh-vibecode-studio-0.1.0.tgz
+
+# (b) source link, for development
 dsh plugin --profile vibe-dev add link:<absolute-path-to-this-repo>
 ```
 
-Use an **absolute** path for `link:`; pnpm resolves relative paths against the
-profile directory. `dsh plugin add` also appends `dsh-vibecode-studio` to the
-profile's `dsh.profile.bundles` via the package's `cordis.patch.yml`.
+Use **absolute** paths for both forms; pnpm resolves relative paths against the
+profile directory. A `file:` install copies the tarball contents into the
+profile, so `pnpm build` alone does not affect it — repack and reinstall to pick
+up changes. With `link:`, restart DSH or let the host hot-reload after each
+build.
 
-After each build, restart DSH or let the host hot-reload the package.
+`dsh plugin add` also appends `dsh-vibecode-studio` to the profile's
+`dsh.profile.bundles` via the package's `cordis.patch.yml`. To switch modes,
+`remove` the package first. Packaging details and a verified clean-install
+transcript are in [docs/RELEASE.md](../../docs/RELEASE.md).
 
 ## 2. Start
 
