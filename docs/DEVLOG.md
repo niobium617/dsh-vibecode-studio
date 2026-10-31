@@ -944,7 +944,8 @@
 - 修复：正文列 `minWidth: '12ch'`（保底可读宽度），来源列 `maxWidth: '45%'`（超长时省略号截断）。`NetworkDrawer` 核对为 `grid` + `minmax(0, 1fr)` URL 列 + 固定内容宽度的时间/耗时列，不存在同类塌陷，不改。
 - 测试：`console-drawer.test.tsx` 新增 U05 用例，长消息 + 长来源时断言正文 `minWidth === '12ch'`、来源 `maxWidth === '45%'`。
 - 结果：`pnpm exec vitest run tests/component/preview` 6 文件 / 63 用例通过；`pnpm typecheck` 0；`pnpm build` host 439.3 + agent 59.1 / client 454.8 KiB；`pnpm test` 117 文件 / 1104 用例通过，另有 2 个 Edge 残留用例因用户正在运行 `vibe-dev` 预览而失败（环境性，同 U02 已知现象）。
-- 未覆盖：真实载体像素级复核需用户在重启 `vibe-dev` 后看 Console 抽屉。
+- 手动复核（2026-10-31，已通过）：重启 `vibe-dev` 加载新 `lib/client.js` 后，Console 抽屉里 React DevTools 长消息按正常宽度折成两行，右侧长来源 URL 以 `…` 收尾，`DEBUG [vite] …` 短行不受影响，0 错误 0 警告。
+- 未覆盖：更窄面板（< 约 200 px）与多分辨率下的换行密度未实测；`12ch`/`45%` 为经验值。
 
 ## 3. 踩坑与已验证经验
 

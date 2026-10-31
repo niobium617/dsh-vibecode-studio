@@ -874,7 +874,7 @@
 - **文件**：`src/client/preview/ConsoleDrawer.tsx`、按需 `NetworkDrawer.tsx`、tests。
 - **实现（2026-10-31，`task/m6-verify-hardening`）**：正文列 `minWidth: 0` → `minWidth: '12ch'`（长来源不再能把正文压到 0 宽），来源列新增 `maxWidth: '45%'`（超长 URL 省略号截断）。`NetworkDrawer` 已核对：行是 `grid` + `minmax(0, 1fr)` URL 列，时间/耗时列是固定内容宽度，不会被长 URL 挤垮，不改。
 - **验证结果**：`pnpm exec vitest run tests/component/preview` → **6 文件 / 63 用例通过**（新增 U05 用例断言 `minWidth`/`maxWidth`）；`pnpm typecheck` 0；`pnpm build` host 439.3 + agent 59.1 / client 454.8 KiB；`pnpm test` **117 文件 / 1104 用例通过 + 2 个 Edge 残留用例失败**——失败是环境性的：用户 `vibe-dev` 预览正在运行，`playwrightEdgePids()` 把它的 msedge 计入“残留”（U02 时同样的已知现象），停止预览后需复跑确认。
-- **手动复核**：需重启 `vibe-dev` 加载新 `lib/client.js`，打开 Console 抽屉确认长消息正文正常换行、来源 URL 以省略号收尾。
+- **手动复核（2026-10-31，已通过）**：重启 `vibe-dev` 加载新 `lib/client.js` 后，Console 抽屉里 React DevTools 长消息（`%cDownload the React DevTools…`）按正常宽度折成两行，右侧长来源 URL 以 `…` 省略号收尾，其余 `DEBUG [vite] …` 短行布局不变，0 错误 0 警告。用户截图确认。
 
 ### - [ ] T059 安全加固
 
