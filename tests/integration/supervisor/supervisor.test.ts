@@ -60,6 +60,10 @@ function createHarness(overrides: Partial<DevServerSupervisorOptions> = {}) {
     listProcesses,
     killTree,
     probePort,
+    // Pin the platform: these cases describe the Windows tree-kill path, which
+    // is what the product ships on Desktop. Without this the assertions flip on
+    // POSIX runners (CI), where shutdown sends SIGTERM instead.
+    platform: 'win32',
     pollIntervalMs: 5,
     readinessTimeoutMs: 150,
     stopTimeoutMs: 100,
@@ -292,6 +296,27 @@ describe('dev server supervisor stop', () => {
     })
     expect(harness.supervisor.state().status).toBe('stopped')
     expect(harness.children[0].running).toBe(false)
+  })
+
+  it('signals the process group head instead of tree-killing on POSIX', async () => {
+    const harness = createHarness({ platform: 'linux' })
+    await harness.supervisor.start(SPEC)
+    const root = harness.children[0]
+    harness.setProcesses([
+      { pid: root.pid as number, parentPid: 1, name: 'node', commandLine: 'node server.js' },
+    ])
+
+    const result = await harness.supervisor.stop()
+
+    expect(root.signals).toContain('SIGTERM')
+    expect(harness.killTree).not.toHaveBeenCalled()
+    expect(result).toEqual({
+      status: 'stopped',
+      pid: root.pid,
+      portReleased: true,
+      survivors: [],
+    })
+    expect(harness.supervisor.state().status).toBe('stopped')
   })
 
   it('does not kill a recycled PID whose command line changed', async () => {
