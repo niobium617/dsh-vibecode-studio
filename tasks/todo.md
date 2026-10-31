@@ -831,7 +831,12 @@
   - i18n：`verify.*` 共 20 个键（简化后删除 `verify.ran`、`verify.bufferHint`），en / zh-CN 同步。
   - 对接文档：`docs/2026-10-31-验证接口对接说明.md`（请求/响应形状、错误码、证据 id、跳转契约、稳定选择器、口径与安全说明）。
 - **验证结果**：`pnpm exec vitest run tests/component/verify tests/component/preview/{preview-tabs,console-drawer,network-drawer}.test.tsx tests/integration/verify` → **7 文件 / 55 用例通过**；`pnpm typecheck` 0；`pnpm test` **119 文件 / 1105 用例通过**（连续两次；其间有一次同样输入下 1 个用例偶发失败，未能复现，日志在 `.tmp/logs/`）；`pnpm build` host 439.3 + agent 59.1 / client 455.5 KiB；`pnpm test:e2e` 9/9。
-  - 说明：本机无 DSH 桌面环境，**手动验收未执行**，需在 `vibe-dev` profile 里跑一次：启动 fixture（`pnpm fixture:dev`）→ 打开预览 → 底部 `Verification` → Run checks；再在 fixture 里制造一个 console error 与一个 500，验证证据按钮跳 Console/Network 并高亮。真实浏览器链路由 T057 覆盖。
+  - 手动验收（2026-10-31，用户在 `vibe-dev` + `pnpm fixture:dev` 执行，**通过**）：
+    - Run checks 全绿：预览目标 / 页面（21 个 DOM 节点）/ 控制台 0 错误 / 网络 0 失败，面板显示“全部检查通过 · 13:11:53”；
+    - 点 fixture 的 `Trigger console error` 后再 Run → **1/4 未通过**，控制台行给出证据 `error · fixture: intentional console error`，点证据行后切到 Console 抽屉、定位并高亮该行（截图见会话记录）；
+    - 点 fixture 的 `GET /api/boom` → Network 抽屉记录 1 个失败（响应 `{"error":"fixture boom"}`），再 Run → 网络行失败，点证据行后切到 Network 抽屉并高亮；
+    - Console 行本身不可点击、只能选中文本，属设计（证据按钮只在验证面板的失败行）。
+  - 手动验收发现的缺陷（2026-10-31，已单独立 U05 修复）：`ConsoleDrawer` 正文列 `flex:1` + `minWidth:0`、来源列 `flex:0 1 auto` + `nowrap`，遇到超长来源 URL 时正文被挤到近乎 0 宽、按词断行（React DevTools 长消息 + 长源码 URL 复现）。
 
 ### - [x] T057 E2E 主链路
 
@@ -859,6 +864,17 @@
   - 报告：`tasks/soak-report.md`（结论、标注、内存/DOM、帧率、进程与清理、错误、复现与限制）；完整数据 `.tmp/logs/t058-soak.json`（gitignore）。
 - **验证结果**：`VIBE_DSH_BIN=... pnpm test:soak` → **PASS**：`annotations=100/100`（队列徽标 100、`.vibe/annotations` +100）、`fps median=16.1`（6 个窗口 15.2–18.0）、渲染器堆 49.4 → 40.0 MiB（112 次采样范围 39.2–49.4）、进程树 RSS 2444（标注后）→ 1830 MiB（结束）、DSH 根进程全程存活、`leftovers=none`、4320/4341 已释放、`errors=0`、实际 1810 s。`pnpm typecheck` 0；`pnpm test` **119 文件 / 1105 用例通过**。
   - 调试记录：首轮冒烟帧率 0（角落采样纯背景 + 静态页面不出帧）；清理曾按进程树派生 PID 强杀并撞上系统 `LeFile*.exe` 的 PID 复用，遂改为身份匹配 + 名称允许列表。产品代码无改动，无暴露缺陷。手动验收（真实桌面窗口缩放/切后台/IME/多标签）仍待用户执行。
+
+### - [x] U05 控制台抽屉列宽修复
+
+- **来源**：T056 手动验收（2026-10-31）发现——`ConsoleDrawer` 在来源 URL 很长时，正文被挤成一词一行。
+- **目标**：正文列保持可读宽度，来源列超长时省略号截断；`NetworkDrawer` 同款列一并核对。
+- **验收**：长来源 + 长消息条目正文正常换行；短来源不变；组件测试与既有抽屉测试全绿。
+- **验证**：`pnpm exec vitest run tests/component/preview` + 手动。
+- **文件**：`src/client/preview/ConsoleDrawer.tsx`、按需 `NetworkDrawer.tsx`、tests。
+- **实现（2026-10-31，`task/m6-verify-hardening`）**：正文列 `minWidth: 0` → `minWidth: '12ch'`（长来源不再能把正文压到 0 宽），来源列新增 `maxWidth: '45%'`（超长 URL 省略号截断）。`NetworkDrawer` 已核对：行是 `grid` + `minmax(0, 1fr)` URL 列，时间/耗时列是固定内容宽度，不会被长 URL 挤垮，不改。
+- **验证结果**：`pnpm exec vitest run tests/component/preview` → **6 文件 / 63 用例通过**（新增 U05 用例断言 `minWidth`/`maxWidth`）；`pnpm typecheck` 0；`pnpm build` host 439.3 + agent 59.1 / client 454.8 KiB；`pnpm test` **117 文件 / 1104 用例通过 + 2 个 Edge 残留用例失败**——失败是环境性的：用户 `vibe-dev` 预览正在运行，`playwrightEdgePids()` 把它的 msedge 计入“残留”（U02 时同样的已知现象），停止预览后需复跑确认。
+- **手动复核**：需重启 `vibe-dev` 加载新 `lib/client.js`，打开 Console 抽屉确认长消息正文正常换行、来源 URL 以省略号收尾。
 
 ### - [ ] T059 安全加固
 

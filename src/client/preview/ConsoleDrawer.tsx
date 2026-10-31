@@ -175,7 +175,8 @@ function levelStyle(level: ConsoleEntry['level']): React.CSSProperties {
 
 const textStyle: React.CSSProperties = {
   flex: 1,
-  minWidth: 0,
+  // A long source URL must not squeeze the message into a one-word column.
+  minWidth: '12ch',
   whiteSpace: 'pre-wrap',
   wordBreak: 'break-word',
 }
@@ -183,6 +184,7 @@ const textStyle: React.CSSProperties = {
 const sourceStyle: React.CSSProperties = {
   flex: '0 1 auto',
   minWidth: 0,
+  maxWidth: '45%',
   opacity: 0.6,
   overflow: 'hidden',
   textOverflow: 'ellipsis',

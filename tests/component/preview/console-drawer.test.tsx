@@ -275,6 +275,19 @@ describe('ConsoleDrawer', () => {
     expect(view.getByText('http://127.0.0.1:4320/a.js?token=REDACTED:3:9')).toBeTruthy()
   })
 
+  it('keeps a readable message floor when the source is long (U05)', async () => {
+    const message =
+      'Download the React DevTools for a better development experience: https://react.dev/link/react-devtools'
+    const sourceUrl = `http://127.0.0.1:4320/node_modules/.vite/deps/react-dom_client.js?v=${'a'.repeat(80)}`
+    const { view } = setup(
+      snapshot([{ ...entry(1, 'info', message), source: { url: sourceUrl, line: 1, column: 1 } }], 1),
+    )
+    await settle()
+
+    expect(view.getByText(message).style.minWidth).toBe('12ch')
+    expect(view.getByText(`${sourceUrl}:1:1`).style.maxWidth).toBe('45%')
+  })
+
   it('stays hidden but keeps counting while another tab is selected', async () => {
     const counts: ConsoleCounts[] = []
     const { view } = setup(
