@@ -1003,7 +1003,7 @@
 - 历史重写（用户批准）：`git filter-branch --env-filter` 覆盖全部 9 个本地分支的 165 个提交，author/committer 统一为 `211148342+niobium617@users.noreply.github.com`；所有 tree 未变（`main` 仍为 `e5c2da1`）；备份 `.tmp/backup/pre-email-rewrite-2026-10-31.bundle`（`git bundle verify` 确认完整）。
 - 提交号回写：按 tree + author date + subject 建立旧→新 165/165 映射，替换文档中 7–40 位提交号 182 处 / 6 文件（`a434a61`）；旧号 `adaa426`/`f59ae06`/`47a046d`/`0b59273` 等已不在跟踪文件。
 - 验证：`pnpm typecheck` 0；`pnpm test` 125 文件 / 1197 用例（期间一次偶发 1 失败，随后两次连跑全绿）；`pnpm test:security` 6 文件 / 90 用例；E2E 在重写前同树 10/10（含真实 DSH 主链路）；`npm pack --dry-run` 11 文件。
-- 待办（需用户批准）：远端仍是旧历史，force-push 9 个分支（`--force-with-lease`）；推送成功后再清理 `refs/original/*` 与旧 reflog。
+- 已执行（2026-10-31，用户批准）：`git push --force-with-lease` 9 个分支成功（`main` `adaa426`→`058669e`，其余 8 个分支同步重写）；远端 167 个可达提交全部为 noreply 邮箱（GitHub API 亦确认）；随后删除 `refs/original/*`、过期全部 reflog 并 `git gc --prune=now`，旧对象已不可达（bundle 备份保留）；`main` CI run `41193583129` success。
 
 ## 3. 踩坑与已验证经验
 
