@@ -109,11 +109,23 @@ describe('VerifyPanel (T056)', () => {
 
     expect(run).toHaveBeenCalledTimes(1)
     expect(screen.getByText(/All checks passed/)).toBeTruthy()
-    expect(screen.getAllByText(/passed/).length).toBeGreaterThanOrEqual(4)
     const rows = Array.from(
-      document.querySelectorAll('[data-vibe-verify-check]'),
-    ).map((row) => row.getAttribute('data-vibe-verify-check'))
-    expect(rows).toEqual(['target', 'page', 'console', 'network'])
+      document.querySelectorAll<HTMLElement>('[data-vibe-verify-check]'),
+    )
+    expect(rows.map((row) => row.getAttribute('data-vibe-verify-check'))).toEqual([
+      'target',
+      'page',
+      'console',
+      'network',
+    ])
+    expect(rows.map((row) => row.getAttribute('data-status'))).toEqual([
+      'pass',
+      'pass',
+      'pass',
+      'pass',
+    ])
+    // The status word lives in the accessible name, not in a second text node.
+    expect(rows[0].getAttribute('aria-label')).toBe('Preview target · passed')
     expect(screen.getByText('Page loaded (4 DOM nodes).')).toBeTruthy()
   })
 

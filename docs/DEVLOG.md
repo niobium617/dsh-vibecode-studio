@@ -910,6 +910,7 @@
 - 实现：`src/client/verify/VerifyPanel.tsx`（一键 `preview.verify.run`、四项检查行、汇总、运行时间/耗时、裁剪与缓冲区口径提示、`role="alert"` 传输错误、未运行/未就绪两种空状态）；`src/client/preview/focus.ts` + 两个抽屉的可选 `focus={{id,nonce}}`（按 nonce 只揭示一次，`scrollIntoView` + 高亮；高亮期间暂停自动滚到底部，否则下一次轮询立刻把证据行顶出视野）；Host 侧新增 `src/host/verify/route.ts`（`registerVerifyMethods`，按 effect 注册 `preview.verify.run`）；结果类型上移到 `src/contracts/verify.ts`，`checks.ts` 原样再导出，**客户端不引用 `src/host`**。`preview-tabs.test.tsx` 的验证标签设为可选 prop，旧的 Console/Network 断言不改。
 - 结果：聚焦 **7 文件 / 55 用例**；`pnpm typecheck` 0；`pnpm test` **119 文件 / 1105 用例**（连续两次；其间同一输入有一次 1 例偶发失败未能复现，两次全量日志在 `.tmp/logs/t056-full*.log`）；`pnpm build` host 439.3 + agent 59.1 / client 455.5 KiB（+14.2 KiB：面板 + 22 个 i18n 键 + 抽屉聚焦逻辑）；`pnpm test:e2e` 9/9。
 - 未完成：本机没有 DSH 桌面环境，**手动验收未执行**；步骤已写进 `tasks/todo.md` T056，真实浏览器链路由 T057 覆盖。现有 e2e 只覆盖 fixture/源码适配，不含面板交互。
+- 补充（2026-10-31，用户要求“确保页面简洁”）：面板去掉每行边框与状态词文本（状态词移入 `aria-label`）、去掉独立的“运行于/耗时”行与缓冲区口径提示，改为标题 + 一键运行 + 一行状态（汇总 · 时刻）+ 四行紧凑结果；`verify.ran`、`verify.bufferHint` 两键从中英 catalog 删除（`verify.*` 20 键），空/未就绪/裁剪文案同步收紧。接口与跳转约定另见 `docs/2026-10-31-验证接口对接说明.md`（含请求/响应形状、证据 id、稳定选择器、口径与安全说明）。
 - 提交：见本任务收尾提交（`task/m6-verify-hardening`，未推送、未合并）。
 
 ## 3. 踩坑与已验证经验
@@ -1149,7 +1150,7 @@ pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 - 预览工具与门禁：`src/host/agent/tools/preview.ts`（`createPreviewHandler`/`previewApprovalDecision`/`createPreviewApprovalGate`）、`src/host/artifacts/store.ts`、`src/host/preview/url.ts`、`tests/integration/preview-tool/`、`tests/unit/artifacts/`。
 - Vibe Studio preset：`presets/vibe-studio/cordis.patch.yml`（preset 行与工具集）、`src/host/agent/preset.ts`（agent 入口，`lib/agent.js`）、`tests/integration/preset/vibe-preset.test.ts`、`package.json`（`exports['./agent']` 与 `dsh.bundle.patch` 数组）、`scripts/build-host.mjs`（多入口）、组合证据 `.tmp/logs/dump-vibe-dev-t052.txt`（L1260 preset 行、L1391 `vibe-tools`）。
 - 验证服务：`src/host/verify/{service,checks,route}.ts`、`src/contracts/{telemetry,verify}.ts`（`isNetworkFailure`、结果 wire 类型）、`tests/integration/verify/`。
-- 验证面板：`src/client/verify/VerifyPanel.tsx`、`src/client/preview/{PreviewTabs.tsx,focus.ts,ConsoleDrawer.tsx,NetworkDrawer.tsx,Canvas.tsx}`（第三个抽屉标签与证据聚焦）、`tests/component/verify/`、`tests/component/preview/{preview-tabs,console-drawer,network-drawer}.test.tsx`（T056 用例）、`src/client/locales/{en,zh-CN}.json`（`verify.*`）。
+- 验证面板：`src/client/verify/VerifyPanel.tsx`、`src/client/preview/{PreviewTabs.tsx,focus.ts,ConsoleDrawer.tsx,NetworkDrawer.tsx,Canvas.tsx}`（第三个抽屉标签与证据聚焦）、`tests/component/verify/`、`tests/component/preview/{preview-tabs,console-drawer,network-drawer}.test.tsx`（T056 用例）、`src/client/locales/{en,zh-CN}.json`（`verify.*`）、对接说明 `docs/2026-10-31-验证接口对接说明.md`。
 - Web 预览：`src/host/targets/web/{adapter,launch}.ts`、`tests/integration/web-adapter/`、`tests/helpers/png.ts`。
 - 预览生命周期：`src/host/preview/session.ts`、`src/client/preview/{Toolbar.tsx,lifecycle.ts,local-url.ts}`、`tests/integration/preview/session-lifecycle.test.ts`、`.tmp/logs/t025-{host,desktop}.json`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。

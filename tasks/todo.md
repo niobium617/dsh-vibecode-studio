@@ -824,10 +824,12 @@
 - **文件**：`src/client/verify/*`、tests。
 - **实现（2026-10-31，`task/m6-verify-hardening`）**：
   - 位置：预览页底部抽屉的第三个标签（`verify`），与 Console/Network 同在 `data-vibe-drawer-layer` 内；证据跳转因此不跨页，点证据直接切到对应抽屉并高亮该行。预览未启动时该标签仍可用，面板显示“启动预览后才能运行检查”，运行按钮禁用。
-  - `src/client/verify/VerifyPanel.tsx`：`Run checks` 一键调用 unary；渲染四项检查（状态符号 + 状态词 + Host 消息）、汇总（全部通过 / N 项未通过）、运行时间与耗时、裁剪提示、缓冲区口径提示；传输失败显示 `role="alert"`，未运行/未就绪分别有空状态文案；`visible` 用 `display:none` 保持挂载。
+  - `src/client/verify/VerifyPanel.tsx`：`Run checks` 一键调用 unary；渲染四项检查（状态符号 + 名称 + Host 消息；状态词放进行 `aria-label`，不占正文）、一行状态（汇总 · 运行时刻）、裁剪提示；传输失败显示 `role="alert"`，未运行/未就绪分别有空状态文案；`visible` 用 `display:none` 保持挂载。
+  - 简洁要求（2026-10-31 用户补充）：去掉每行边框与状态词文本、去掉耗时与缓冲区口径提示，面板只留标题 + 一键运行 + 一行状态 + 四行紧凑结果。
   - `src/client/preview/focus.ts` + 两个抽屉：新增可选 `focus={{id,nonce}}`，按 nonce 只揭示一次，`scrollIntoView`（jsdom 无此 API，测试跳过）+ 2 s 高亮；高亮期间暂停“自动滚到底部”，避免下一次轮询把证据行顶出视野。
   - Host：`PREVIEW_VERIFY_RUN_METHOD = 'preview.verify.run'`，`src/host/verify/route.ts` 的 `registerVerifyMethods` 在 `apply()` 内按 effect 注册；结果类型上移到 `src/contracts/verify.ts`（`checks.ts` 原样再导出，T055 导出面不变），客户端不引用 `src/host`。
-  - i18n：`verify.*` 共 22 个键，en / zh-CN 同步。
+  - i18n：`verify.*` 共 20 个键（简化后删除 `verify.ran`、`verify.bufferHint`），en / zh-CN 同步。
+  - 对接文档：`docs/2026-10-31-验证接口对接说明.md`（请求/响应形状、错误码、证据 id、跳转契约、稳定选择器、口径与安全说明）。
 - **验证结果**：`pnpm exec vitest run tests/component/verify tests/component/preview/{preview-tabs,console-drawer,network-drawer}.test.tsx tests/integration/verify` → **7 文件 / 55 用例通过**；`pnpm typecheck` 0；`pnpm test` **119 文件 / 1105 用例通过**（连续两次；其间有一次同样输入下 1 个用例偶发失败，未能复现，日志在 `.tmp/logs/`）；`pnpm build` host 439.3 + agent 59.1 / client 455.5 KiB；`pnpm test:e2e` 9/9。
   - 说明：本机无 DSH 桌面环境，**手动验收未执行**，需在 `vibe-dev` profile 里跑一次：启动 fixture（`pnpm fixture:dev`）→ 打开预览 → 底部 `Verification` → Run checks；再在 fixture 里制造一个 console error 与一个 500，验证证据按钮跳 Console/Network 并高亮。真实浏览器链路由 T057 覆盖。
 

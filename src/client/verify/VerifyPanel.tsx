@@ -47,10 +47,10 @@ function rootStyle(visible: boolean): React.CSSProperties {
   return {
     display: visible ? 'grid' : 'none',
     gridTemplateRows: 'auto minmax(0, 1fr)',
-    gap: 6,
+    gap: 4,
     height: '100%',
     minHeight: 0,
-    padding: '6px 8px 8px',
+    padding: '4px 8px 8px',
     boxSizing: 'border-box',
     font: '12px/1.5 system-ui, sans-serif',
   }
@@ -87,12 +87,18 @@ const bodyStyle: React.CSSProperties = {
   overflow: 'auto',
   display: 'grid',
   alignContent: 'start',
-  gap: 6,
+  gap: 4,
 }
 
 const noteStyle: React.CSSProperties = {
   margin: 0,
   opacity: 0.75,
+}
+
+const metaStyle: React.CSSProperties = {
+  margin: 0,
+  opacity: 0.75,
+  fontVariantNumeric: 'tabular-nums',
 }
 
 const alertStyle: React.CSSProperties = {
@@ -108,7 +114,7 @@ const listStyle: React.CSSProperties = {
   padding: 0,
   listStyle: 'none',
   display: 'grid',
-  gap: 6,
+  gap: 2,
 }
 
 const checkStyle: React.CSSProperties = {
@@ -116,9 +122,7 @@ const checkStyle: React.CSSProperties = {
   gridTemplateColumns: '14px minmax(0, 1fr)',
   columnGap: 6,
   alignItems: 'start',
-  padding: '4px 6px',
-  border: '1px solid var(--dsw-border-color, rgba(127, 127, 127, 0.24))',
-  borderRadius: 4,
+  padding: '2px 0',
 }
 
 function statusColor(status: VerifyCheckStatus): string {
@@ -138,16 +142,15 @@ const statusStyle = (status: VerifyCheckStatus): React.CSSProperties => ({
   fontWeight: 700,
 })
 
-const checkHeadingStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: 6,
-  alignItems: 'baseline',
-  minWidth: 0,
+const checkLabelStyle: React.CSSProperties = {
+  margin: 0,
+  font: '600 12px/1.4 system-ui, sans-serif',
+  wordBreak: 'break-word',
 }
 
 const checkMessageStyle: React.CSSProperties = {
   margin: 0,
-  opacity: 0.85,
+  opacity: 0.7,
   wordBreak: 'break-word',
 }
 
@@ -208,15 +211,17 @@ function CheckRow({
 }): React.ReactElement {
   const evidence = check.evidence ?? []
   return (
-    <li data-vibe-verify-check={check.id} data-status={check.status} style={checkStyle}>
+    <li
+      data-vibe-verify-check={check.id}
+      data-status={check.status}
+      aria-label={`${t(`verify.check.${check.id}`)} · ${t(`verify.status.${check.status}`)}`}
+      style={checkStyle}
+    >
       <span aria-hidden="true" style={statusStyle(check.status)}>
         {statusSymbol(check.status)}
       </span>
       <div style={{ minWidth: 0 }}>
-        <div style={checkHeadingStyle}>
-          <strong>{t(`verify.check.${check.id}`)}</strong>
-          <span style={{ opacity: 0.6 }}>{t(`verify.status.${check.status}`)}</span>
-        </div>
+        <p style={checkLabelStyle}>{t(`verify.check.${check.id}`)}</p>
         <p style={checkMessageStyle}>{check.message}</p>
         {evidence.length === 0 ? null : (
           <ul style={evidenceListStyle}>
@@ -293,10 +298,7 @@ export function VerifyPanel({
       style={rootStyle(visible)}
     >
       <div style={headerStyle}>
-        <strong style={titleStyle}>
-          {t('verify.title')}
-          {summary === null ? null : ` · ${summary}`}
-        </strong>
+        <strong style={titleStyle}>{t('verify.title')}</strong>
         <button
           type="button"
           style={buttonStyle}
@@ -328,11 +330,8 @@ export function VerifyPanel({
           <p style={noteStyle}>{ready ? t('verify.empty') : t('verify.notReady')}</p>
         ) : (
           <>
-            <p style={noteStyle} role="status">
-              {t('verify.ran', {
-                time: formatRanAt(result.ranAt, locale ?? 'en'),
-                duration: result.durationMs,
-              })}
+            <p style={metaStyle} role="status">
+              {`${summary ?? ''} · ${formatRanAt(result.ranAt, locale ?? 'en')}`}
             </p>
             <ul style={listStyle} aria-label={t('verify.results')}>
               {result.checks.map((check) => (
@@ -347,7 +346,6 @@ export function VerifyPanel({
             {result.truncated ? (
               <p style={noteStyle}>{t('verify.truncated')}</p>
             ) : null}
-            <p style={noteStyle}>{t('verify.bufferHint')}</p>
           </>
         )}
       </div>
