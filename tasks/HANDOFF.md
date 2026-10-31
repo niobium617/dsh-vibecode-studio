@@ -616,3 +616,10 @@ dsh --profile vibe-dev --dump-config
 - README 首屏加入主视觉截图与中英双语“最大特色”说明，并新增三步小节；USER-GUIDE 顶部加入图文入口；快速开始同步链接。
 - 验证：Markdown 相对链接与图片路径 0 缺失；`git diff --check` 通过；未改产品代码、依赖或 profile。
 - 待办：API 工作台与验证面板暂无合适的新截图，先用文字说明；提交后推送受网络影响，若失败等待用户开启代理。
+
+### 公开仓库截图脱敏与图文入口强化（2026-11-01，`chore/public-release-cleanup`）
+
+- 6 张 `docs/images/*.png` 已移除左下角 DSH 个人昵称/头像，替换为中性「开发者」标签；原图备份 `.tmp/logs/images-backup/`。
+- README 首屏新增置顶图文入口，主视觉截图可点击直达 `docs/USAGE.zh-CN.md`；导航把图文说明提到首位。
+- 验证：图片尺寸不变，`grep -a '蜡笔小新' docs/images/*.png` 无命中，`git diff --check` 通过。
+- 待办：提交并合并到 `main` 后等 CI；公开可见性仍需用户最终确认。

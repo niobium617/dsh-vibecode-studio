@@ -3,8 +3,16 @@
 > A visual feedback loop for **DeepSeek Harness**: preview your local web app inside DSH, point at what is wrong, and hand structured notes to the coding agent — no screenshot ping-pong.
 
 <p align="center">
-  <img src="docs/images/feature-pick-and-annotate.png" alt="Preview the app inside DSH, click an element, and write a change note next to it" width="920">
+  <a href="docs/USAGE.zh-CN.md"><strong>📖 第一次使用？直接看图文使用说明（5 分钟上手）</strong></a>
 </p>
+
+<p align="center">
+  <a href="docs/USAGE.zh-CN.md">
+    <img src="docs/images/feature-pick-and-annotate.png" alt="Preview the app inside DSH, click an element, and write a change note next to it" width="920">
+  </a>
+</p>
+
+<p align="center"><em>点图直达图文使用说明：预览 → 点选元素 → 发送到对话。</em></p>
 
 <p align="center"><strong>The killer feature: live preview + click-to-annotate.</strong><br>
 Point at the exact element, describe the change, and send it to the agent as structured context —
@@ -27,11 +35,11 @@ selector, source location, DOM snapshot — not a screenshot.</p>
 
 <p align="center"><em>点「发送到对话」只写入 composer 草稿；改完后状态行提示「文件已改动」，刷新预览继续下一处。</em></p>
 
-完整的 5 分钟上手流程、功能导览与排障见 **[使用说明（图文）](docs/USAGE.zh-CN.md)**。
+**👉 完整的 5 分钟上手流程、功能导览与排障：[使用说明（图文）](docs/USAGE.zh-CN.md)**
 
 **Status: pre-alpha, unpublished.** M0–M6 are complete and the G0–G6 gates passed: embedded preview, inspect/annotation, the API workbench, agent tools (`vibe_status`/`vibe_observe`/`vibe_annotation_get`/`vibe_preview`), the `Vibe Studio` preset, `/vibe`, the bundled skill, and the M6 verification/hardening work (verification service and panel, real-DSH E2E, soak run, security hardening, packaging/docs). G6 passed 8/8 against SPEC §2.3. M6 is merged into `main` (merge commit `f2f5342`). The package is deliberately still `private` and unpublished — see [RELEASE.md](docs/RELEASE.md) for the publish checklist. See the [G0 review](spikes/G0.md) for the go/no-go and fallback decisions.
 
-[中文简介](#中文简介) · [使用说明（图文）](docs/USAGE.zh-CN.md) · [Install & usage](docs/USER-GUIDE.md) · [Release](docs/RELEASE.md) · [Security policy](SECURITY.md) · [Security audit](docs/SECURITY.md) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md) · [Dev log](docs/DEVLOG.md) · [M2 手册](docs/2026-10-28-手动测试手册.md) · [M3 手册](docs/2026-10-29-M3手动测试手册.md) · [M4 手册](docs/2026-10-30-M4手动测试手册.md) · [M5 手册](docs/2026-10-31-M5手动测试手册.md) · [M6 手册](docs/2026-10-31-M6手动测试手册.md) · [界面与项目方向](docs/2026-10-28-界面与项目方向.md) · [后续方向](docs/2026-10-31-后续开发方向.md) · [验证接口对接](docs/2026-10-31-验证接口对接说明.md)
+**[📖 使用说明（图文）](docs/USAGE.zh-CN.md)** · [中文简介](#中文简介) · [Install & usage](docs/USER-GUIDE.md) · [Release](docs/RELEASE.md) · [Security policy](SECURITY.md) · [Security audit](docs/SECURITY.md) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md) · [Dev log](docs/DEVLOG.md) · [M2 手册](docs/2026-10-28-手动测试手册.md) · [M3 手册](docs/2026-10-29-M3手动测试手册.md) · [M4 手册](docs/2026-10-30-M4手动测试手册.md) · [M5 手册](docs/2026-10-31-M5手动测试手册.md) · [M6 手册](docs/2026-10-31-M6手动测试手册.md) · [界面与项目方向](docs/2026-10-28-界面与项目方向.md) · [后续方向](docs/2026-10-31-后续开发方向.md) · [验证接口对接](docs/2026-10-31-验证接口对接说明.md)
 
 ## 中文简介
 
