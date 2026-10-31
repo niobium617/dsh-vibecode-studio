@@ -5,15 +5,28 @@
  * drawer itself is an overlay inside the stage. Each tab shows its live count
  * even while the drawer is closed, which is why the drawers stay mounted and
  * keep polling; this component is purely presentational.
+ *
+ * T056 adds an optional third tab for the verification panel. It has no live
+ * count (runs are manual) and is available even while the preview is idle,
+ * because opening it is how a beginner finds out the checks cannot run yet.
  */
 import * as React from 'react'
 import { createTranslator, type Locale } from '../i18n'
 
-export type PreviewDrawerKind = 'console' | 'network'
+export type PreviewDrawerKind = 'console' | 'network' | 'verify'
 
 export interface TabCount {
   readonly available: boolean
   readonly count: number
+}
+
+/** T056: the verification panel is manual, so its tab has no live count. */
+export interface VerifyTab {
+  /**
+   * The panel can open even while the preview is idle (it explains why the
+   * checks cannot run); the run button itself waits for `ready`.
+   */
+  readonly available: boolean
 }
 
 export interface PreviewTabsProps {
@@ -21,6 +34,8 @@ export interface PreviewTabsProps {
   readonly ready: boolean
   readonly console: TabCount
   readonly network: TabCount
+  /** Optional: tabs without it keep the pre-T056 two-tab layout. */
+  readonly verify?: VerifyTab
   readonly open: PreviewDrawerKind | null
   onToggle(kind: PreviewDrawerKind): void
 }
@@ -57,18 +72,20 @@ export function PreviewTabs({
   ready,
   console: consoleTab,
   network: networkTab,
+  verify: verifyTab,
   open,
   onToggle,
 }: PreviewTabsProps): React.ReactElement {
   const t = React.useMemo(() => createTranslator(locale ?? 'en'), [locale])
   const consoleEnabled = ready && consoleTab.available
   const networkEnabled = ready && networkTab.available
+  const verifyEnabled = verifyTab?.available === true
 
   const renderTab = (
     kind: PreviewDrawerKind,
     label: string,
-    tab: TabCount,
     enabled: boolean,
+    count?: number,
   ): React.ReactElement => (
     <button
       key={kind}
@@ -79,10 +96,11 @@ export function PreviewTabs({
       disabled={!enabled}
       data-vibe-console-toggle={kind === 'console' ? '1' : undefined}
       data-vibe-network-toggle={kind === 'network' ? '1' : undefined}
+      data-vibe-verify-toggle={kind === 'verify' ? '1' : undefined}
       style={tabStyle(open === kind)}
       onClick={() => onToggle(kind)}
     >
-      {label} ({tab.count})
+      {count === undefined ? label : `${label} (${count})`}
     </button>
   )
 
@@ -93,8 +111,11 @@ export function PreviewTabs({
       data-vibe-tabs="1"
       style={rootStyle}
     >
-      {renderTab('console', t('preview.console.title'), consoleTab, consoleEnabled)}
-      {renderTab('network', t('preview.network.title'), networkTab, networkEnabled)}
+      {renderTab('console', t('preview.console.title'), consoleEnabled, consoleTab.count)}
+      {renderTab('network', t('preview.network.title'), networkEnabled, networkTab.count)}
+      {verifyTab === undefined
+        ? null
+        : renderTab('verify', t('verify.title'), verifyEnabled)}
     </div>
   )
 }

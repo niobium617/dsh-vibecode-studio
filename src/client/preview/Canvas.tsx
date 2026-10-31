@@ -19,6 +19,7 @@
 import * as React from 'react'
 import type { Annotation } from '../../contracts/annotation'
 import type { TargetKind, TargetViewport } from '../../contracts/target'
+import type { VerifyEvidence } from '../../contracts/verify'
 import {
   PREVIEW_NAVIGATE_METHOD,
   PREVIEW_RELOAD_METHOD,
@@ -44,7 +45,9 @@ import { persistAnnotation } from '../inspect/history-store'
 import { PickCard, usePicker } from '../inspect/Picker'
 import { setActiveTab } from '../shell/store'
 import { callUnary } from '../transport/client'
+import { VerifyPanel } from '../verify/VerifyPanel'
 import { ConsoleDrawer, type ConsoleCounts } from './ConsoleDrawer'
+import type { DrawerFocus } from './focus'
 import { InputLayer } from './InputLayer'
 import { markPreviewActive } from './lifecycle'
 import { isLocalPreviewUrl } from './local-url'
@@ -260,6 +263,9 @@ export function PreviewPage({ locale, send }: PreviewPageProps): React.ReactElem
   const [stats, setStats] = React.useState<PreviewTransportStats | null>(null)
   const [stageSize, setStageSize] = React.useState<StageSize | null>(null)
   const [drawer, setDrawer] = React.useState<PreviewDrawerKind | null>(null)
+  /** T056: the evidence row the Verification panel asked the drawers to reveal. */
+  const [focus, setFocus] = React.useState<DrawerFocus | null>(null)
+  const focusNonce = React.useRef(0)
   // `unsaved` means the note is in the queue but the history file was not written.
   const [queueNotice, setQueueNotice] = React.useState<QueueNotice | null>(null)
   const [consoleCounts, setConsoleCounts] = React.useState<ConsoleCounts>({
@@ -592,11 +598,25 @@ export function PreviewPage({ locale, send }: PreviewPageProps): React.ReactElem
   const canNetwork = ready && !stopping && snapshot?.capabilities?.network === true
 
   React.useEffect(() => {
-    if (!ready || stopping) setDrawer(null)
+    if (stopping) {
+      setDrawer(null)
+      return
+    }
+    // Console/network close with the session; the verification panel stays
+    // open because it is where a beginner learns the checks cannot run yet.
+    if (!ready) setDrawer((current) => (current === 'verify' ? current : null))
   }, [ready, stopping])
 
   const toggleDrawer = (next: PreviewDrawerKind): void => {
     setDrawer((current) => (current === next ? null : next))
+  }
+
+  // A verification evidence button opens the drawer that owns the entry and
+  // asks it to reveal the row; the nonce makes a repeat click observable.
+  const openEvidence = (evidence: VerifyEvidence): void => {
+    focusNonce.current += 1
+    setFocus({ id: evidence.id, nonce: focusNonce.current })
+    setDrawer(evidence.kind)
   }
 
   // The bitmap keeps the target page ratio; the residual stage area is a
@@ -759,6 +779,7 @@ export function PreviewPage({ locale, send }: PreviewPageProps): React.ReactElem
             active={canConsole}
             locale={locale}
             visible={drawer === 'console'}
+            focus={focus}
             onClose={() => setDrawer(null)}
             onCountsChange={setConsoleCounts}
           />
@@ -766,8 +787,16 @@ export function PreviewPage({ locale, send }: PreviewPageProps): React.ReactElem
             active={canNetwork}
             locale={locale}
             visible={drawer === 'network'}
+            focus={focus}
             onClose={() => setDrawer(null)}
             onCountsChange={setNetworkCounts}
+          />
+          <VerifyPanel
+            locale={locale}
+            visible={drawer === 'verify'}
+            ready={ready && !stopping}
+            onClose={() => setDrawer(null)}
+            onOpenEvidence={openEvidence}
           />
         </div>
       </div>
@@ -777,6 +806,7 @@ export function PreviewPage({ locale, send }: PreviewPageProps): React.ReactElem
         ready={ready}
         console={consoleTab}
         network={networkTab}
+        verify={{ available: true }}
         open={drawer}
         onToggle={toggleDrawer}
       />

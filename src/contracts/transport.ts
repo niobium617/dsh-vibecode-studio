@@ -63,6 +63,11 @@ export const PREVIEW_NETWORK_BODY_METHOD = 'preview.network.body'
 export const PREVIEW_PICK_START_METHOD = 'preview.pick.start'
 export const PREVIEW_PICK_STOP_METHOD = 'preview.pick.stop'
 export const PREVIEW_PICK_STATUS_METHOD = 'preview.pick.status'
+/**
+ * T056: one read-only verification run; the panel calls it on click. It takes
+ * no params and never mutates the session, so it is safe to repeat.
+ */
+export const PREVIEW_VERIFY_RUN_METHOD = 'preview.verify.run'
 /** Annotation history (T033); persistence lives in `.vibe/annotations`. */
 export const ANNOTATION_HISTORY_LIST_METHOD = 'annotation.history.list'
 export const ANNOTATION_HISTORY_GET_METHOD = 'annotation.history.get'

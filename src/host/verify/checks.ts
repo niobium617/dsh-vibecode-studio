@@ -20,6 +20,13 @@ import type {
   PreviewSessionSnapshot,
 } from '../../contracts/transport'
 import type { DomSnapshot } from '../preview/dom'
+import type {
+  VerifyCheck,
+  VerifyCheckId,
+  VerifyConsoleEvidence,
+  VerifyNetworkEvidence,
+  VerifyResult,
+} from '../../contracts/verify'
 
 /** Hard cap for one serialized verification result (SPEC budget). */
 export const VERIFY_BUDGET_BYTES = 4 * 1024
@@ -29,48 +36,17 @@ export const VERIFY_MESSAGE_CHARS = 240
 export const VERIFY_EVIDENCE_TEXT_CHARS = 200
 export const VERIFY_EVIDENCE_URL_CHARS = 200
 
-export type VerifyCheckId = 'target' | 'page' | 'console' | 'network'
-export type VerifyCheckStatus = 'pass' | 'fail' | 'skipped'
-
-export interface VerifyConsoleEvidence {
-  readonly kind: 'console'
-  readonly id: string
-  readonly level: string
-  readonly text: string
-}
-
-export interface VerifyNetworkEvidence {
-  readonly kind: 'network'
-  readonly id: string
-  readonly method: string
-  readonly url: string
-  readonly status: number | null
-  readonly outcome: string
-}
-
-export type VerifyEvidence = VerifyConsoleEvidence | VerifyNetworkEvidence
-
-export interface VerifyCheck {
-  readonly id: VerifyCheckId
-  readonly status: VerifyCheckStatus
-  readonly message: string
-  readonly evidence?: readonly VerifyEvidence[]
-}
-
-export interface VerifyResult {
-  /** True only when every check ran and passed. */
-  readonly ok: boolean
-  readonly ranAt: string
-  readonly durationMs: number
-  readonly url: string | null
-  readonly checks: readonly VerifyCheck[]
-  /** Null when console capture was unavailable, so the count is unknown. */
-  readonly consoleErrors: number | null
-  /** Null when network capture was unavailable, so the count is unknown. */
-  readonly failedRequests: number | null
-  /** Evidence was trimmed to satisfy the byte budget or the per-check cap. */
-  readonly truncated: boolean
-}
+// The wire shape lives in contracts so the panel can import it (T056); this
+// module re-exports it to keep the T055 public surface unchanged.
+export type {
+  VerifyCheck,
+  VerifyCheckId,
+  VerifyCheckStatus,
+  VerifyConsoleEvidence,
+  VerifyEvidence,
+  VerifyNetworkEvidence,
+  VerifyResult,
+} from '../../contracts/verify'
 
 /**
  * One snapshot read. `null` means the check did not run at all (preview not

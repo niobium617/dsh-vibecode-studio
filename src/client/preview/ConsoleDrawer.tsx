@@ -19,6 +19,12 @@ import {
 } from '../../contracts/transport'
 import { createTranslator, type Locale } from '../i18n'
 import { callUnary } from '../transport/client'
+import {
+  FOCUS_HIGHLIGHT_MS,
+  findEntryRow,
+  revealEntry,
+  type DrawerFocus,
+} from './focus'
 
 export interface ConsoleSource {
   list(query: PreviewConsoleQuery): Promise<PreviewConsoleSnapshot>
@@ -42,6 +48,8 @@ export interface ConsoleDrawerProps {
   readonly pollMs?: number
   /** Shown when this drawer is the selected bottom tab. */
   readonly visible?: boolean
+  /** T056: reveal this entry (verification evidence) and highlight it briefly. */
+  readonly focus?: DrawerFocus | null
   onClose?(): void
   /** Keeps the bottom tab count in sync while the drawer is closed. */
   onCountsChange?(counts: ConsoleCounts): void
@@ -136,12 +144,16 @@ const listStyle: React.CSSProperties = {
   font: '11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace',
 }
 
-const entryStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: 6,
-  alignItems: 'baseline',
-  padding: '2px 4px',
-  borderBottom: '1px solid var(--dsw-border-color, rgba(127, 127, 127, 0.16))',
+function entryStyle(highlighted: boolean): React.CSSProperties {
+  return {
+    display: 'flex',
+    gap: 6,
+    alignItems: 'baseline',
+    padding: '2px 4px',
+    borderBottom: '1px solid var(--dsw-border-color, rgba(127, 127, 127, 0.16))',
+    background: highlighted ? 'rgba(79, 140, 246, 0.2)' : undefined,
+    outline: highlighted ? '1px solid var(--dsw-accent-color, #4f8cff)' : undefined,
+  }
 }
 
 function levelStyle(level: ConsoleEntry['level']): React.CSSProperties {
@@ -204,6 +216,7 @@ export function ConsoleDrawer({
   source = DEFAULT_SOURCE,
   pollMs = DEFAULT_POLL_MS,
   visible = true,
+  focus = null,
   onClose,
   onCountsChange,
 }: ConsoleDrawerProps): React.ReactElement {
@@ -217,6 +230,9 @@ export function ConsoleDrawer({
   const clearEpoch = React.useRef(0)
   const mounted = React.useRef(true)
   const listRef = React.useRef<HTMLOListElement | null>(null)
+  const [highlightId, setHighlightId] = React.useState<string | null>(null)
+  /** Nonce of the last focus handled, so a re-render does not re-scroll. */
+  const handledFocus = React.useRef<number | null>(null)
 
   React.useEffect(() => {
     mounted.current = true
@@ -232,6 +248,8 @@ export function ConsoleDrawer({
       setEntries([])
       setStatus(null)
       setClearing(false)
+      setHighlightId(null)
+      handledFocus.current = null
       return
     }
 
@@ -278,10 +296,28 @@ export function ConsoleDrawer({
   }, [active, source, pollMs])
 
   React.useEffect(() => {
-    if (!visible) return
+    // While an evidence row is highlighted, leave the scroll position alone:
+    // the bottom-follow would pull it out of view on the next poll.
+    if (!visible || highlightId !== null) return
     const list = listRef.current
     if (list !== null) list.scrollTop = list.scrollHeight
-  }, [entries.length, visible])
+  }, [entries.length, visible, highlightId])
+
+  React.useEffect(() => {
+    if (!visible || focus === null) return
+    if (handledFocus.current === focus.nonce) return
+    const row = findEntryRow(listRef.current, 'data-vibe-console-entry', focus.id)
+    // The entry may arrive with the next poll; the effect re-runs then.
+    if (row === null) return
+    handledFocus.current = focus.nonce
+    setFilter('all')
+    revealEntry(row)
+    setHighlightId(focus.id)
+    const timer = setTimeout(() => {
+      if (mounted.current) setHighlightId(null)
+    }, FOCUS_HIGHLIGHT_MS)
+    return () => clearTimeout(timer)
+  }, [focus, visible, entries])
 
   const counts = React.useMemo(() => {
     let errors = 0
@@ -404,8 +440,9 @@ export function ConsoleDrawer({
               <li
                 key={entry.id}
                 data-vibe-console-entry="1"
+                data-entry-id={entry.id}
                 data-level={entry.level}
-                style={entryStyle}
+                style={entryStyle(highlightId === entry.id)}
               >
                 <span style={levelStyle(entry.level)}>{entry.level}</span>
                 <span style={textStyle}>{entry.text}</span>

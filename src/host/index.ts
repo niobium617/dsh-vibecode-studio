@@ -29,6 +29,7 @@ import {
   type PreviewService,
 } from './preview/route'
 import { createPreviewService } from './preview/session'
+import { registerVerifyMethods } from './verify/route'
 import { createVerifyService, type VerifyService } from './verify/service'
 import {
   createStudioSettingsService,
@@ -177,6 +178,7 @@ export type {
   PreviewServiceOptions,
 } from './preview/session'
 export { isLoopbackHost } from './preview/url'
+export { registerVerifyMethods } from './verify/route'
 export { createVerifyService } from './verify/service'
 export type {
   VerifyPreviewSource,
@@ -525,6 +527,13 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
     void setupPreview()
   }
   registerPreviewRoutes(ctx, preview)
+  // T056: the panel runs the four basic checks through one read-only method.
+  const setupVerify = () => registerVerifyMethods(registry, verify)
+  if (typeof ctx.effect === 'function') {
+    ctx.effect(setupVerify, 'vibe-studio: verify methods')
+  } else {
+    setupVerify()
+  }
 
   // T050: `/vibe` reads the same host-owned state as `vibe_status` and answers
   // with one next step; it never starts, stops or navigates a preview. The

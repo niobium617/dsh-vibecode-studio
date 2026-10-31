@@ -6,6 +6,7 @@ import {
   type NetworkCounts,
   type NetworkSource,
 } from '../../../src/client/preview/NetworkDrawer'
+import type { DrawerFocus } from '../../../src/client/preview/focus'
 import type { NetworkEntry } from '../../../src/contracts/telemetry'
 import type {
   PreviewNetworkBody,
@@ -113,6 +114,19 @@ function setup(initial: PreviewNetworkSnapshot, options: SetupOptions = {}) {
     body,
     setSnapshot(next: PreviewNetworkSnapshot) {
       current = next
+    },
+    /** T056: swap the shared `focus` prop without remounting the drawer. */
+    rerender(next: { focus?: DrawerFocus | null; visible?: boolean } = {}) {
+      view.rerender(
+        <NetworkDrawer
+          active={options.active ?? true}
+          source={source}
+          pollMs={POLL_MS}
+          visible={next.visible ?? options.visible ?? true}
+          focus={next.focus ?? null}
+          onCountsChange={options.onCountsChange}
+        />,
+      )
     },
   }
 }
@@ -344,5 +358,27 @@ describe('NetworkDrawer', () => {
     const { view } = setup(snapshot([], 0))
     await settle()
     expect(view.queryByRole('button', { name: 'Close drawer' })).toBeNull()
+  })
+
+  it('reveals and highlights the evidence row once per focus (T056)', async () => {
+    const { view, rerender } = setup(snapshot([OK_ENTRY, BAD_ENTRY], 2))
+    await settle()
+
+    const row = () =>
+      view.container.querySelector<HTMLElement>('[data-entry-id="network-2"]')
+    const scrollIntoView = vi.fn()
+    if (row() !== null) row()!.scrollIntoView = scrollIntoView
+
+    const focus: DrawerFocus = { id: 'network-2', nonce: 1 }
+    await act(async () => rerender({ focus }))
+
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(row()?.style.background).not.toBe('')
+
+    await act(async () => rerender({ focus }))
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+
+    await advance(2000)
+    expect(row()?.style.background).toBe('')
   })
 })

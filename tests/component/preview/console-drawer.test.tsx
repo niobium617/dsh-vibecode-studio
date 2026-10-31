@@ -6,6 +6,7 @@ import {
   type ConsoleCounts,
   type ConsoleSource,
 } from '../../../src/client/preview/ConsoleDrawer'
+import type { DrawerFocus } from '../../../src/client/preview/focus'
 import type { ConsoleEntry } from '../../../src/contracts/telemetry'
 import type {
   PreviewConsoleClearResult,
@@ -70,6 +71,19 @@ function setup(initial: PreviewConsoleSnapshot, options: SetupOptions = {}) {
     clear,
     setSnapshot(next: PreviewConsoleSnapshot) {
       current = next
+    },
+    /** T056: swap the shared `focus` prop without remounting the drawer. */
+    rerender(next: { focus?: DrawerFocus | null; visible?: boolean } = {}) {
+      view.rerender(
+        <ConsoleDrawer
+          active={options.active ?? true}
+          source={source}
+          pollMs={POLL_MS}
+          visible={next.visible ?? options.visible ?? true}
+          focus={next.focus ?? null}
+          onCountsChange={options.onCountsChange}
+        />,
+      )
     },
   }
 }
@@ -278,5 +292,31 @@ describe('ConsoleDrawer', () => {
     const { view } = setup(snapshot([], 0))
     await settle()
     expect(view.queryByRole('button', { name: 'Close drawer' })).toBeNull()
+  })
+
+  it('reveals and highlights the evidence row once per focus (T056)', async () => {
+    const { view, rerender } = setup(
+      snapshot([entry(1, 'error', 'boom'), entry(2, 'info', 'hi')], 2),
+    )
+    await settle()
+
+    const row = () =>
+      view.container.querySelector<HTMLElement>('[data-entry-id="console-1"]')
+    const scrollIntoView = vi.fn()
+    if (row() !== null) row()!.scrollIntoView = scrollIntoView
+
+    const focus: DrawerFocus = { id: 'console-1', nonce: 1 }
+    await act(async () => rerender({ focus }))
+
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(row()?.style.background).not.toBe('')
+
+    // Re-rendering with the same nonce must not scroll again.
+    await act(async () => rerender({ focus }))
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+
+    // The highlight clears on its own so new entries cannot stay stranded.
+    await advance(2000)
+    expect(row()?.style.background).toBe('')
   })
 })
