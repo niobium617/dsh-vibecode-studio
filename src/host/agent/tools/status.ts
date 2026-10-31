@@ -13,6 +13,7 @@ import type {
   PreviewSessionSnapshot,
 } from '../../../contracts/transport'
 import { isStudioError } from '../../../contracts/errors'
+import { redactUrl } from '../../../contracts/redact'
 import {
   countConsoleErrors,
   countNetworkFailures,
@@ -147,6 +148,11 @@ export function createStatusHandler(deps: StatusToolDeps): StatusHandler {
       saved = 0
     }
 
+    // A page URL can carry a token in its query (dev servers and DSH itself
+    // use `?token=`). Tool output reaches the model, so it is redacted here,
+    // exactly like console/network sources; the panel keeps the raw URL.
+    const safeUrl = snapshot.url === null ? null : redactUrl(snapshot.url)
+
     // The host does not retain the configured display name yet; the target id
     // is the honest identifier until preview targets carry a name.
     const target =
@@ -155,7 +161,7 @@ export function createStatusHandler(deps: StatusToolDeps): StatusHandler {
             id: snapshot.targetId,
             name: snapshot.targetId,
             kind: snapshot.kind,
-            ...(snapshot.url ? { url: snapshot.url } : {}),
+            ...(safeUrl === null ? {} : { url: safeUrl }),
           }
         : undefined
 
@@ -166,7 +172,7 @@ export function createStatusHandler(deps: StatusToolDeps): StatusHandler {
       networkFailures: counts.failures,
       annotations: { queued: 0, saved },
       ...(stale ? { stale: true } : {}),
-      summary: summarize(state, snapshot.url, counts, saved, snapshot.lastError?.message, stale),
+      summary: summarize(state, safeUrl, counts, saved, snapshot.lastError?.message, stale),
     }
   }
 }

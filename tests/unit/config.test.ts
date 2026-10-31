@@ -55,6 +55,7 @@ describe('host config', () => {
       annotationHistory: expect.anything(),
       artifacts: expect.anything(),
       apiSecrets: expect.anything(),
+      verify: expect.anything(),
     })
   })
 })

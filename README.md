@@ -2,9 +2,9 @@
 
 > A visual feedback loop for **DeepSeek Harness**: preview your local web app inside DSH, point at what is wrong, and hand structured notes to the coding agent — no screenshot ping-pong.
 
-**Status: pre-alpha.** The M0 spike gate is complete. Transport, composer handoff, screencast/input/Chinese IME, and element/source mapping are verified; the G0 review selected stream-first frames with a pull fallback, one-shot CDP input, clipboard-only screenshots, and per-framework source adapters. M1–M4 (foundation, preview, inspect/annotation, and the API workbench) are in `src/`, `tests/` and `fixtures/`; nothing is published yet. See the [G0 review](spikes/G0.md) for the go/no-go and fallback decisions.
+**Status: pre-alpha, unpublished.** M0–M6 are complete and the G0–G6 gates passed: embedded preview, inspect/annotation, the API workbench, agent tools (`vibe_status`/`vibe_observe`/`vibe_annotation_get`/`vibe_preview`), the `Vibe Studio` preset, `/vibe`, the bundled skill, and the M6 verification/hardening work (verification service and panel, real-DSH E2E, soak run, security hardening, packaging/docs). G6 passed 8/8 against SPEC §2.3. M6 lives on `task/m6-verify-hardening` and is awaiting approval to merge and publish. The package is deliberately still `private` — see [RELEASE.md](docs/RELEASE.md) for the publish checklist. See the [G0 review](spikes/G0.md) for the go/no-go and fallback decisions.
 
-[中文简介](#中文简介) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md) · [Dev log](docs/DEVLOG.md) · [M2 手册](docs/2026-10-28-手动测试手册.md) · [M3 手册](docs/2026-10-29-M3手动测试手册.md) · [M4 手册](docs/2026-10-30-M4手动测试手册.md) · [M5 手册](docs/2026-10-31-M5手动测试手册.md) · [界面与项目方向](docs/2026-10-28-界面与项目方向.md)
+[中文简介](#中文简介) · [Install & usage](docs/USER-GUIDE.md) · [Release](docs/RELEASE.md) · [Security](docs/SECURITY.md) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md) · [Dev log](docs/DEVLOG.md) · [M2 手册](docs/2026-10-28-手动测试手册.md) · [M3 手册](docs/2026-10-29-M3手动测试手册.md) · [M4 手册](docs/2026-10-30-M4手动测试手册.md) · [M5 手册](docs/2026-10-31-M5手动测试手册.md) · [M6 手册](docs/2026-10-31-M6手动测试手册.md) · [界面与项目方向](docs/2026-10-28-界面与项目方向.md) · [后续方向](docs/2026-10-31-后续开发方向.md) · [验证接口对接](docs/2026-10-31-验证接口对接说明.md)
 
 ## 中文简介
 
@@ -22,20 +22,23 @@ Vibe coding 的关键是让 Agent “看见”结果。截图会丢失元素身�
 ### 当前进度
 
 - **M0 / G0 已通过**：S1 传输、S2 composer 交接、S3 screencast/输入/中文、S4 拾取/源码四个 spike 均完成，结论与回退方案见 [spikes/G0.md](spikes/G0.md)。
+- **M1 完成并通过 G1**：包脚手架与构建链、host ESM 入口、client loader bundle、contracts v1 契约、右栏 Studio shell 与标签页、`ctx.connection` 传输、测试 harness 与 Vite fixture、`.vibe` 设置与设置面板均已完成。
 - **M2 完成并通过 G2**：预览闭环（screencast/帧路由/输入/工具栏/生命周期）、Console/Network 采集与抽屉、`.vibe` 设置已在 Host、Web 与隔离 Desktop 载体验证；G2 三端实测 24.4–25.9 fps。手动复测步骤见 [手动测试手册](docs/2026-10-28-手动测试手册.md)。
 - **M2.5 / U01 已完成（Layout v2）**：预览页改为画布优先——常驻仅状态行、地址行、底部 tab，视口参数移入设置与“更多”菜单，Console/Network 改为覆盖式抽屉；三档面板（320/400/500px）无横向溢出，舞台占面板 85.6%，实测 26.2 fps。方向与验收见 [界面与项目方向](docs/2026-10-28-界面与项目方向.md)。
 - **M3 完成并通过 G3**：元素拾取与选择器、元素上下文、React/Vue/Svelte 源码适配、标注气泡与队列、保存通知、composer 草稿交接、标注历史均已完成；G3 四项验收通过（50/50 源码命中、标注 ≤ 4 KB、3 动作进 composer、不自动发送）。手动复测步骤见 [M3 手动测试手册](docs/2026-10-29-M3手动测试手册.md)。
 - **M4 完成并通过 G4**：HTTP 发送（取消/超时/重定向/大响应）、请求构建（query/headers/body/auth）、响应查看（JSON 树/HTML/图片/二进制/分页）、环境与密钥引用、集合与历史、cURL 导入导出、OpenAPI 导入、内置断言、预览抓包回放均已完成；FR-API-01–10、12 通过，FR-API-11（Cookie jar）按 D8 延后。界面按 M4 人工审核意见整改（U04）：首屏只留“方法 + URL + 发送”与响应区，其余收进「更多配置」与“更多工具”抽屉，新增新手/专业模式（默认新手并记忆）与内置 loopback 示例请求，术语改为 URL 参数/身份验证/结果校验/收藏。手动复测步骤见 [M4 手动测试手册](docs/2026-10-30-M4手动测试手册.md)，配套本地目标服务 `tools/m4-manual-server.mjs`。
-- **尚未发布**：根包可在开发 profile 中加载，但尚未打包发布；`spikes/` 保留为 spike 证据。
+- **M5 完成并通过 G5**：Agent 侧能力就绪——四个工具（`vibe_status` / `vibe_observe` / `vibe_annotation_get` / `vibe_preview`）、`Vibe Studio` preset、斜杠命令 `/vibe`、内置技能 `vibecoding-studio`；工具 schema 经 DSH 校验，越权动作（非 loopback、跨源、关闭截图后的 screenshot）在审批前即拒绝。手动复测步骤见 [M5 手动测试手册](docs/2026-10-31-M5手动测试手册.md)。
+- **M6 完成并通过 G6**（`task/m6-verify-hardening`，等待批准合并）：验证服务与验证面板、真实 DSH 的 E2E 主链路、30 分钟 / 100 次标注的 soak、安全加固（`pnpm test:security`，见 [SECURITY.md](docs/SECURITY.md)）、打包与文档（[USER-GUIDE.md](docs/USER-GUIDE.md)、[RELEASE.md](docs/RELEASE.md)）。G6 对照 SPEC §2.3 的 8 条逐项达标（GO）；干净 `vibe-dev` 安装已验证：tarball 225.7 kB / 11 个文件，`--dump-config` 组合树含插件行，`/api/vibe/health` 正常，Studio E2E 通过；隔离 Desktop 载体验证 5 个页签与验证抽屉可用，真实 `desktop` profile 未被修改。手测步骤见 [M6 手动测试手册](docs/2026-10-31-M6手动测试手册.md)；M6 之后的选题建议见 [后续开发方向](docs/2026-10-31-后续开发方向.md)。
+- **尚未发布**：包保持 `"private": true`；发布需要用户明确批准，步骤与回滚见 [RELEASE.md](docs/RELEASE.md)。`spikes/` 保留为 spike 证据。
 
-### 计划中的 MVP
+### MVP 能力（M0–M6 已完成）
 
 - 仅限 localhost 的内嵌预览，默认 30 fps 流式 JPEG，拉取式回退。
 - 页面元素拾取与标注 overlay，支持 React / Vue / Svelte 开发态源码定位。
 - 批注队列、气泡与历史；交接前可审核。
 - 通过公开 `InputActions` 把结构化文本写入 composer 草稿，**不自动发送**；截图走“复制 PNG + 手动粘贴”。
 - 会话级多页面 tab；密钥只存放在 `ctx.credentials`，UI 只读取 `describe` 元数据。
-- 后续模块：API 工作台、Agent 工具与 `/vibe` 命令、验证与打包。
+- API 工作台、Agent 工具与 `/vibe` 命令、验证面板与打包（M4/M5/M6）。
 
 ### 安全边界
 
@@ -44,19 +47,25 @@ Vibe coding 的关键是让 Agent “看见”结果。截图会丢失元素身�
 - host/client 通信只走 `ctx.connection`，不直接使用 `ctx.webServer`。
 - CDP 只连接已启动或已批准的 loopback 端点，不暴露到网络，并清理进程树。
 
-### 快速开始（开发 spike）
+### 快速开始
 
-需要 Node.js 24、pnpm 11，以及 DSH `0.2.1-rc.2` 或更新版本。
+需要 Node.js 24、pnpm 11，以及 DSH `0.2.1-rc.2` 或更新版本。**只装进开发 profile `vibe-dev`**，
+不要动 `desktop` / `web`。
 
 ```bash
 pnpm install
-pnpm typecheck
-pnpm spike:s1                 # 本地 10 s 拉取 vs 流式基准
-pnpm spike:s3 --seconds 10    # screencast / 输入 / 中文
-pnpm spike:s4                 # React / Vue / Svelte 拾取与源码命中
+pnpm build                                   # lib/index.js + lib/agent.js + lib/client.js
+npm pack                                     # 产出 dsh-vibecode-studio-0.1.0.tgz
+dsh plugin --profile vibe-dev add file:<绝对路径>/dsh-vibecode-studio-0.1.0.tgz
+dsh --profile vibe-dev --no-open --host 127.0.0.1 --port 4317
 ```
 
-完整设计见 [SPEC](docs/SPEC-vibecoding-studio.md)，任务顺序见 [todo.md](tasks/todo.md)，开发记录见 [DEVLOG](docs/DEVLOG.md)，自己复测功能见 [M2 手动测试手册](docs/2026-10-28-手动测试手册.md)、[M3 手动测试手册](docs/2026-10-29-M3手动测试手册.md) 与 [M4 手动测试手册](docs/2026-10-30-M4手动测试手册.md) 与 [M5 手动测试手册](docs/2026-10-31-M5手动测试手册.md)，界面与产品方向见 [方向文档](docs/2026-10-28-界面与项目方向.md)。
+开发时也可用 `dsh plugin --profile vibe-dev add link:<本仓库绝对路径>`，每次 `pnpm build` 后重启 DSH。
+右栏“新标签页 → Vibe Studio”打开界面。完整步骤、界面说明、配置与已知限制见
+[用户指南](docs/USER-GUIDE.md)；打包、干净安装验证与发布流程见 [发布说明](docs/RELEASE.md)。
+
+完整设计见 [SPEC](docs/SPEC-vibecoding-studio.md)，任务顺序见 [todo.md](tasks/todo.md)，开发记录见 [DEVLOG](docs/DEVLOG.md)，
+自己复测功能见 [M2 手动测试手册](docs/2026-10-28-手动测试手册.md)、[M3 手动测试手册](docs/2026-10-29-M3手动测试手册.md)、[M4 手动测试手册](docs/2026-10-30-M4手动测试手册.md) 与 [M5 手动测试手册](docs/2026-10-31-M5手动测试手册.md)，界面与产品方向见 [方向文档](docs/2026-10-28-界面与项目方向.md)。
 
 ## Why
 
@@ -83,10 +92,10 @@ The agent stays in control. Notes are prepared for the composer; nothing is sent
 ## Repository layout
 
 ```text
-docs/        product spec, capability map, DSH ecosystem notes, UI/product direction
+docs/        product spec, user guide, release/security notes, capability map, UI direction
 src/         product package (host, client, contracts)
-tests/       Vitest unit/component/integration + Playwright E2E
-fixtures/    vite-basic React app for E2E and preview/inspect tests
+tests/       Vitest unit/component/integration, Playwright E2E, security suite, soak runner
+fixtures/    vite-basic React app plus the security-injection fixture
 tasks/       implementation plan, ordered task list, handoff state
 spikes/
   s1/        T001 transport spike: pull JPEG vs multipart stream
@@ -96,7 +105,7 @@ spikes/
   G0.md      T005 spike review: go/no-go and final fallback decisions
 ```
 
-G0 has passed and M1 is in progress: the root package already builds host `lib/index.js` and loader-wrapped `lib/client.js`, with the test harness in `tests/` and `fixtures/vite-basic`.
+G0–G6 have passed and M1–M6 are complete: the root package builds host `lib/index.js`, agent `lib/agent.js`, and loader-wrapped `lib/client.js`, plus `presets/` and `skills/` for the agent preset; tests live in `tests/` with fixtures in `fixtures/`.
 
 ## Development
 
@@ -105,8 +114,12 @@ Requirements: Node.js 24, pnpm 11, and DeepSeek Harness `0.2.1-rc.2` or newer fo
 ```bash
 pnpm install
 pnpm typecheck
+pnpm build                   # host + agent + client bundles
+npm pack --dry-run           # package contents check
 pnpm test                    # Vitest: node + jsdom projects
-pnpm test:e2e                # Playwright + local Edge against fixtures/vite-basic
+pnpm test:security           # injection / redaction / origin / credential suites
+pnpm test:e2e                # Playwright; real-DSH carrier via VIBE_DSH_BIN
+pnpm test:soak               # 30 min + 100 annotations stability run
 pnpm fixture:dev             # fixture only → http://127.0.0.1:4320
 pnpm spike:s1:build          # bundle S1 host/client (required before linking)
 pnpm spike:s1                # local 10 s pull-vs-stream benchmark

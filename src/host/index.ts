@@ -29,6 +29,8 @@ import {
   type PreviewService,
 } from './preview/route'
 import { createPreviewService } from './preview/session'
+import { registerVerifyMethods } from './verify/route'
+import { createVerifyService, type VerifyService } from './verify/service'
 import {
   createStudioSettingsService,
   registerSettingsMethods,
@@ -176,6 +178,29 @@ export type {
   PreviewServiceOptions,
 } from './preview/session'
 export { isLoopbackHost } from './preview/url'
+export { registerVerifyMethods } from './verify/route'
+export { createVerifyService } from './verify/service'
+export type {
+  VerifyPreviewSource,
+  VerifyService,
+  VerifyServiceOptions,
+} from './verify/service'
+export {
+  evaluateVerify,
+  fitVerifyResult,
+  VERIFY_BUDGET_BYTES,
+  VERIFY_EVIDENCE_MAX,
+} from './verify/checks'
+export type {
+  VerifyCheck,
+  VerifyCheckId,
+  VerifyCheckStatus,
+  VerifyConsoleEvidence,
+  VerifyEvidence,
+  VerifyInput,
+  VerifyNetworkEvidence,
+  VerifyResult,
+} from './verify/checks'
 export { createPreviewFrameBuffer, PreviewFrameBuffer } from './preview/frame-buffer'
 export type { FrameListener, PreviewFrame } from './preview/frame-buffer'
 export { createScreencastSource } from './preview/screencast'
@@ -419,6 +444,8 @@ export interface VibeStudioService {
   readonly artifacts: ArtifactStore
   /** Credential seam for API environments (T036); never returns secret values. */
   readonly apiSecrets: ApiSecretStore
+  /** Basic page verification over the live preview (T055). */
+  readonly verify: VerifyService
 }
 
 /** Minimal Cordis surface used at this stage. */
@@ -480,6 +507,9 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
 
   // T020 preview: unary lifecycle methods plus the stream/pull frame routes.
   const preview = createPreviewService({ targets })
+  // T055: verification reads the same live preview (session + bounded buffers).
+  // It has no side effects, so the panel can run it whenever it likes (T056).
+  const verify = createVerifyService({ preview })
   // T052: `vibe_preview screenshot` stores PNG bytes under `.vibe/artifacts` and
   // returns only the artifact id, so the model never receives image data. The
   // preset reads this store through the `vibeStudio` service.
@@ -497,6 +527,13 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
     void setupPreview()
   }
   registerPreviewRoutes(ctx, preview)
+  // T056: the panel runs the four basic checks through one read-only method.
+  const setupVerify = () => registerVerifyMethods(registry, verify)
+  if (typeof ctx.effect === 'function') {
+    ctx.effect(setupVerify, 'vibe-studio: verify methods')
+  } else {
+    setupVerify()
+  }
 
   // T050: `/vibe` reads the same host-owned state as `vibe_status` and answers
   // with one next step; it never starts, stops or navigates a preview. The
@@ -557,5 +594,6 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
     annotationHistory,
     artifacts,
     apiSecrets,
+    verify,
   } satisfies VibeStudioService)
 }

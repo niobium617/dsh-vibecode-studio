@@ -47,6 +47,17 @@ describe('PreviewTabs (U01)', () => {
     expect(onToggle).toHaveBeenCalledWith('console')
   })
 
+  it('adds the verification tab only when the page provides it (T056)', () => {
+    expect(screen.queryByRole('tab', { name: 'Verification' })).toBeNull()
+
+    cleanup()
+    const { onToggle } = renderTabs({ verify: { available: true } })
+    const tab = screen.getByRole('tab', { name: 'Verification' })
+    expect(tab).toHaveProperty('disabled', false)
+    fireEvent.click(tab)
+    expect(onToggle).toHaveBeenCalledWith('verify')
+  })
+
   it('disables a tab until the session is ready and the target supports it', () => {
     renderTabs({ ready: false })
     expect(screen.getByRole('tab', { name: 'Console (3)' })).toHaveProperty('disabled', true)

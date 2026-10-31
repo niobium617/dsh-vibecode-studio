@@ -18,6 +18,14 @@ export default defineConfig({
   outputDir: '.tmp/playwright-results',
   timeout: 30_000,
   expect: { timeout: 5_000 },
+  /**
+   * The studio main-chain spec boots a real DSH carrier, so it gets its own
+   * project and a longer budget; it skips itself when `VIBE_DSH_BIN` is unset.
+   */
+  projects: [
+    { name: 'fixture', testMatch: /(fixture|source-adapters)\.spec\.ts/ },
+    { name: 'studio', testMatch: /studio\.spec\.ts/, timeout: 240_000 },
+  ],
   use: {
     baseURL,
     channel: 'msedge',

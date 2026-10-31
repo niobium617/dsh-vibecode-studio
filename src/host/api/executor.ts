@@ -15,7 +15,7 @@ import {
   type HttpResponseBody,
 } from '../../contracts/api'
 import { isStudioError, studioError, type StudioError } from '../../contracts/errors'
-import { redactHeaders } from '../../contracts/redact'
+import { isSensitiveKey, redactHeaders } from '../../contracts/redact'
 import { isBlockedHost, normalizeHttpRequest, type NormalizedHttpRequest } from './request'
 
 export interface HttpExecutorOptions {
@@ -85,6 +85,25 @@ function withoutBodyHeaders(headers: Readonly<Record<string, string>>): Record<s
     if (/^content-(?:type|length|encoding)$/i.test(name) || /^transfer-encoding$/i.test(name)) {
       continue
     }
+    result[name] = value
+  }
+  return result
+}
+
+/**
+ * T059: a redirect is decided by the target server, so credentials must not
+ * follow it to a different origin — the same rule browsers and curl apply.
+ * The executor follows redirects by hand (`redirect: 'manual'`), which
+ * otherwise forwards them unchecked. The predicate is the redaction one
+ * (`isSensitiveKey`), so a custom `X-Api-Key` or `X-Client-Secret` header is
+ * dropped just like `Authorization`/`Cookie`.
+ */
+function withoutCrossOriginCredentials(
+  headers: Readonly<Record<string, string>>,
+): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const [name, value] of Object.entries(headers)) {
+    if (isSensitiveKey(name)) continue
     result[name] = value
   }
   return result
@@ -284,6 +303,11 @@ export class HttpExecutor {
         method = rewrite.method
         body = null
         headers = withoutBodyHeaders(headers)
+      }
+      // Strip credentials before the next hop, not after: a cross-origin
+      // redirect target must never receive the original Authorization/Cookie.
+      if (new URL(url).origin !== next.origin) {
+        headers = withoutCrossOriginCredentials(headers)
       }
       url = next.toString()
     }

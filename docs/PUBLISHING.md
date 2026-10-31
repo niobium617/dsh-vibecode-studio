@@ -17,13 +17,15 @@ The repository starts private while the implementation is unstable. Before chang
 - [ ] README is accurate about status and installability.
 - [ ] Add the GitHub description, topics, and social preview.
 - [ ] Confirm CI is green on `main`.
-- [ ] Add a short GIF or screenshot of the preview + annotation flow once T003 exists. Use a synthetic demo app, not a private project.
+- [ ] Add a short GIF or screenshot of the preview + annotation flow (the full loop is implemented since M3). Use a synthetic demo app, not a private project.
 - [ ] Check docs links and code fences.
 - [ ] Confirm `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, and `CODE_OF_CONDUCT.md` are present.
 
 ## Verification
 
 - [ ] `pnpm typecheck` passes on a clean install.
+- [ ] `pnpm test` and `pnpm build` pass; `npm pack --dry-run` shows the expected 11 files and no `node_modules`/`.tmp`/source leakage.
+- [ ] `pnpm test:security`, `pnpm test:soak` (30 min), and `pnpm test:e2e` (with `VIBE_DSH_BIN` for the studio project) pass on the release commit.
 - [ ] `pnpm spike:s1` passes both modes (local loopback: fps ≥ 10, zero errors/invalid frames). This benchmark does not exercise the client's document-relative `appRoute()` or the Desktop `dsh-app://` fetch bridge; repeat the Web/Desktop carrier acceptance in `spikes/s1/REPORT.md` §5–6, whose setup is environment-specific.
 - [ ] `spikes/s1/soak.mjs` completes a 600 s stream run on Web and isolated Desktop with `packageChanged: false`, zero reconnects, and < 50 MB memory growth.
 - [ ] `pnpm spike:s2:build` passes; manually repeat the text/no-auto-send/clipboard/session checks in `spikes/s2/run.md` on Web and isolated Desktop. Direct `createDrafts` attachment behavior is experimental and must not be presented as a public product path.

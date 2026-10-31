@@ -15,6 +15,9 @@ export default defineConfig({
             'tests/smoke.test.ts',
             'tests/unit/**/*.test.ts',
             'tests/integration/**/*.test.ts',
+            // T059: the security suite runs with the default Node environment;
+            // the DOM boundary file opts into jsdom with a per-file pragma.
+            'tests/security/**/*.test.ts',
           ],
           environment: 'node',
         },

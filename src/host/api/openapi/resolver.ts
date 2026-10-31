@@ -26,6 +26,7 @@ import {
   type OpenApiExternalRef,
   type ParsedOpenApi,
 } from './parser'
+import { isBlockedHost } from '../request'
 
 export const OPENAPI_MAX_REMOTE_DOCUMENTS = 10
 export const OPENAPI_MAX_REMOTE_BYTES = 1024 * 1024
@@ -49,12 +50,6 @@ export interface ResolvedRemotePolicy {
   readonly requestTimeoutMs: number
 }
 
-const METADATA_HOSTNAMES: ReadonlySet<string> = new Set([
-  'metadata',
-  'metadata.google.internal',
-  'metadata.goog',
-])
-
 function normalizedHost(hostname: string): string {
   return hostname.trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '')
 }
@@ -66,13 +61,13 @@ export function isLoopbackHost(hostname: string): boolean {
   return host.split('.').every((part, index) => index === 0 || Number(part) <= 255)
 }
 
+/**
+ * T059: one metadata/link-local predicate for both the API executor and remote
+ * `$ref` fetches, so a trailing-dot FQDN or an IPv4-mapped IPv6 address cannot
+ * pass one gate and fail the other.
+ */
 function isMetadataHost(hostname: string): boolean {
-  const host = normalizedHost(hostname)
-  if (METADATA_HOSTNAMES.has(host)) return true
-  if (/^169\.254\.\d{1,3}\.\d{1,3}$/.test(host)) return true
-  // Alibaba Cloud and AWS IMDS IPv6 endpoints.
-  if (host === '100.100.100.200' || host === 'fd00:ec2::254') return true
-  return host.startsWith('fe80:')
+  return isBlockedHost(hostname)
 }
 
 /** Validates and freezes the policy once, before a document is scanned. */
@@ -119,9 +114,10 @@ export function resolveRemotePolicy(
 }
 
 /**
- * The single gate for every remote document. Intentionally stricter than the
- * executor's host check: loopback needs an explicit switch and any other host
- * must be listed by origin.
+ * The single gate for every remote document. Metadata/link-local blocking is
+ * shared with the executor (`isBlockedHost`); this gate is stricter about
+ * everything else: loopback needs an explicit switch and any other host must
+ * be listed by origin.
  */
 export function assertRemoteAllowed(
   url: URL,

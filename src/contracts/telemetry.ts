@@ -60,6 +60,17 @@ export interface NetworkEntry {
   readonly requestBodyUnavailable?: boolean
 }
 
+/**
+ * A failed request: either the transport reported an error or the page got a
+ * 4xx/5xx response. `aborted` is not a failure — a navigation or a stop
+ * cancels requests on purpose. Shared by the tools and the verifier so both
+ * report the same count.
+ */
+export function isNetworkFailure(entry: NetworkEntry): boolean {
+  if (entry.outcome === 'error') return true
+  return entry.status !== null && entry.status >= 400
+}
+
 /** Render a one-line console summary; URLs are redacted before truncation. */
 export function renderConsoleEntry(
   entry: ConsoleEntry,
