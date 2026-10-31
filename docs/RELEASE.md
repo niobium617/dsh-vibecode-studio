@@ -66,7 +66,7 @@ npm pack              # 产出 dsh-vibecode-studio-0.1.0.tgz
 
 ```bash
 dsh plugin --profile vibe-dev remove dsh-vibecode-studio
-dsh plugin --profile vibe-dev add file:F:/Project/DSH_vibecode_studio/.tmp/pack/dsh-vibecode-studio-0.1.0.tgz
+dsh plugin --profile vibe-dev add file:<repo>/.tmp/pack/dsh-vibecode-studio-0.1.0.tgz
 dsh --profile vibe-dev --dump-config
 ```
 

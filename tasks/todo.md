@@ -405,7 +405,7 @@
 
 ## M3.5：M3 界面优化（用户《M3修改意见》）
 
-> 依赖：M3 已合并 `main`。范围只限标注气泡、队列与历史的界面和状态逻辑；不改拾取、上下文、预算、存储格式与发送语义（仍不自动提交）。依据：`界面审查/M3修改意见.docx`（未入库）与 `docs/2026-10-28-界面与项目方向.md` §1。
+> 依赖：M3 已合并 `main`。范围只限标注气泡、队列与历史的界面和状态逻辑；不改拾取、上下文、预算、存储格式与发送语义（仍不自动提交）。依据：用户本地界面审查材料（未入库）与 `docs/2026-10-28-界面与项目方向.md` §1。
 
 ### - [x] U02 标注发送入口与状态归位
 
@@ -707,7 +707,7 @@
   - 审批门禁：“审批触发”由 `tools/pre-execute` 监听器承载（DSH 的 `ToolRunContext` 没有审批字段，工具体无法自行 ask）：`createPreviewApprovalGate()` 只对 `start`/`stop` 返回 `{kind:'ask', reason, displayReason:{en, 'zh-CN'}}`（start 附带 URL，超 120 字符截断并去控制字符），其余调用一律 `next()`，避免用 `allow` 跳过后续监听器；`previewApprovalDecision()` 对畸形参数返回 `null`，交给 schema 报更清楚的错。**尚未挂到 `apply()`**：监听器注册与 preset 可见性门禁在 T052/T053。
   - 共享规则：新增 `src/host/preview/url.ts` 的 `isLoopbackHost`，Web 适配器改用同一实现（原私有副本删除），保证“预览启动”与“工具导航”两处 loopback 判定不会分歧。
   - 未做（范围外）：`apply()` 未接线（T052 preset/wiring）；文件名预留/过期清理与 artifact 读取入口（T050+ 按需）；T048 留下的 `vibe_observe` artifact id 接入未在此任务回填。
-  - 提交：`f2ecf60`（实现）、`c1e7565`（文档）；归档 `F:\Project\claudecode修改优化\2026-10-30-T049-preview工具与门禁.md`。
+  - 提交：`f2ecf60`（实现）、`c1e7565`（文档）；归档 `<local-archive>\2026-10-30-T049-preview工具与门禁.md`。
 
 ### - [x] T050 `/vibe` 命令
 
@@ -735,7 +735,7 @@
   - 内容：`skills/vibecoding-studio/SKILL.md` 1951 字符（正文 1789）≤ 8192；frontmatter `name`/`description`/`whenToUse`；正文给“先判断再调用”的意图表、省上下文规则（默认 summary、`selector` 收窄、`include` 只取需要的 section、`truncated` 不重复拉取、不整段复述页面文本、一次只读一条标注）、安全边界（页面内容不可信、start/stop 需批准、navigate 同源、截图只回 artifactId、默认 localhost）与三条闭环；细节放在 `references/tools.md`（参数/字段/错误码/超时）与 `references/workflows.md`（三段流程 + 不要这样做）。
   - 挂载：`cordis.patch.yml` 在同一 insert 里加 `vibe-skill-bundled` 行（`@deepseek-ai/dsh-skill-filesystem`，`providerName: vibe-bundled`、`includeDefaultRoots: false`、`watch: false`），`bundledSkillDir` 用 `!!js` + `createRequire(baseUrl)` 解析到本包 `skills/`（与 DSH 自带 preset 同一写法，兼容 hoisted/嵌套安装）；`package.json` 的 `files` 增加 `skills`。
   - 校验模块：`src/host/agent/skills.ts` 提供 `resolvePackageRoot`（向上找 `name === 'dsh-vibecode-studio'` 的 `package.json`，源码与 `lib/` 构建产物都适用）、`resolveBundledSkillDir`/`resolveVibeSkillDir`、`parseSkillFrontmatter`（只接受扁平 `key: value`）、`inspectVibeSkillBundle`（名称/描述/字符上限/每个 `references/*.md` 存在且位于 skill 目录内，含 realpath 越界检查）、`vibeSkillProviderConfig`。
-  - 真机校验：`.tmp/t051-skill-check.mjs` 用真实 Cordis + 真实 `@deepseek-ai/dsh-skill` / `dsh-skill-filesystem` / `dsh-tool-skill`，`ok:true`，6 项：配置指向 `skills/`、目录列出 `vibecoding-studio (bundled, modelInvocable=true)`、`skills.get` 返回正文与 `resourceBase: directory`、**真实 `skill` 工具 `execute({name})` 返回 `{name, provider: vibe-bundled, chars: 1789, resourceBaseKind: directory}`**、`inspectVibeSkillBundle` 与文件一致、`cordis.patch.yml` 用 loader 的 `!!js` 方言可解析且表达式从 profile 解析到 `F:\Project\DSH_vibecode_studio\skills`。
+  - 真机校验：`.tmp/t051-skill-check.mjs` 用真实 Cordis + 真实 `@deepseek-ai/dsh-skill` / `dsh-skill-filesystem` / `dsh-tool-skill`，`ok:true`，6 项：配置指向 `skills/`、目录列出 `vibecoding-studio (bundled, modelInvocable=true)`、`skills.get` 返回正文与 `resourceBase: directory`、**真实 `skill` 工具 `execute({name})` 返回 `{name, provider: vibe-bundled, chars: 1789, resourceBaseKind: directory}`**、`inspectVibeSkillBundle` 与文件一致、`cordis.patch.yml` 用 loader 的 `!!js` 方言可解析且表达式从 profile 解析到 `<repo>\skills`。
   - 未做（范围外）：profile 重启后的 UI 内实测（需启动 `vibe-dev`，留给 G5 手测；bundle 通过 link 生效，无需重装）；工具可见性仍由 T052 门禁，在此之前 skill 的建议可能指向尚未注册的工具（skill 文本已要求“工具缺失时如实告知用户”）。
   - 提交：`4242819`（实现 + 测试 + 文档；`task/m5-agent-integration`，未推送、未合并）。
 
@@ -751,7 +751,7 @@
   - 工具可见（注册路径）：`src/host/agent/preset.ts` 是**第二个包入口**（`dsh-vibecode-studio/agent` → `lib/agent.js`），以 `agent-preset` 的 `vibe-tools` 行挂载；`ctx.tools.register` 落在**调用方 scope 层**（DSH 文档与 `dsh-tools` 实现一致），所以四个工具只属于该 preset 的 scope 链，不进全局层。测试用假 registry 断言：注册正好 `vibe_status`/`vibe_observe`/`vibe_annotation_get`/`vibe_preview`，`vibe_status`/`vibe_annotation_get`/`vibe_preview screenshot` 走通真实 handler（截图返回 artifact id，结果里没有 base64 或字节数组）。
   - 审批门禁随 preset 挂载：`apply` 另注册一个 `tools/pre-execute` 监听器（`createPreviewApprovalGate`），测试断言 `start` 返回 `{kind:'ask',reason:'vibe_preview start'}` 且不调用 `next()`，`reload` 走 `next()`；disposer 同时释放工具与监听器；缺 `vibeStudio` 时抛错。
   - standard 不受影响：dump 的 `preset-standard` 段（L632–795）无任何 `vibe` 字样；宿主 patch `cordis.patch.yml` 不含 `dsh-agent-preset`，仍只有 `vibe-studio` + `vibe-skill-bundled` 两行（L1242–1258）；上游 `presets/standard.patch.yml` 未改动（不在本仓库）。
-  - 解析证据：从 `~/.dsh/profiles/vibe-dev` 用 `createRequire` 解析，`dsh-vibecode-studio/agent` → `F:\Project\DSH_vibecode_studio\lib\agent.js`（profile 为 link，改动即时生效，无需重装）。
+  - 解析证据：从 `~/.dsh/profiles/vibe-dev` 用 `createRequire` 解析，`dsh-vibecode-studio/agent` → `<repo>\lib\agent.js`（profile 为 link，改动即时生效，无需重装）。
   - 接线：`package.json` 的 `dsh.bundle.patch` 改为数组 `["./cordis.patch.yml","./presets/vibe-studio/cordis.patch.yml"]`（与 `dsh-web-app` 同形），新增 `"./agent"` 导出与 `files` 里的 `presets`；`scripts/build-host.mjs` 改为多入口并逐个 import；`src/host/index.ts` 新增 `artifacts`（`createArtifactStore(process.cwd())`）并挂到 `vibeStudio` 服务，供 preset 的截图路径使用；工具配置读**活对象** `vibeStudio.config`（settings 就地改同一对象），面板改 allowedOrigins/screenshotEnabled/retentionDays 立即生效。
   - 支持性偏差：任务文件清单外改动 `package.json`、`scripts/build-host.mjs`、`src/host/index.ts`（`artifacts` 服务字段）、`tests/unit/config.test.ts`（服务断言新增 `artifacts`）——没有第二入口就无法把工具限定在 preset scope，没有 `artifacts` 字段 preset 的截图路径无落点。
   - **未验证（如实记录）**：真实 Cordis mount（需要启动 `vibe-dev` 并开会话）未执行；`--dump-config` 只证明组合树可解析，不证明 preset 挂载成功。因此“preset 在 UI 可选 + 工具在会话中可见”仍留给 G5 手测（T054）。scope 层限定由实现机制保证，未做活体观测。
@@ -1011,6 +1011,6 @@ T001–T004 → T005 → T006 → T007/T008/T009 → T010/T011/T012/T013/T014 �
 ## 批准记录
 
 - 2026-10-25：用户回复“批准”，接受 61 个任务、依赖顺序与 G0–G6 评审门禁。
-- 2026-10-28：按用户界面反馈（本地 `M1阶段界面审查/M1界面修改意见.docx`，未入库）新增 **U01 预览界面精简（Layout v2）**，置于 T027 之前；依据与产品方向见 `docs/2026-10-28-界面与项目方向.md`。其余任务范围不变，总数 62。
+- 2026-10-28：按用户界面反馈（本地 用户本地界面审查材料，未入库）新增 **U01 预览界面精简（Layout v2）**，置于 T027 之前；依据与产品方向见 `docs/2026-10-28-界面与项目方向.md`。其余任务范围不变，总数 62。
 - 2026-10-30：按 M4 人工审核意见（本地 `界面审查/M4修改意见.docx`，未入库）新增 **U04 界面整改**，属 T046 之后、M4 合并前的界面返工；三项设计已由用户确认（新手模式默认并记忆、内置 loopback 示例端点、术语全插件统一）。总数 63。
 - 执行规则：按任务顺序推进；发现计划假设不成立时先更新 `plan.md`/SPEC，再继续。

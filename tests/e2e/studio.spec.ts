@@ -5,7 +5,7 @@
 //
 // Requires a DSH install that links this package into `vibe-dev` and a fresh
 // `pnpm build` (DSH loads `lib/client.js`). Set `VIBE_DSH_BIN` to the launcher,
-// e.g. `F:/Deepseek-Harness/DH/bin/dsh.cmd`; without it the spec is skipped so
+// e.g. `<DSH_BIN>`; without it the spec is skipped so
 // `pnpm test:e2e` stays green on machines with no DSH.
 import { expect, test, type Page } from '@playwright/test'
 import { resolveDshBin, startDsh, type DshCarrier } from './dsh-carrier'
