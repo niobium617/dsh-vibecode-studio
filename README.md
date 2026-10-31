@@ -2,9 +2,9 @@
 
 > A visual feedback loop for **DeepSeek Harness**: preview your local web app inside DSH, point at what is wrong, and hand structured notes to the coding agent — no screenshot ping-pong.
 
-**Status: pre-alpha, unpublished.** M0–M6 are complete and the G0–G6 gates passed: embedded preview, inspect/annotation, the API workbench, agent tools (`vibe_status`/`vibe_observe`/`vibe_annotation_get`/`vibe_preview`), the `Vibe Studio` preset, `/vibe`, the bundled skill, and the M6 verification/hardening work (verification service and panel, real-DSH E2E, soak run, security hardening, packaging/docs). G6 passed 8/8 against SPEC §2.3. M6 lives on `task/m6-verify-hardening` and is awaiting approval to merge and publish. The package is deliberately still `private` — see [RELEASE.md](docs/RELEASE.md) for the publish checklist. See the [G0 review](spikes/G0.md) for the go/no-go and fallback decisions.
+**Status: pre-alpha, unpublished.** M0–M6 are complete and the G0–G6 gates passed: embedded preview, inspect/annotation, the API workbench, agent tools (`vibe_status`/`vibe_observe`/`vibe_annotation_get`/`vibe_preview`), the `Vibe Studio` preset, `/vibe`, the bundled skill, and the M6 verification/hardening work (verification service and panel, real-DSH E2E, soak run, security hardening, packaging/docs). G6 passed 8/8 against SPEC §2.3. M6 is merged into `main` (merge commit `f59ae06`). The package is deliberately still `private` and unpublished — see [RELEASE.md](docs/RELEASE.md) for the publish checklist. See the [G0 review](spikes/G0.md) for the go/no-go and fallback decisions.
 
-[中文简介](#中文简介) · [Install & usage](docs/USER-GUIDE.md) · [Release](docs/RELEASE.md) · [Security](docs/SECURITY.md) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md) · [Dev log](docs/DEVLOG.md) · [M2 手册](docs/2026-10-28-手动测试手册.md) · [M3 手册](docs/2026-10-29-M3手动测试手册.md) · [M4 手册](docs/2026-10-30-M4手动测试手册.md) · [M5 手册](docs/2026-10-31-M5手动测试手册.md) · [M6 手册](docs/2026-10-31-M6手动测试手册.md) · [界面与项目方向](docs/2026-10-28-界面与项目方向.md) · [后续方向](docs/2026-10-31-后续开发方向.md) · [验证接口对接](docs/2026-10-31-验证接口对接说明.md)
+[中文简介](#中文简介) · [Install & usage](docs/USER-GUIDE.md) · [Release](docs/RELEASE.md) · [Security policy](SECURITY.md) · [Security audit](docs/SECURITY.md) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md) · [Dev log](docs/DEVLOG.md) · [M2 手册](docs/2026-10-28-手动测试手册.md) · [M3 手册](docs/2026-10-29-M3手动测试手册.md) · [M4 手册](docs/2026-10-30-M4手动测试手册.md) · [M5 手册](docs/2026-10-31-M5手动测试手册.md) · [M6 手册](docs/2026-10-31-M6手动测试手册.md) · [界面与项目方向](docs/2026-10-28-界面与项目方向.md) · [后续方向](docs/2026-10-31-后续开发方向.md) · [验证接口对接](docs/2026-10-31-验证接口对接说明.md)
 
 ## 中文简介
 
@@ -28,7 +28,7 @@ Vibe coding 的关键是让 Agent “看见”结果。截图会丢失元素身�
 - **M3 完成并通过 G3**：元素拾取与选择器、元素上下文、React/Vue/Svelte 源码适配、标注气泡与队列、保存通知、composer 草稿交接、标注历史均已完成；G3 四项验收通过（50/50 源码命中、标注 ≤ 4 KB、3 动作进 composer、不自动发送）。手动复测步骤见 [M3 手动测试手册](docs/2026-10-29-M3手动测试手册.md)。
 - **M4 完成并通过 G4**：HTTP 发送（取消/超时/重定向/大响应）、请求构建（query/headers/body/auth）、响应查看（JSON 树/HTML/图片/二进制/分页）、环境与密钥引用、集合与历史、cURL 导入导出、OpenAPI 导入、内置断言、预览抓包回放均已完成；FR-API-01–10、12 通过，FR-API-11（Cookie jar）按 D8 延后。界面按 M4 人工审核意见整改（U04）：首屏只留“方法 + URL + 发送”与响应区，其余收进「更多配置」与“更多工具”抽屉，新增新手/专业模式（默认新手并记忆）与内置 loopback 示例请求，术语改为 URL 参数/身份验证/结果校验/收藏。手动复测步骤见 [M4 手动测试手册](docs/2026-10-30-M4手动测试手册.md)，配套本地目标服务 `tools/m4-manual-server.mjs`。
 - **M5 完成并通过 G5**：Agent 侧能力就绪——四个工具（`vibe_status` / `vibe_observe` / `vibe_annotation_get` / `vibe_preview`）、`Vibe Studio` preset、斜杠命令 `/vibe`、内置技能 `vibecoding-studio`；工具 schema 经 DSH 校验，越权动作（非 loopback、跨源、关闭截图后的 screenshot）在审批前即拒绝。手动复测步骤见 [M5 手动测试手册](docs/2026-10-31-M5手动测试手册.md)。
-- **M6 完成并通过 G6**（`task/m6-verify-hardening`，等待批准合并）：验证服务与验证面板、真实 DSH 的 E2E 主链路、30 分钟 / 100 次标注的 soak、安全加固（`pnpm test:security`，见 [SECURITY.md](docs/SECURITY.md)）、打包与文档（[USER-GUIDE.md](docs/USER-GUIDE.md)、[RELEASE.md](docs/RELEASE.md)）。G6 对照 SPEC §2.3 的 8 条逐项达标（GO）；干净 `vibe-dev` 安装已验证：tarball 225.7 kB / 11 个文件，`--dump-config` 组合树含插件行，`/api/vibe/health` 正常，Studio E2E 通过；隔离 Desktop 载体验证 5 个页签与验证抽屉可用，真实 `desktop` profile 未被修改。手测步骤见 [M6 手动测试手册](docs/2026-10-31-M6手动测试手册.md)；M6 之后的选题建议见 [后续开发方向](docs/2026-10-31-后续开发方向.md)。
+- **M6 完成并通过 G6，已合并入 `main`**（合并提交 `f59ae06`）：验证服务与验证面板、真实 DSH 的 E2E 主链路、30 分钟 / 100 次标注的 soak、安全加固（`pnpm test:security`，见 [安全审计](docs/SECURITY.md)）、打包与文档（[USER-GUIDE.md](docs/USER-GUIDE.md)、[RELEASE.md](docs/RELEASE.md)）。G6 对照 SPEC §2.3 的 8 条逐项达标（GO）；干净 `vibe-dev` 安装已验证：tarball 227.1 kB / 11 个文件，`--dump-config` 组合树含插件行，`/api/vibe/health` 正常，Studio E2E 通过；隔离 Desktop 载体验证 5 个页签与验证抽屉可用，真实 `desktop` profile 未被修改。手测步骤见 [M6 手动测试手册](docs/2026-10-31-M6手动测试手册.md)；M6 之后的选题建议见 [后续开发方向](docs/2026-10-31-后续开发方向.md)。
 - **尚未发布**：包保持 `"private": true`；发布需要用户明确批准，步骤与回滚见 [RELEASE.md](docs/RELEASE.md)。`spikes/` 保留为 spike 证据。
 
 ### MVP 能力（M0–M6 已完成）
@@ -146,6 +146,10 @@ See [docs/SPEC-vibecoding-studio.md](docs/SPEC-vibecoding-studio.md) for the ful
 ## Contributing
 
 Early-stage contributions are welcome, especially protocol and transport reviews. Read [CONTRIBUTING.md](CONTRIBUTING.md) first. Security reports should follow [SECURITY.md](SECURITY.md).
+
+## Disclaimer
+
+This is an independent open-source project. It is not affiliated with, endorsed by, or sponsored by DeepSeek. “DeepSeek” and “DeepSeek Harness” are used only to describe the host the plugin runs on.
 
 ## License
 
