@@ -895,6 +895,14 @@
 - 已知限制（非缺陷，保留在手册里）：`bash`/`pwsh` 改文件不标 stale；带端口的 loopback origin 需显式加入 `allowedOrigins`；页面自身跨源重定向不回写同源判断。
 - 提交：证据与手册 `6e17399`；收尾文档 `fd6cebe`。M5 已推送并以 `--no-ff` 合并入 `main`（合并提交 `03e1e07`，2026-10-31，用户批准）。归档 `F:\Project\claudecode修改优化\2026-10-31-T054-G5评审.md`。
 
+### T055 — 验证服务（基础检查）（2026-10-31，`task/m6-verify-hardening`）
+
+- 目标：给出“目标在线 / 页面可加载 / 无 console error / 无失败请求”四项基础检查与稳定的结果 schema，结果 ≤ 4 KB。
+- 实现：`src/host/verify/checks.ts` 纯评估 + `fitVerifyResult`（按 UTF-8 字节丢弃尾部证据 → 收紧消息 → 清空消息，保证仍是合法 JSON 且 ≤ 4096 B）；`src/host/verify/service.ts` 只读编排（`ready` 时才读 `domSnapshot({maxBytes:512})` / `consoleList({limit:500})` / `networkList({limit:300})`，任一路失败只降级自己那项，`run()` 不抛异常）；证据行带 `console-N`/`network-N` id 供 T056 跳抽屉。`isNetworkFailure` 上移到 `src/contracts/telemetry.ts`，`preview-data.ts` 改为再导出，避免 `vibe_status`/`vibe_observe` 与验证服务对“失败请求”定义分叉。
+- 结果：`pnpm exec vitest run tests/integration/verify` **2 文件 / 18 用例通过**；`pnpm typecheck` 0；`pnpm test` **117 文件 / 1093 用例通过**；`pnpm build` host 438.8 + agent 59.1 / client 441.3 KiB；`pnpm test:e2e` 9/9。默认结果 620 B；最坏样本（30 条超长 console error + 30 个 500）仍 ≤ 4 KB、`truncated: true`、`JSON.parse` 往返一致。
+- 取舍：采集不可用（`unsupported` 等）记为 `skipped` 且计数为 `null`，不谎报通过；`ok` 要求四项全部 `pass`，因此 `skipped` 也是 `ok: false`。检查基于有界缓冲区全量（不只本次运行后新增），需要“干净一次”时先 reload/清空。
+- 提交：见本任务收尾提交（`task/m6-verify-hardening`，未推送、未合并）。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -1131,6 +1139,7 @@ pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 - 工具实现（状态/观察/标注）：`src/host/agent/tools/{status,observe,annotation,preview-data}.ts`、`src/host/preview/dom.ts`（`PreviewService.domSnapshot`）、`tests/integration/tools/`。
 - 预览工具与门禁：`src/host/agent/tools/preview.ts`（`createPreviewHandler`/`previewApprovalDecision`/`createPreviewApprovalGate`）、`src/host/artifacts/store.ts`、`src/host/preview/url.ts`、`tests/integration/preview-tool/`、`tests/unit/artifacts/`。
 - Vibe Studio preset：`presets/vibe-studio/cordis.patch.yml`（preset 行与工具集）、`src/host/agent/preset.ts`（agent 入口，`lib/agent.js`）、`tests/integration/preset/vibe-preset.test.ts`、`package.json`（`exports['./agent']` 与 `dsh.bundle.patch` 数组）、`scripts/build-host.mjs`（多入口）、组合证据 `.tmp/logs/dump-vibe-dev-t052.txt`（L1260 preset 行、L1391 `vibe-tools`）。
+- 验证服务：`src/host/verify/{service,checks}.ts`、`src/contracts/telemetry.ts`（`isNetworkFailure`）、`tests/integration/verify/`。
 - Web 预览：`src/host/targets/web/{adapter,launch}.ts`、`tests/integration/web-adapter/`、`tests/helpers/png.ts`。
 - 预览生命周期：`src/host/preview/session.ts`、`src/client/preview/{Toolbar.tsx,lifecycle.ts,local-url.ts}`、`tests/integration/preview/session-lifecycle.test.ts`、`.tmp/logs/t025-{host,desktop}.json`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。

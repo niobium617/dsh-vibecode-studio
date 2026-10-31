@@ -801,12 +801,20 @@
 
 > 依赖：M2–M5。T055 先做；T056 依赖 T055；T057 依赖 M3/M5；T058/T059 依赖功能完成；T060 最后；T061 汇总。
 
-### - [ ] T055 验证服务（基础检查）
+### - [x] T055 验证服务（基础检查）
 
 - **目标**：目标在线、页面可加载、无 console error、无失败请求；结果 schema。
 - **验收**：fixture 故意报错/500 能捕获；结果 ≤ 4 KB；单测通过。
-- **验证**：`pnpm test -- tests/integration/verify`。
+- **验证**：`pnpm test -- tests/integration/verify`（`-- <path>` 不过滤，实际用 `pnpm exec vitest run tests/integration/verify`）。
 - **文件**：`src/host/verify/{service,checks}.ts`、tests。
+- **实现（2026-10-31，`task/m6-verify-hardening`）**：
+  - `checks.ts`：纯函数 `evaluateVerify`，四项检查 `target|page|console|network`，状态 `pass|fail|skipped`；结果 schema `{ ok, ranAt, durationMs, url, checks, consoleErrors, failedRequests, truncated }`；证据行带 `console-N`/`network-N` id（供 T056 跳抽屉）；每项最多 5 条、文本 200 字/URL 200 字、消息 240 字。
+  - `fitVerifyResult`：按 `utf8Bytes(JSON.stringify(...))` 逐步丢弃尾部证据 → 收紧消息（120/60/24 字）→ 清空消息，保证仍是合法 JSON 且 ≤ 4 KB。
+  - `service.ts`：`createVerifyService({ preview, now })` 只读判定；仅 `ready` 时读 `domSnapshot({ maxBytes: 512 })`、`consoleList({ limit: 500 })`、`networkList({ limit: 300 })`；任一路失败只降级自己那项，`run()` 不因预览侧错误抛异常。
+  - `src/host/index.ts`：提供 `verify` 到 `vibeStudio`，并在包入口导出服务与类型。
+  - `src/contracts/telemetry.ts`：`isNetworkFailure` 上移到 contracts，`preview-data.ts` 改为再导出，保证 `vibe_status`/`vibe_observe` 与验证服务对“失败请求”定义一致（error 或 ≥400；aborted/pending 不算）。
+- **验证结果**：`pnpm exec vitest run tests/integration/verify` → **2 文件 / 18 用例通过**；`pnpm typecheck` 0；`pnpm test` **117 文件 / 1093 用例通过**；`pnpm build` host 438.8 + agent 59.1 / client 441.3 KiB；`pnpm test:e2e` 9/9。默认结果实测 620 B，最坏情况（30 条超长 console error + 30 个 500）仍 ≤ 4 KB 且 `JSON.parse` 往返一致。
+  - 说明：fixture 的“故意报错/500”目前由集成测试用真实 `PreviewConsoleBuffer` / `PreviewNetworkBuffer` 造样本覆盖（`console-2`、`network-2`、status 500、`net::ERR_FAILED`）；真实浏览器 E2E 归 T057。
 
 ### - [ ] T056 验证面板
 
