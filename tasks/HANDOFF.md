@@ -435,11 +435,11 @@ DSH 的 VibeCoding Studio 插件已完成需求/可行性 SPEC、能力地图、
 
 ```
 读 tasks/HANDOFF.md 的“一句话状态”“下一步”“环境与路径”和“不可违反的约束”，
-任务清单已批准，T001–T046 已完成（G0/G1/G2/G3/G4 通过，M1/M2/M3/M4 完成并合并 main，U01/M3.5/U04 已合并）；M5 的 T047–T052 已完成（未推送）。界面/产品方向已定稿于 docs/2026-10-28-界面与项目方向.md。
+任务清单已批准，T001–T054 已完成（G0/G1/G2/G3/G4/G5 通过，M1/M2/M3/M4/M5 完成并合并 main，U01/M3.5/U04 已合并）。界面/产品方向已定稿于 docs/2026-10-28-界面与项目方向.md。
 M4（T035–T046 + U04）已推送并合并入 `main`（`35962e4`，2026-10-30）；`task/m4-api-workbench` 远端保留，不要再提交。
-M5 分支 task/m5-agent-integration：T047 工具 schema 与注册、T048 status/observe/annotation 实现、T049 preview 工具与门禁、T050 `/vibe` 命令、T051 Bundled skill 已完成（2026-10-30，未推送）。四个工具只使用 DSH 强制 JSON-Schema 子集（DSH 自带校验 16/16）；T048 实现三个只读工具 + `PreviewService.domSnapshot`；T049 实现 `vibe_preview`（reload/navigate/screenshot/start/stop，origin 门禁 loopback → allowedOrigins → 同源）、`PreviewService.captureScreenshot` 与 `.vibe/artifacts` 存储（截图字节不进结果），start/stop 的 ask 由 `tools/pre-execute` 监听器 `createPreviewApprovalGate()` 承载；T050 的 `/vibe` 经 `ctx.get('commands')` 装配；T051 把技能作为文件交付（`skills/vibecoding-studio/`）并由 `cordis.patch.yml` 的 `vibe-skill-bundled` 行挂载（真实 `skill` 工具可加载）；T052 新增第二个包入口 `dsh-vibecode-studio/agent`（`lib/agent.js`）与 `presets/vibe-studio/cordis.patch.yml`，四个工具在 preset mount scope 里注册、审批门禁挂在同一 scope，宿主 `apply()` 仍不注册任何 agent-plane 工具，所以 standard 看不到 `vibe_*`。
-四类基线：`pnpm typecheck` 0；113 文件 / 1048 用例；build host 429.7 + agent 56.7 / client 440.5 KiB；e2e 9/9；`--dump-config` 退出 0。
-下一步：按 tasks/todo.md 开 M5 第七个任务 T053（M5 hooks：stale 预览提示 + 越权护栏；依赖 T020/T030）。不要重读已批准的 SPEC/plan；`pnpm test -- <path>` 不会过滤，聚焦测试用 `pnpm exec vitest run <path>`。
+M5（T047–T054）已完成并通过 G5：四个 vibe 工具（DSH schema 子集 16/16）、`PreviewService.domSnapshot`、`vibe_preview` 五动作 + origin 门禁（loopback → allowedOrigins → 同源）、`/vibe` 命令、内置技能 `vibecoding-studio`、`Vibe Studio` preset（第二包入口 `lib/agent.js`，工具与审批门禁都在 preset mount scope，standard 看不到 `vibe_*`）、M5 hooks（`write`/`edit` 后标记 stale、越权在 `tools/pre-execute` 先于审批 deny）。T054 G5 **GO**（自动化证据 + 用户手测“没有问题”），已推送并以 `--no-ff` 合并入 `main`（合并提交 `03e1e07`，2026-10-31，用户批准）；`task/m5-agent-integration` 远端保留，不要再提交。
+四类基线（合并前回归）：`pnpm typecheck` 0；`pnpm test` 115 文件 / 1075 用例；build host 430.6 + agent 59.1 / client 441.3 KiB；e2e 9/9。
+下一步：从 `main` 新建 M6 分支（建议 `task/m6-verify-hardening`），执行 tasks/todo.md 的 **T055 验证服务（基础检查）**：`src/host/verify/{service,checks}.ts` + tests，验收为目标在线、页面可加载、无 console error、无失败请求，fixture 故意报错/500 能捕获、结果 ≤ 4 KB、单测通过。不要重读已批准的 SPEC/plan；`pnpm test -- <path>` 不会过滤，聚焦测试用 `pnpm exec vitest run <path>`。
 ```
 
 ---
