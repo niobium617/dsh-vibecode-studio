@@ -173,7 +173,12 @@ export function normalizeDomSnippet(value: unknown): string {
 /** Caps page-provided text at 200 code points, suffix included. */
 export function normalizeElementText(value: unknown): string {
   if (typeof value !== 'string') return ''
-  const cleaned = value.replace(/\s+/g, ' ').trim()
+  // The picker runs in the page, so a hostile page can answer with anything.
+  // Drop C0/C1 noise before collapsing whitespace, exactly like the snippet.
+  const cleaned = value
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
   const chars = Array.from(cleaned)
   if (chars.length <= ELEMENT_TEXT_CHARS) return cleaned
   return `${chars.slice(0, ELEMENT_TEXT_CHARS - 1).join('')}…`

@@ -77,6 +77,33 @@ const BLOCKED_HOSTNAMES: ReadonlySet<string> = new Set([
   'metadata.goog',
 ])
 
+/** Providers expose IMDS on a fixed non-link-local IPv4 address too. */
+const BLOCKED_IPV4_HOSTS: ReadonlySet<string> = new Set(['100.100.100.200'])
+
+/**
+ * Compare in one canonical form: `new URL()` keeps a trailing dot
+ * (`metadata.google.internal.` is the same FQDN to DNS), and IPv6 arrives in
+ * brackets. Without this, a trailing dot or a mapped IPv6 address walks past
+ * the block list (T059).
+ */
+function normalizeHost(hostname: string): string {
+  return hostname.trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '')
+}
+
+/** Last 32 bits of `::ffff:a9fe:a9fe` / `::a9fe:a9fe`, as a dotted quad. */
+function mappedIpv4(host: string): string | null {
+  const match = /^(?:::ffff:|::)([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(host)
+  if (!match) return null
+  const high = Number.parseInt(match[1], 16)
+  const low = Number.parseInt(match[2], 16)
+  return [high >> 8, high & 0xff, low >> 8, low & 0xff].join('.')
+}
+
+function isBlockedIpv4(host: string): boolean {
+  if (/^169\.254\.\d{1,3}\.\d{1,3}$/.test(host)) return true
+  return BLOCKED_IPV4_HOSTS.has(host)
+}
+
 const encoder = new TextEncoder()
 
 function invalidInput(message: string, field: string): StudioError {
@@ -90,13 +117,20 @@ function hasHeader(headers: Readonly<Record<string, string>>, name: string): boo
 
 /**
  * Rejects link-local addresses and well-known metadata hosts. The executor is
- * an API client by design, so public and local addresses stay allowed.
+ * an API client by design, so public and local addresses stay allowed. Shared
+ * with the OpenAPI remote-`$ref` resolver: a metadata endpoint must stay
+ * blocked even when an origin was explicitly allowed.
  */
 export function isBlockedHost(hostname: string): boolean {
-  const host = hostname.trim().toLowerCase().replace(/^\[|\]$/g, '')
+  const host = normalizeHost(hostname)
   if (host === '') return true
   if (BLOCKED_HOSTNAMES.has(host)) return true
-  return /^169\.254\.\d{1,3}\.\d{1,3}$/.test(host)
+  if (isBlockedIpv4(host)) return true
+  // IPv6 link-local (fe80::/10) and the AWS IMDS IPv6 endpoint.
+  if (/^fe[89ab][0-9a-f]:/.test(host)) return true
+  if (host === 'fd00:ec2::254') return true
+  const mapped = mappedIpv4(host)
+  return mapped !== null && isBlockedIpv4(mapped)
 }
 
 function parseTargetUrl(raw: string): URL {

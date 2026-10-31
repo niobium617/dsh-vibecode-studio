@@ -34,6 +34,36 @@ function maskSensitive(key: string, value: string): string {
   return isSensitiveKey(key) && !isPlaceholderValue(value) ? REDACTED : value
 }
 
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+/**
+ * T059: a token can arrive in the fragment (OAuth implicit flow, hash routers
+ * that mirror the query). Only `key=value` pairs with a sensitive key are
+ * rewritten; everything else keeps its exact encoding, so a route fragment
+ * like `#/settings` is untouched.
+ */
+function redactFragment(hash: string): string {
+  const raw = hash.slice(1)
+  if (raw === '' || !raw.includes('=')) return hash
+  let changed = false
+  const parts = raw.split('&').map((part) => {
+    const separator = part.indexOf('=')
+    if (separator <= 0) return part
+    const key = part.slice(0, separator)
+    const value = part.slice(separator + 1)
+    if (!isSensitiveKey(safeDecode(key)) || isPlaceholderValue(safeDecode(value))) return part
+    changed = true
+    return `${key}=${REDACTED}`
+  })
+  return changed ? `#${parts.join('&')}` : hash
+}
+
 export function isSensitiveKey(key: string): boolean {
   return SENSITIVE_KEY_PATTERN.test(key)
 }
@@ -64,6 +94,7 @@ export function redactUrl(value: string): string {
     params.append(key, maskSensitive(key, entry))
   }
   url.search = params.toString()
+  url.hash = redactFragment(url.hash)
   return restorePlaceholders(url.toString())
 }
 

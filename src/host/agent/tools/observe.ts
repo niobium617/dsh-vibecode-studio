@@ -18,6 +18,7 @@
  */
 import { OBSERVE_BUDGET_BYTES, truncateUtf8, utf8Bytes } from '../../../contracts/budget'
 import { isStudioError, studioError } from '../../../contracts/errors'
+import { redactUrl } from '../../../contracts/redact'
 import type { ConsoleEntry, NetworkEntry } from '../../../contracts/telemetry'
 import { renderConsoleEntry, renderNetworkEntry } from '../../../contracts/telemetry'
 import {
@@ -206,7 +207,10 @@ function buildSummary(
   const parts: string[] = []
   const state = toToolPreviewState(snapshot.status)
   if (state === 'ready') {
-    parts.push(snapshot.url ? `Preview is ready at ${snapshot.url}.` : 'Preview is ready.')
+    // T059: the page URL can carry a token in its query; this string reaches
+    // the model, so it is redacted like every console/network source below.
+    const url = snapshot.url === null ? null : redactUrl(snapshot.url)
+    parts.push(url ? `Preview is ready at ${url}.` : 'Preview is ready.')
   } else if (state === 'failed') {
     parts.push(
       snapshot.lastError
