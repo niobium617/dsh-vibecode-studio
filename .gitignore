@@ -2,6 +2,11 @@
 node_modules/
 .pnpm-store/
 
+# Local secrets and environment overrides
+.env
+.env.*
+!.env.example
+
 # Local scratch space
 .tmp/
 *.log

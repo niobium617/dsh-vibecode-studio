@@ -5,6 +5,27 @@
   "type": "module",
   "description": "DSH Vibecode Studio: in-chat preview, annotation, inspect and API workbench for DeepSeek Harness.",
   "license": "MIT",
+  "author": "DSH Vibecode Studio contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/niobium617/dsh-vibecode-studio.git"
+  },
+  "homepage": "https://github.com/niobium617/dsh-vibecode-studio#readme",
+  "bugs": {
+    "url": "https://github.com/niobium617/dsh-vibecode-studio/issues"
+  },
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "vibe-coding",
+    "preview",
+    "annotation",
+    "inspector",
+    "api-client",
+    "playwright"
+  ],
   "packageManager": "pnpm@11.21.0",
   "main": "./lib/index.js",
   "exports": {
