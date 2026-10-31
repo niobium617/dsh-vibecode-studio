@@ -1030,6 +1030,8 @@
 - 新增：`docs/images/feature-interface-tour.png`，基于真实 `feature-pick-and-annotate.png` 叠加 8 个编号，分别指向 Studio 标签页、五个页签、状态行、地址栏、预览画布、拾取提示/元素卡片、批注气泡、底部抽屉；原图不改。
 - 文档：`docs/USAGE.zh-CN.md` §3 顶部加入导览图与编号说明表；README 首屏主视觉换成同一张导览图（点击进入 §3），原干净点选截图保留在 §1。
 - 验证：导览图 1440×900；编号与说明表一一对应；Markdown 相对链接 0 缺失；`git diff --check` 通过。
+- 显示修复：当前网络无法直连 `raw.githubusercontent.com`，GitHub README 的相对图片会显示空白；README 与 `docs/USAGE.zh-CN.md` 的 9 处图片引用（7 张唯一图）改为 jsDelivr 绝对地址（pin `7a4398d`），由 GitHub camo 代理加载。7 张图经 camo 实测均返回 `200 image/png`，字节数与本地文件一致。
+- 脱敏说明：导览图使用 demo fixture，左下角个人资料替换为「开发者」；README 图注与使用说明文末均标注“真实预览截图，已脱敏”。
 
 ## 3. 踩坑与已验证经验
 

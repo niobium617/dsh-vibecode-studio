@@ -629,4 +629,6 @@ dsh --profile vibe-dev --dump-config
 - 新增 `docs/images/feature-interface-tour.png`：基于真实点选批注截图叠加 8 个编号，标注 Studio 标签页、五个页签、状态行、地址栏、预览画布、拾取提示/元素卡片、批注气泡、底部抽屉。
 - `docs/USAGE.zh-CN.md` §3 顶部加入导览图与编号说明表；README 首屏主视觉换成导览图（点击进入 §3），原图保留在 §1。
 - 验证：导览图 1440×900；相对链接 0 缺失；`git diff --check` 通过。
+- 修复：README/使用说明 9 处图片引用（7 张唯一图）改为 jsDelivr 绝对地址（pin `7a4398d`），绕开当前网络不可达的 `raw.githubusercontent.com`；7 张图经 GitHub camo 实测均 `200 image/png`，字节数与本地一致。
+- 脱敏：导览图使用 demo fixture，左下角个人资料替换为「开发者」；图注/文末标注“真实预览截图，已脱敏”。
 - 待办：提交并推送后等 CI。

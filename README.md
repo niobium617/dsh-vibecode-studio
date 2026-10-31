@@ -8,11 +8,11 @@
 
 <p align="center">
   <a href="docs/USAGE.zh-CN.md#3-功能导览">
-    <img src="docs/images/feature-interface-tour.png" alt="Vibe Studio interface tour: Studio tab, five tabs, status row, address bar, preview canvas, picker banner and element card, annotation bubble, bottom drawers" width="920">
+    <img src="https://cdn.jsdelivr.net/gh/niobium617/dsh-vibecode-studio@7a4398d/docs/images/feature-interface-tour.png" alt="Vibe Studio interface tour: Studio tab, five tabs, status row, address bar, preview canvas, picker banner and element card, annotation bubble, bottom drawers" width="920">
   </a>
 </p>
 
-<p align="center"><em>界面导览（点图看完整说明）：① Studio 标签页 ② 五个页签 ③ 状态行/更多 ④ 地址栏 ⑤ 预览画布 ⑥ 拾取提示/元素卡片 ⑦ 批注气泡 ⑧ 底部抽屉。</em></p>
+<p align="center"><em>界面导览（真实预览截图，已脱敏；点图看完整说明）：① Studio 标签页 ② 五个页签 ③ 状态行/更多 ④ 地址栏 ⑤ 预览画布 ⑥ 拾取提示/元素卡片 ⑦ 批注气泡 ⑧ 底部抽屉。</em></p>
 
 <p align="center"><strong>The killer feature: live preview + click-to-annotate.</strong><br>
 Point at the exact element, describe the change, and send it to the agent as structured context —
@@ -30,7 +30,7 @@ selector, source location, DOM snapshot — not a screenshot.</p>
    `vibe_observe` / `vibe_preview` 读取结构化上下文并修改代码；不会自动发送，也不会自动提交。
 
 <p align="center">
-  <img src="docs/images/feature-send-to-chat.png" alt="Send the annotation to the chat draft; nothing is sent automatically" width="920">
+  <img src="https://cdn.jsdelivr.net/gh/niobium617/dsh-vibecode-studio@7a4398d/docs/images/feature-send-to-chat.png" alt="Send the annotation to the chat draft; nothing is sent automatically" width="920">
 </p>
 
 <p align="center"><em>点「发送到对话」只写入 composer 草稿；改完后状态行提示「文件已改动」，刷新预览继续下一处。</em></p>

@@ -12,7 +12,7 @@
 ## 1. 最大特色：实时预览 + 点选元素，直接让 DSH 改
 
 <p align="center">
-  <img src="./images/feature-pick-and-annotate.png" alt="在 DSH 右栏实时预览本地页面，点选输入框并直接写下修改意见" width="920">
+  <img src="https://cdn.jsdelivr.net/gh/niobium617/dsh-vibecode-studio@7a4398d/docs/images/feature-pick-and-annotate.png" alt="在 DSH 右栏实时预览本地页面，点选输入框并直接写下修改意见" width="920">
 </p>
 
 <p align="center"><em>在 DSH 右栏预览本地应用，点中要改的元素，批注气泡就出现在元素旁边。</em></p>
@@ -28,7 +28,7 @@ Vibe Studio 把**预览本身变成反馈界面**：
    Agent 收到的是结构化上下文，而不是一张不透明的图片。
 
 <p align="center">
-  <img src="./images/feature-send-to-chat.png" alt="批注发送到对话后，只写入 composer 草稿，不会自动发送" width="920">
+  <img src="https://cdn.jsdelivr.net/gh/niobium617/dsh-vibecode-studio@7a4398d/docs/images/feature-send-to-chat.png" alt="批注发送到对话后，只写入 composer 草稿，不会自动发送" width="920">
 </p>
 
 <p align="center"><em>点「发送到对话」只是把结构化文本插入草稿，不会自动发送，也不会自动提交。</em></p>
@@ -63,7 +63,7 @@ source: unavailable
 | `vibe_preview` | reload / navigate / screenshot / start / stop；越权动作直接拒绝 |
 
 <p align="center">
-  <img src="./images/feature-agent-status.png" alt="Agent 在会话中调用 vibe_status 并返回结构化 JSON" width="820">
+  <img src="https://cdn.jsdelivr.net/gh/niobium617/dsh-vibecode-studio@7a4398d/docs/images/feature-agent-status.png" alt="Agent 在会话中调用 vibe_status 并返回结构化 JSON" width="820">
 </p>
 
 <p align="center"><em>Agent 调用 <code>vibe_status</code> 拿到的是宿主计数的结构化 JSON，而不是自然语言猜测。</em></p>
@@ -136,7 +136,7 @@ dsh --profile vibe-dev --no-open --host 127.0.0.1 --port 4317
 `vibe_*` 工具；选择 preset 后，Agent 才能主动读取页面、标注和预览状态。
 
 <p align="center">
-  <img src="./images/setup-preset.png" alt="在会话模式菜单中选择 Vibe Studio preset" width="820">
+  <img src="https://cdn.jsdelivr.net/gh/niobium617/dsh-vibecode-studio@7a4398d/docs/images/setup-preset.png" alt="在会话模式菜单中选择 Vibe Studio preset" width="820">
 </p>
 
 <p align="center"><em>模式菜单中的 Vibe Studio preset；只影响当前会话。</em></p>
@@ -149,10 +149,10 @@ dsh --profile vibe-dev --no-open --host 127.0.0.1 --port 4317
 ## 3. 功能导览
 
 <p align="center">
-  <img src="./images/feature-interface-tour.png" alt="Vibe Studio 界面导览：Studio 标签页、五个页签、状态行、地址栏、预览画布、拾取提示与元素卡片、批注气泡、底部抽屉" width="920">
+  <img src="https://cdn.jsdelivr.net/gh/niobium617/dsh-vibecode-studio@7a4398d/docs/images/feature-interface-tour.png" alt="Vibe Studio 界面导览：Studio 标签页、五个页签、状态行、地址栏、预览画布、拾取提示与元素卡片、批注气泡、底部抽屉" width="920">
 </p>
 
-<p align="center"><em>界面导览：编号对应下方说明（真实预览 + 点选批注状态）。</em></p>
+<p align="center"><em>界面导览：编号对应下方说明（真实预览 + 点选批注状态；截图已脱敏，个人资料替换为「开发者」）。</em></p>
 
 | 编号 | 区域 | 作用 |
 |---|---|---|
@@ -206,7 +206,7 @@ dsh --profile vibe-dev --no-open --host 127.0.0.1 --port 4317
 - 历史里的标注可搜索、重开入队、两步删除；落盘在 `.vibe/annotations/`，单文件、原子写入。
 
 <p align="center">
-  <img src="./images/feature-annotation-history.png" alt="标注历史与进入 composer 的结构化元素上下文" width="920">
+  <img src="https://cdn.jsdelivr.net/gh/niobium617/dsh-vibecode-studio@7a4398d/docs/images/feature-annotation-history.png" alt="标注历史与进入 composer 的结构化元素上下文" width="920">
 </p>
 
 <p align="center"><em>左侧 composer 中是 Agent 收到的结构化元素上下文；右侧是标注历史。</em></p>
@@ -319,7 +319,7 @@ dsh --profile vibe-dev --no-open --host 127.0.0.1 --port 4317   # 终端 2
 | OpenAPI 导入报 `remote_ref_blocked` | 远程 `$ref` 默认拒绝；loopback 需显式许可，且不跟随 302 |
 
 <p align="center">
-  <img src="./images/troubleshoot-preview-failed.png" alt="预览失败时的错误卡片与重启按钮" width="820">
+  <img src="https://cdn.jsdelivr.net/gh/niobium617/dsh-vibecode-studio@7a4398d/docs/images/troubleshoot-preview-failed.png" alt="预览失败时的错误卡片与重启按钮" width="820">
 </p>
 
 <p align="center"><em>失败态会给出可执行的检查项和「重启」按钮，而不是只留一块黑屏。</em></p>
@@ -336,4 +336,4 @@ dsh --profile vibe-dev --no-open --host 127.0.0.1 --port 4317   # 终端 2
 - [2026-10-31-M6手动测试手册.md](./2026-10-31-M6手动测试手册.md)：M6 功能手测步骤
 
 > 本文截图来自本仓库的 demo fixture（`pnpm fixture:dev`）与真实 `vibe-dev` profile；
-> 中文 / 英文界面以实际版本为准。
+> 已移除个人昵称/头像（左下角替换为「开发者」），不包含密钥；中文 / 英文界面以实际版本为准。
