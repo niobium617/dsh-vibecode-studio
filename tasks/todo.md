@@ -833,12 +833,18 @@
 - **验证结果**：`pnpm exec vitest run tests/component/verify tests/component/preview/{preview-tabs,console-drawer,network-drawer}.test.tsx tests/integration/verify` → **7 文件 / 55 用例通过**；`pnpm typecheck` 0；`pnpm test` **119 文件 / 1105 用例通过**（连续两次；其间有一次同样输入下 1 个用例偶发失败，未能复现，日志在 `.tmp/logs/`）；`pnpm build` host 439.3 + agent 59.1 / client 455.5 KiB；`pnpm test:e2e` 9/9。
   - 说明：本机无 DSH 桌面环境，**手动验收未执行**，需在 `vibe-dev` profile 里跑一次：启动 fixture（`pnpm fixture:dev`）→ 打开预览 → 底部 `Verification` → Run checks；再在 fixture 里制造一个 console error 与一个 500，验证证据按钮跳 Console/Network 并高亮。真实浏览器链路由 T057 覆盖。
 
-### - [ ] T057 E2E 主链路
+### - [x] T057 E2E 主链路
 
 - **目标**：DSH + Vite fixture：打开 Studio → 拾取 → 标注 → 放入对话 → 发送 → 预览可见。
 - **验收**：E2E 稳定通过；无 flaky；失败有截图/日志。
 - **验证**：`pnpm test:e2e`。
 - **文件**：`tests/e2e/studio.spec.ts`、`playwright.config.ts`。
+- **实现（2026-10-31，`task/m6-verify-hardening`）**：
+  - `tests/e2e/dsh-carrier.ts`：Node `spawn('cmd.exe', ['/c', <VIBE_DSH_BIN>, '--profile', 'vibe-dev', '--no-open', '--host', '127.0.0.1', '--port', 4341])`，从输出取 `?token=...` URL，`taskkill /PID /T /F` 清理整棵进程树，日志尾部 20 KB 失败时作为 `dsh-log` 附件；`VIBE_DSH_BIN` 未设置时用例 `test.skip`（无 DSH 的机器 `pnpm test:e2e` 仍绿）；`VIBE_E2E_DEBUG=1` 打 chunk + `[data-chat-turn]` 快照，`VIBE_E2E_ARTIFACTS=1` 另存 `.tmp/logs/t057-studio-flow.png`。
+  - `tests/e2e/studio.spec.ts`：右栏 `Vibe Studio` → 填 `http://127.0.0.1:4320/` 启动预览（`data-state="ready"` + canvas 非背景像素）→ 拾取开关 → canvas 15%/10% 点选 → 拾取卡/标注气泡（选择器非空；`vite-basic` 无 inspector 元数据，`data-vibe-pick-source` 值为 `0`，源码映射由 `source-adapters.spec.ts` 覆盖）→ 保存标注 → 通知条“放入对话” → 草稿含标注 → Enter 发送 → 草稿清空 + “停止/Stop” + **`[data-chat-turn]` 中含标注**（发送证据）→ 停止生成 → 预览仍 `ready` 且继续绘制。
+  - `playwright.config.ts`：拆 `fixture`（`fixture|source-adapters`，30 s）与 `studio`（`studio.spec.ts`，240 s）两个 project，仍 `workers: 1`、失败 trace + 截图。
+- **验证结果**：`VIBE_DSH_BIN=... pnpm exec playwright test --project=studio --repeat-each=2` → **2/2 通过**（17.7 s / 19.4 s）；`VIBE_DSH_BIN=... pnpm test:e2e` → **10/10 通过**（54.6 s）；不设 `VIBE_DSH_BIN` 的 `pnpm test:e2e` → **9 通过 + 1 跳过**；`pnpm typecheck` 0；`pnpm test` **119 文件 / 1105 用例通过**。
+  - 备注：调试期间一次 120 s 内未打印 token URL 的失败无法在 Node 侧复现（`.tmp/t057-spawn-probe.mjs` 秒开；Git Bash 把 `cmd.exe /c` 的 `/c` 当盘符是 shell 假象），已在 carrier 增加 `child.on('error')` 与 debug 日志；后续连续 5 次运行均正常。T056 手动验收（证据跳转）仍待用户在 `vibe-dev` 执行。
 
 ### - [ ] T058 Soak/性能
 
