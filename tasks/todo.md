@@ -775,7 +775,7 @@
   - **未验证（如实记录）**：真实 Cordis mount 与 UI 内实测仍未做，G5/T054 一起做；`bash`/`pwsh` 改文件不触发提示是刻意限制，不是遗漏。
   - 提交：`e90a91b`（`task/m5-agent-integration`，未推送、未合并）。
 
-### - [ ] T054 G5 Agent 评审 [GATE]
+### - [x] T054 G5 Agent 评审 [GATE]
 
 - **目标**：验证工具/preset/skill/门禁/预算。
 - **验收**：preset 工具可用；standard 不受影响；越权被拒；skill 加载；结果 ≤ 8 KB。
@@ -790,7 +790,10 @@
   - skill 加载：Vibe Studio 会话内调用 `skill` 工具 `name=vibecoding-studio`，返回 `<skill_content name="vibecoding-studio">` 与技能 base 目录（`t054-tools-skill.json`）。
   - 结果 ≤ 8 KB：已测得真实结果 208 B / 270 B，远低于 8192 字节上限；上限本身由 T047/T048 的渲染预算单测覆盖。
   - **未覆盖（需用户手测）**：真实预览启动一整套链路（start 走审批 → 工具栏 Live → `vibe_observe` 真实 DOM 结果 → 改源码后 stale 徽标）需要在 UI 里配置 allowedOrigins 后操作；步骤见 `docs/2026-10-31-M5手动测试手册.md`。
-  - 待用户在真实 UI 手测确认后勾选本任务；评审期间未改产品代码。
+  - 待用户在真实 UI 手测确认后勾选本任务（已由下方“验证结果”确认）；评审期间未改产品代码。
+  - **验证结果（2026-10-31，用户手测，`task/m5-agent-integration`）**：用户按 `docs/2026-10-31-M5手动测试手册.md` 在真实 `vibe-dev` UI 完成第 1–6 节手测（第 6.4 的 stale 徽标为可选项），反馈“手测完毕，没有问题”，未提出返工项。
+  - **结论：GO**，M5 完成；评审期间未改产品代码。
+  - 提交：证据与手册 `6e17399`；本任务收尾文档（todo/DEVLOG/HANDOFF）随后提交，不推送、不合并。
 
 ---
 
