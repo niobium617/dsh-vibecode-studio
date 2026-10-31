@@ -995,6 +995,16 @@
 - 合并：`git merge --no-ff` → `f2f5342`；`git diff task/m6-verify-hardening HEAD` 为空，`main` 树与分支末端 `fd9a4df` 一致。
 - 未做：npm 发布（`private: true` 未改）；未改 `desktop`/`web` profile。日志 `.tmp/logs/m6-merge-*.log`。
 
+### 公开前仓库与历史清理（2026-10-31，`chore/public-release-cleanup`）
+
+- 范围：按 `docs/PUBLISHING.md` 审计跟踪文件、提交历史、临时产物与文档引用；功能侧在重写前同树已跑通全量。
+- 发现：11 个跟踪文件含本机绝对路径（DSH 安装目录、仓库根、本地归档目录、本地审查材料），1 个提交（原 `0b59273`）author 为个人邮箱；无 token/私钥/凭证，无 `.tmp`/`.vibe`/`node_modules`/构建产物入库，无曾提交的敏感文件名。
+- 路径清理：`47a046d` 把本机路径替换为 `<repo>`、`<DSH_BIN>`、`<local-archive>` 等占位（11 文件）。
+- 历史重写（用户批准）：`git filter-branch --env-filter` 覆盖全部 9 个本地分支的 165 个提交，author/committer 统一为 `211148342+niobium617@users.noreply.github.com`；所有 tree 未变（`main` 仍为 `e5c2da1`）；备份 `.tmp/backup/pre-email-rewrite-2026-10-31.bundle`（`git bundle verify` 确认完整）。
+- 提交号回写：按 tree + author date + subject 建立旧→新 165/165 映射，替换文档中 7–40 位提交号 182 处 / 6 文件（`a434a61`）；旧号 `adaa426`/`f59ae06`/`47a046d`/`0b59273` 等已不在跟踪文件。
+- 验证：`pnpm typecheck` 0；`pnpm test` 125 文件 / 1197 用例（期间一次偶发 1 失败，随后两次连跑全绿）；`pnpm test:security` 6 文件 / 90 用例；E2E 在重写前同树 10/10（含真实 DSH 主链路）；`npm pack --dry-run` 11 文件。
+- 待办（需用户批准）：远端仍是旧历史，force-push 9 个分支（`--force-with-lease`）；推送成功后再清理 `refs/original/*` 与旧 reflog。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
