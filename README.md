@@ -3,7 +3,7 @@
 > A visual feedback loop for **DeepSeek Harness**: preview your local web app inside DSH, point at what is wrong, and hand structured notes to the coding agent — no screenshot ping-pong.
 
 <p align="center">
-  <a href="docs/USAGE.zh-CN.md"><strong>📖 第一次使用？直接看图文使用说明（5 分钟上手）</strong></a>
+  <a href="docs/USAGE.zh-CN.md"><strong>📖 第一次使用？直接看图文使用说明（5 分钟上手 + 界面导览）</strong></a>
 </p>
 
 <p align="center">
