@@ -903,6 +903,15 @@
 - 取舍：采集不可用（`unsupported` 等）记为 `skipped` 且计数为 `null`，不谎报通过；`ok` 要求四项全部 `pass`，因此 `skipped` 也是 `ok: false`。检查基于有界缓冲区全量（不只本次运行后新增），需要“干净一次”时先 reload/清空。
 - 提交：见本任务收尾提交（`task/m6-verify-hardening`，未推送、未合并）。
 
+### T056 — 验证面板（2026-10-31，`task/m6-verify-hardening`）
+
+- 目标：一键运行、结果列表、证据跳转、空/错状态。
+- 位置取舍：面板做成**预览页底部抽屉的第三个标签**（`verify`），与 Console/Network 同层。证据跳转因此不跨页：点一条证据直接切到对应抽屉并在那一行高亮 2 s。没有新建侧栏 tab，因为验证总是针对当前预览页，跨页跳转反而要把页面状态复制一遍。预览未启动时该标签仍可打开，面板显示“启动预览后才能运行检查”、按钮禁用——这也是新手遇到“点不动”时唯一的解释入口。
+- 实现：`src/client/verify/VerifyPanel.tsx`（一键 `preview.verify.run`、四项检查行、汇总、运行时间/耗时、裁剪与缓冲区口径提示、`role="alert"` 传输错误、未运行/未就绪两种空状态）；`src/client/preview/focus.ts` + 两个抽屉的可选 `focus={{id,nonce}}`（按 nonce 只揭示一次，`scrollIntoView` + 高亮；高亮期间暂停自动滚到底部，否则下一次轮询立刻把证据行顶出视野）；Host 侧新增 `src/host/verify/route.ts`（`registerVerifyMethods`，按 effect 注册 `preview.verify.run`）；结果类型上移到 `src/contracts/verify.ts`，`checks.ts` 原样再导出，**客户端不引用 `src/host`**。`preview-tabs.test.tsx` 的验证标签设为可选 prop，旧的 Console/Network 断言不改。
+- 结果：聚焦 **7 文件 / 55 用例**；`pnpm typecheck` 0；`pnpm test` **119 文件 / 1105 用例**（连续两次；其间同一输入有一次 1 例偶发失败未能复现，两次全量日志在 `.tmp/logs/t056-full*.log`）；`pnpm build` host 439.3 + agent 59.1 / client 455.5 KiB（+14.2 KiB：面板 + 22 个 i18n 键 + 抽屉聚焦逻辑）；`pnpm test:e2e` 9/9。
+- 未完成：本机没有 DSH 桌面环境，**手动验收未执行**；步骤已写进 `tasks/todo.md` T056，真实浏览器链路由 T057 覆盖。现有 e2e 只覆盖 fixture/源码适配，不含面板交互。
+- 提交：见本任务收尾提交（`task/m6-verify-hardening`，未推送、未合并）。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -1139,7 +1148,8 @@ pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 - 工具实现（状态/观察/标注）：`src/host/agent/tools/{status,observe,annotation,preview-data}.ts`、`src/host/preview/dom.ts`（`PreviewService.domSnapshot`）、`tests/integration/tools/`。
 - 预览工具与门禁：`src/host/agent/tools/preview.ts`（`createPreviewHandler`/`previewApprovalDecision`/`createPreviewApprovalGate`）、`src/host/artifacts/store.ts`、`src/host/preview/url.ts`、`tests/integration/preview-tool/`、`tests/unit/artifacts/`。
 - Vibe Studio preset：`presets/vibe-studio/cordis.patch.yml`（preset 行与工具集）、`src/host/agent/preset.ts`（agent 入口，`lib/agent.js`）、`tests/integration/preset/vibe-preset.test.ts`、`package.json`（`exports['./agent']` 与 `dsh.bundle.patch` 数组）、`scripts/build-host.mjs`（多入口）、组合证据 `.tmp/logs/dump-vibe-dev-t052.txt`（L1260 preset 行、L1391 `vibe-tools`）。
-- 验证服务：`src/host/verify/{service,checks}.ts`、`src/contracts/telemetry.ts`（`isNetworkFailure`）、`tests/integration/verify/`。
+- 验证服务：`src/host/verify/{service,checks,route}.ts`、`src/contracts/{telemetry,verify}.ts`（`isNetworkFailure`、结果 wire 类型）、`tests/integration/verify/`。
+- 验证面板：`src/client/verify/VerifyPanel.tsx`、`src/client/preview/{PreviewTabs.tsx,focus.ts,ConsoleDrawer.tsx,NetworkDrawer.tsx,Canvas.tsx}`（第三个抽屉标签与证据聚焦）、`tests/component/verify/`、`tests/component/preview/{preview-tabs,console-drawer,network-drawer}.test.tsx`（T056 用例）、`src/client/locales/{en,zh-CN}.json`（`verify.*`）。
 - Web 预览：`src/host/targets/web/{adapter,launch}.ts`、`tests/integration/web-adapter/`、`tests/helpers/png.ts`。
 - 预览生命周期：`src/host/preview/session.ts`、`src/client/preview/{Toolbar.tsx,lifecycle.ts,local-url.ts}`、`tests/integration/preview/session-lifecycle.test.ts`、`.tmp/logs/t025-{host,desktop}.json`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。

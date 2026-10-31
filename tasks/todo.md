@@ -816,12 +816,20 @@
 - **验证结果**：`pnpm exec vitest run tests/integration/verify` → **2 文件 / 18 用例通过**；`pnpm typecheck` 0；`pnpm test` **117 文件 / 1093 用例通过**；`pnpm build` host 438.8 + agent 59.1 / client 441.3 KiB；`pnpm test:e2e` 9/9。默认结果实测 620 B，最坏情况（30 条超长 console error + 30 个 500）仍 ≤ 4 KB 且 `JSON.parse` 往返一致。
   - 说明：fixture 的“故意报错/500”目前由集成测试用真实 `PreviewConsoleBuffer` / `PreviewNetworkBuffer` 造样本覆盖（`console-2`、`network-2`、status 500、`net::ERR_FAILED`）；真实浏览器 E2E 归 T057。
 
-### - [ ] T056 验证面板
+### - [x] T056 验证面板
 
 - **目标**：运行、结果列表、证据跳转、空/错状态。
 - **验收**：一键运行；证据可跳 Console/Network；组件测试。
 - **验证**：`pnpm test -- tests/component/verify` + 手动。
 - **文件**：`src/client/verify/*`、tests。
+- **实现（2026-10-31，`task/m6-verify-hardening`）**：
+  - 位置：预览页底部抽屉的第三个标签（`verify`），与 Console/Network 同在 `data-vibe-drawer-layer` 内；证据跳转因此不跨页，点证据直接切到对应抽屉并高亮该行。预览未启动时该标签仍可用，面板显示“启动预览后才能运行检查”，运行按钮禁用。
+  - `src/client/verify/VerifyPanel.tsx`：`Run checks` 一键调用 unary；渲染四项检查（状态符号 + 状态词 + Host 消息）、汇总（全部通过 / N 项未通过）、运行时间与耗时、裁剪提示、缓冲区口径提示；传输失败显示 `role="alert"`，未运行/未就绪分别有空状态文案；`visible` 用 `display:none` 保持挂载。
+  - `src/client/preview/focus.ts` + 两个抽屉：新增可选 `focus={{id,nonce}}`，按 nonce 只揭示一次，`scrollIntoView`（jsdom 无此 API，测试跳过）+ 2 s 高亮；高亮期间暂停“自动滚到底部”，避免下一次轮询把证据行顶出视野。
+  - Host：`PREVIEW_VERIFY_RUN_METHOD = 'preview.verify.run'`，`src/host/verify/route.ts` 的 `registerVerifyMethods` 在 `apply()` 内按 effect 注册；结果类型上移到 `src/contracts/verify.ts`（`checks.ts` 原样再导出，T055 导出面不变），客户端不引用 `src/host`。
+  - i18n：`verify.*` 共 22 个键，en / zh-CN 同步。
+- **验证结果**：`pnpm exec vitest run tests/component/verify tests/component/preview/{preview-tabs,console-drawer,network-drawer}.test.tsx tests/integration/verify` → **7 文件 / 55 用例通过**；`pnpm typecheck` 0；`pnpm test` **119 文件 / 1105 用例通过**（连续两次；其间有一次同样输入下 1 个用例偶发失败，未能复现，日志在 `.tmp/logs/`）；`pnpm build` host 439.3 + agent 59.1 / client 455.5 KiB；`pnpm test:e2e` 9/9。
+  - 说明：本机无 DSH 桌面环境，**手动验收未执行**，需在 `vibe-dev` profile 里跑一次：启动 fixture（`pnpm fixture:dev`）→ 打开预览 → 底部 `Verification` → Run checks；再在 fixture 里制造一个 console error 与一个 500，验证证据按钮跳 Console/Network 并高亮。真实浏览器链路由 T057 覆盖。
 
 ### - [ ] T057 E2E 主链路
 
