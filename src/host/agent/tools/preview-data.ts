@@ -7,7 +7,11 @@
  * and `vibe_observe` can never disagree.
  */
 import type { ConsoleEntry, NetworkEntry } from '../../../contracts/telemetry'
+import { isNetworkFailure } from '../../../contracts/telemetry'
 import type { PreviewSessionState } from '../../../contracts/transport'
+
+/** Re-exported so the tools keep one import path (definition in contracts). */
+export { isNetworkFailure }
 
 /** State value the tool schemas accept (see `PREVIEW_STATES`). */
 export type ToolPreviewState = 'starting' | 'ready' | 'degraded' | 'failed' | 'closed'
@@ -28,12 +32,6 @@ export function countConsoleErrors(entries: readonly ConsoleEntry[]): number {
   let errors = 0
   for (const entry of entries) if (entry.level === 'error') errors += 1
   return errors
-}
-
-/** A 4xx/5xx status or a transport failure the page never received. */
-export function isNetworkFailure(entry: NetworkEntry): boolean {
-  if (entry.outcome === 'error') return true
-  return entry.status !== null && entry.status >= 400
 }
 
 export function countNetworkFailures(entries: readonly NetworkEntry[]): number {
