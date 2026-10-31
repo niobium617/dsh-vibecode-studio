@@ -876,26 +876,65 @@
 - **验证结果**：`pnpm exec vitest run tests/component/preview` → **6 文件 / 63 用例通过**（新增 U05 用例断言 `minWidth`/`maxWidth`）；`pnpm typecheck` 0；`pnpm build` host 439.3 + agent 59.1 / client 454.8 KiB；`pnpm test` **117 文件 / 1104 用例通过 + 2 个 Edge 残留用例失败**——失败是环境性的：用户 `vibe-dev` 预览正在运行，`playwrightEdgePids()` 把它的 msedge 计入“残留”（U02 时同样的已知现象），停止预览后需复跑确认。
 - **手动复核（2026-10-31，已通过）**：重启 `vibe-dev` 加载新 `lib/client.js` 后，Console 抽屉里 React DevTools 长消息（`%cDownload the React DevTools…`）按正常宽度折成两行，右侧长来源 URL 以 `…` 省略号收尾，其余 `DEBUG [vite] …` 短行布局不变，0 错误 0 警告。用户截图确认。
 
-### - [ ] T059 安全加固
+### - [x] T059 安全加固
 
 - **目标**：脱敏审计、origin 白名单、SSRF、prompt injection fixture、CDP 暴露检查、清理。
 - **验收**：SPEC 3.2/9 的安全项全过；报告；修复项关闭。
 - **验证**：`pnpm test:security` + 手动检查。
 - **文件**：`tests/security/*`、`docs/SECURITY.md`。
+- **实现（2026-10-31，`task/m6-verify-hardening`）**：
+  - 新增 6 个安全检查文件（`vitest.config.ts` node 项目纳入 `tests/security/**/*.test.ts`，DOM 边界文件用 `@vitest-environment jsdom` 逐文件切换）：`redaction`、`ssrf`、`origin-policy`、`exposure`、`untrusted-boundary`、`cleanup`。
+  - `fixtures/security-injection/index.html`：可见注入文字、伪造工具调用 JSON、大小写/空格变体的包裹闭合、hidden/aria-hidden/CSS 隐藏/script 载荷、aria-label 注入与正常表单控件。
+  - 修复 F1/F2（SSRF）：`isBlockedHost` 先规范化 host（去尾点、WHATWG IPv4 归一、IPv6 压缩），阻断元数据、`169.254/16`、`100.100.100.200`、`fe80::/10`、`fd00:ec2::254`、IPv4-mapped/compatible 地址；`assertRemoteAllowed` 复用同一谓词。
+  - 修复 F3（重定向）：跨 origin 跳转按 `isSensitiveKey` 丢弃敏感 header（`Authorization`、`Cookie`、`X-Api-Key` 等），同 origin 保留；跳转目标重新做协议与 host 检查。
+  - 修复 F4（工具输出）：`vibe_status` / `vibe_observe` 输出前用 `redactUrl` 处理预览 URL，`?token=` 不再进入模型上下文。
+  - 修复 F6（fragment）：`redactUrl` 对 `#access_token=…` 这类键值脱敏，普通锚点与 hash-router fragment 原样保留。
+  - 附带加固：`normalizeElementText` 把 C0/C1 控制字符替换为空格，避免页面文本拼接歧义。
+  - `docs/SECURITY.md`：FR-SEC-01..09 对照、F1–F8 处置/残余、验证命令与手动清单。
+  - 残余（已记录，不在本轮改）：F5 截图 `expiresAt` 无过期清理（FR-SEC-08 SHOULD）；F7 不解析 DNS，rebinding/link-local 域名可绕；F8 三处 loopback 判定重复。
+- **验证结果**：`pnpm test:security` → **6 文件 / 90 用例通过**；`pnpm typecheck` 0；`pnpm test` → **125 文件 / 1196 用例通过**；`pnpm build` → host 440.9 + agent 60.0 / client 454.8 KiB。手动检查：`pnpm exec vite --host 127.0.0.1 --port 4321 --strictPort fixtures/security-injection` 后 `curl` 返回 200，`netstat` 仅 `127.0.0.1:4321` LISTENING（无 `0.0.0.0`），`taskkill /PID <pid> /T /F` 后端口释放、无残留进程；临时探针 `.tmp/security-probe*.ts` 已删除，curl 输出留在 `.tmp/logs/security-fixture.html`。
 
-### - [ ] T060 打包与文档
+### - [x] T060 打包与文档
 
 - **目标**：`files` 白名单、client bundle、README/USER-GUIDE/RELEASE；干净 profile 安装；`npm pack` 检查。
 - **验收**：包内只含允许文件；干净安装可用；文档覆盖安装/使用/限制。
 - **验证**：`pnpm build`、`npm pack --dry-run`、干净 `vibe-dev` 安装。
 - **文件**：`package.json`、`README.md`、`docs/{USER-GUIDE,SECURITY,RELEASE}.md`。
+- **实现（2026-10-31，`task/m6-verify-hardening`）**：
+  - `package.json`：`files` 白名单 `lib` / `presets` / `skills` / `cordis.patch.yml`（`README.md`、`LICENSE`、`package.json` 由 npm 自动包含）；`private: true` 有意保留，发布需批准（SPEC §9），步骤写入 RELEASE.md。
+  - **修复打包缺陷**：`playwright-core` 从 `devDependencies` 移到 `dependencies`。`src/host/targets/web/launch.ts` 运行时才 `import()`，原先干净 tarball 安装后预览会报 `playwright-core is not installed`。`pnpm install --offline` 同步 lockfile（仅条目位置变化，3 行）。
+  - 与 SPEC §8.6 的有意偏差：`cordis.patch.yml` 必须在 `files` 里，否则 `dsh.bundle.patch` 指向的文件不在包内，安装后组合树没有 `vibe-studio` 行；已在 RELEASE.md 记录。
+  - 新增 `docs/USER-GUIDE.md`（安装/界面/预览/检查/标注/API/Agent 协作/配置/已知限制/故障排查）、`docs/RELEASE.md`（版本策略、包内容表、构建与检查清单、干净安装证据、发布与回滚）；更新 `README.md`（M5/M6 状态、tarball 安装、文档入口、开发命令）、`profiles/vibe-dev/README.md`（`file:` tarball 与 `link:` 两种安装）。
+- **验证结果**：`pnpm typecheck` 0；`pnpm test` → **125 文件 / 1196 用例通过**（`.tmp/logs/t060-test.log`）；`pnpm build` → `lib/index.js` 440.9 KiB、`lib/agent.js` 60.0 KiB、`lib/client.js` 454.8 KiB，入口 import 自检通过；`npm pack --dry-run` → **11 文件 / 225.7 kB（1.0 MB 解包）**，shasum `4b711b619cbd758f32f6be5c63a55b7292d2d459`，无 `src/`、`tests/`、`.tmp/` 泄漏。干净安装：`vibe-dev` 移除 link → `add file:.tmp/pack/dsh-vibecode-studio-0.1.0.tgz`（+5 packages，bundles 自动追加）→ `--dump-config` 退出 0 / 1392 行（`.tmp/logs/t060-dump-config.txt`，`vibe-studio` 行 1242–1263，`dsh-vibecode-studio/agent` 末行）→ `/api/vibe/health` 200、`value.plugin` 匹配、0 告警（`.tmp/logs/t060-clean-install.json`）→ tarball 安装下 Studio E2E **1 passed (22.9s)**（`.tmp/logs/t060-studio-e2e.log`）。还原：改回 `link:` 后 profile `package.json` / `cordis.patch.yml` 与备份逐字节一致，端口仅 TIME_WAIT、无监听。
 
-### - [ ] T061 G6 最终评审 [GATE]
+### - [x] T061 G6 最终评审 [GATE]
 
 - **目标**：对照 SPEC 第 2.3 节 1–8 条逐项验收。
 - **验收**：全部达标；`pnpm typecheck/test/build` 绿；干净安装；MVP 可交付。
 - **验证**：逐条清单 + 命令输出；记录到 `tasks/todo.md`。
 - **文件**：无。
+- **评审（2026-10-31，`task/m6-verify-hardening`）——结论：GO（8/8 达标）**：
+
+| # | SPEC §2.3 标准 | 结果 | 证据 |
+|---|---|---|---|
+| 1 | 点“圈选”到可发送标注卡片，中位 < 15 s（不含写意见） | **通过**：中位 332 ms、p95 350 ms、最大 869 ms（自动化，含 300 ms 点选轮询；不含打字） | T058 soak，`tasks/soak-report.md` §5、`.tmp/logs/t058-soak.json` |
+| 2 | React/Vue 选择器 + 源码命中率 ≥ 80%（人工抽测 50 元素） | **通过**：T034 抽测 50/50（100%）；T029 三框架开发态各 30/30，生产态 30/30 正确降级 | `docs/DEVLOG.md` T029/T034；`.tmp/logs/g3-source.json` |
+| 3 | 1280×800 稳定 ≥ 10 fps；输入到画面反馈 < 200 ms | **通过**：三端 24.4–25.9 fps（G2）；soak 可见帧率中位 16.1 fps；输入端到端最大 39.3 ms（Web）/ 14.3 ms（Desktop） | `docs/DEVLOG.md` T020/T021/T026/T058；`.tmp/logs/t021-*.json` |
+| 4 | 标注文本 ≤ 4 KB；`vibe_observe` ≤ 8 KB；截图不进工具结果 | **通过**：最坏标注 4,095 B；observe 8 KB 适配并可解析；截图只回 artifact id + 尺寸/字节数，字节留在宿主 | T034/T048/T049；`tests/integration/tools/` |
+| 5 | 抓包到回放 ≤ 3 次点击；状态/耗时/响应体可见；可存集合 | **通过**：回放 → 保存 → 重开 = 3 次点击；状态、耗时、大小、body 分区可见；集合持久化与重开通过 | T043/T044 手动 `.tmp/logs/t044-web.json`；T039/T040 |
+| 6 | 连续 30 分钟 / 100 次标注不崩 Host；关闭 tab 清理预览进程 | **通过**：`PASS annotations=100/100 fps median=16.1 leftovers=none errors=0 seconds=1810`；停止后进程全退（T025 4471/3820 ms，soak 5 s 内无残留、端口释放） | `tasks/soak-report.md`；`.tmp/logs/t058-soak.json`；T025 |
+| 7 | DSH Web 与 Desktop 都能打开 Studio；Windows 11 + Edge | **通过（本轮新取证）**：Web 由 E2E/soak 覆盖；Desktop 用隔离 `DSH_HOME=.tmp/desktop-home` + 独立 userData 启动真实 Electron，`dsh-app://app` 下 health `plugin=dsh-vibecode-studio`、5 个页签、验证抽屉可开；真实 `desktop` profile 前后哈希一致、9223 释放 | `.tmp/t061-desktop.mjs`、`.tmp/logs/t061-desktop.json`（`ok:true`，4 条预热 503 为 Host 就绪前轮询噪声） |
+| 8 | 导出/日志/模型上下文无明文密钥；默认拒绝非 localhost 与非 HTTP(S) | **通过**：`pnpm test:security` 6 文件 / 90 用例覆盖脱敏、SSRF、origin、不可信边界、清理；F5/F7/F8 为已记录残余（不影响本条） | `docs/SECURITY.md`；`tests/security/` |
+
+- **命令基线（2026-10-31 复跑）**：`pnpm typecheck` 退出 0；`pnpm test` **125 文件 / 1196 用例通过**（`.tmp/logs/t060-test.log`）；`pnpm build` → `lib/index.js` 440.9 KiB、`lib/agent.js` 60.0 KiB、`lib/client.js` 454.8 KiB，入口 import 自检通过；`npm pack --dry-run` 11 文件 / 225.7 kB；干净 `vibe-dev` tarball 安装 + `--dump-config` + health + E2E 全部通过（详见 T060）。
+- **保留说明**：第 7 条 Desktop 使用隔离 `DSH_HOME` 副本，未改动真实 `desktop`/`web` profile（项目约束）；第 2 条为历史人工抽测数据，本轮未重新人工点 50 个元素；F5（截图过期无清理）、F7（DNS rebinding）、F8（loopback 判定重复）维持 SECURITY.md 的残余风险登记。
+- **交付判定**：MVP 可交付（pre-alpha）；合并入 `main` 与 npm 发布均需用户批准，发布前 `private` 需改为 `false`（见 `docs/RELEASE.md`）。
+
+### - [x] U06 M6 手动测试手册与后续方向（2026-10-31，用户要求）
+
+- **目标**：补 M6 手测入口（验证面板、证据跳转、主链路、安装、soak、安全抽查），并把 M6 之后的选题建议固化成文档，避免方向散落在会话里。
+- **交付**：`docs/2026-10-31-M6手动测试手册.md`（前置、8 组检查点、记录模板、已知限制）、`docs/2026-10-31-后续开发方向.md`（现状、P0–P3.5 分级、门槛、待用户回答的问题，标注建议稿未批准）。
+- **验证**：文档链接在 README 与 `tasks/HANDOFF.md` §2 可直达；手册命令与 `package.json` scripts 一致；不涉及代码与 profile 变更。
 
 ---
 
@@ -927,11 +966,15 @@
 | M2 Preview | 11 | T016–T026 |
 | M2.5 UI Layout v2 | 1 | U01（2026-10-28 插入，阻塞 T027） |
 | M3 Inspect | 8 | T027–T034 |
+| M3.5 UI 优化 | 1 | U02（2026-10-29 插入，气泡直达发送、状态内联、删除弹窗） |
+| M3.6 拾取修复 | 1 | U03（2026-10-29 插入，`Page.enable`、导航复位、重开序号） |
 | M4 API | 12 | T035–T046 |
 | M4.5 UI 整改 | 1 | U04（2026-10-30 插入，M4 界面审查返工） |
 | M5 Agent | 8 | T047–T054 |
 | M6 Hardening | 7 | T055–T061 |
-| **合计** | **63** | 不含 B/C backlog |
+| M6.5 Console 抽屉修复 | 1 | U05（2026-10-31 插入，长来源挤压正文） |
+| M6.6 文档 | 1 | U06（2026-10-31 插入，M6 手测手册与后续方向） |
+| **合计** | **67** | 不含 B/C backlog |
 
 **关键路径：**
 
