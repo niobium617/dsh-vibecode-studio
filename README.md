@@ -2,9 +2,36 @@
 
 > A visual feedback loop for **DeepSeek Harness**: preview your local web app inside DSH, point at what is wrong, and hand structured notes to the coding agent — no screenshot ping-pong.
 
+<p align="center">
+  <img src="docs/images/feature-pick-and-annotate.png" alt="Preview the app inside DSH, click an element, and write a change note next to it" width="920">
+</p>
+
+<p align="center"><strong>The killer feature: live preview + click-to-annotate.</strong><br>
+Point at the exact element, describe the change, and send it to the agent as structured context —
+selector, source location, DOM snapshot — not a screenshot.</p>
+
+<p align="center"><strong>最大特色：实时预览 + 点选页面元素，直接让 DSH 改。</strong><br>
+不用截图、不用描述“左边那个蓝色按钮”。点中它，写一句要改成什么，Agent 收到的是选择器、源码位置和 DOM 上下文。</p>
+
+## 最大特色：实时预览 + 点选元素，直接改
+
+1. **在 DSH 右栏实时预览本地应用** —— 流式 JPEG 约 30 fps，页面可点击、输入、滚动。
+2. **点选出问题的元素，写下修改意见** —— 自动带出选择器、role / 可访问名称、DOM 片段，
+   以及 React / Vue / Svelte 开发态源码位置。
+3. **一键发送到对话** —— 批注进入 composer 草稿，Agent 用 `vibe_annotation_get` /
+   `vibe_observe` / `vibe_preview` 读取结构化上下文并修改代码；不会自动发送，也不会自动提交。
+
+<p align="center">
+  <img src="docs/images/feature-send-to-chat.png" alt="Send the annotation to the chat draft; nothing is sent automatically" width="920">
+</p>
+
+<p align="center"><em>点「发送到对话」只写入 composer 草稿；改完后状态行提示「文件已改动」，刷新预览继续下一处。</em></p>
+
+完整的 5 分钟上手流程、功能导览与排障见 **[使用说明（图文）](docs/USAGE.zh-CN.md)**。
+
 **Status: pre-alpha, unpublished.** M0–M6 are complete and the G0–G6 gates passed: embedded preview, inspect/annotation, the API workbench, agent tools (`vibe_status`/`vibe_observe`/`vibe_annotation_get`/`vibe_preview`), the `Vibe Studio` preset, `/vibe`, the bundled skill, and the M6 verification/hardening work (verification service and panel, real-DSH E2E, soak run, security hardening, packaging/docs). G6 passed 8/8 against SPEC §2.3. M6 is merged into `main` (merge commit `f2f5342`). The package is deliberately still `private` and unpublished — see [RELEASE.md](docs/RELEASE.md) for the publish checklist. See the [G0 review](spikes/G0.md) for the go/no-go and fallback decisions.
 
-[中文简介](#中文简介) · [Install & usage](docs/USER-GUIDE.md) · [Release](docs/RELEASE.md) · [Security policy](SECURITY.md) · [Security audit](docs/SECURITY.md) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md) · [Dev log](docs/DEVLOG.md) · [M2 手册](docs/2026-10-28-手动测试手册.md) · [M3 手册](docs/2026-10-29-M3手动测试手册.md) · [M4 手册](docs/2026-10-30-M4手动测试手册.md) · [M5 手册](docs/2026-10-31-M5手动测试手册.md) · [M6 手册](docs/2026-10-31-M6手动测试手册.md) · [界面与项目方向](docs/2026-10-28-界面与项目方向.md) · [后续方向](docs/2026-10-31-后续开发方向.md) · [验证接口对接](docs/2026-10-31-验证接口对接说明.md)
+[中文简介](#中文简介) · [使用说明（图文）](docs/USAGE.zh-CN.md) · [Install & usage](docs/USER-GUIDE.md) · [Release](docs/RELEASE.md) · [Security policy](SECURITY.md) · [Security audit](docs/SECURITY.md) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md) · [Dev log](docs/DEVLOG.md) · [M2 手册](docs/2026-10-28-手动测试手册.md) · [M3 手册](docs/2026-10-29-M3手动测试手册.md) · [M4 手册](docs/2026-10-30-M4手动测试手册.md) · [M5 手册](docs/2026-10-31-M5手动测试手册.md) · [M6 手册](docs/2026-10-31-M6手动测试手册.md) · [界面与项目方向](docs/2026-10-28-界面与项目方向.md) · [后续方向](docs/2026-10-31-后续开发方向.md) · [验证接口对接](docs/2026-10-31-验证接口对接说明.md)
 
 ## 中文简介
 
@@ -61,8 +88,10 @@ dsh --profile vibe-dev --no-open --host 127.0.0.1 --port 4317
 ```
 
 开发时也可用 `dsh plugin --profile vibe-dev add link:<本仓库绝对路径>`，每次 `pnpm build` 后重启 DSH。
-右栏“新标签页 → Vibe Studio”打开界面。完整步骤、界面说明、配置与已知限制见
-[用户指南](docs/USER-GUIDE.md)；打包、干净安装验证与发布流程见 [发布说明](docs/RELEASE.md)。
+右栏“新标签页 → Vibe Studio”打开界面。**第一次使用建议先看
+[使用说明（图文）](docs/USAGE.zh-CN.md)**：5 分钟跑通“预览 → 点选元素 → 发送到对话”的闭环。
+完整安装参数、配置与已知限制见 [用户指南](docs/USER-GUIDE.md)；打包、干净安装验证与发布流程见
+[发布说明](docs/RELEASE.md)。
 
 完整设计见 [SPEC](docs/SPEC-vibecoding-studio.md)，任务顺序见 [todo.md](tasks/todo.md)，开发记录见 [DEVLOG](docs/DEVLOG.md)，
 自己复测功能见 [M2 手动测试手册](docs/2026-10-28-手动测试手册.md)、[M3 手动测试手册](docs/2026-10-29-M3手动测试手册.md)、[M4 手动测试手册](docs/2026-10-30-M4手动测试手册.md) 与 [M5 手动测试手册](docs/2026-10-31-M5手动测试手册.md)，界面与产品方向见 [方向文档](docs/2026-10-28-界面与项目方向.md)。

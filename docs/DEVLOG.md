@@ -1005,6 +1005,16 @@
 - 验证：`pnpm typecheck` 0；`pnpm test` 125 文件 / 1197 用例（期间一次偶发 1 失败，随后两次连跑全绿）；`pnpm test:security` 6 文件 / 90 用例；E2E 在重写前同树 10/10（含真实 DSH 主链路）；`npm pack --dry-run` 11 文件。
 - 已执行（2026-10-31，用户批准）：`git push --force-with-lease` 9 个分支成功（`main` `adaa426`→`058669e`，其余 8 个分支同步重写）；远端 167 个可达提交全部为 noreply 邮箱（GitHub API 亦确认）；随后删除 `refs/original/*`、过期全部 reflog 并 `git gc --prune=now`，旧对象已不可达（bundle 备份保留）；`main` CI run `41193583129` success。
 
+### 公开仓库图文使用说明（2026-11-01，`chore/public-release-cleanup`）
+
+- 目标：给公开仓库补一份面向第一次使用者的图文说明，并在首屏把最大特色「实时预览 + 点选页面元素，直接让 DSH 改」放到显眼位置。
+- 新增：`docs/USAGE.zh-CN.md`（特色、5 分钟上手、功能导览、完整示例、Agent 协作习惯、安全边界、FAQ、文档索引）；`docs/images/` 6 张截图（点选批注、发送到对话、Agent `vibe_status`、Vibe Studio preset、标注历史、预览失败态）。
+- README：标题下新增主视觉截图（`docs/images/feature-pick-and-annotate.png`）与中英双语特色说明；新增“最大特色”三步小节和发送到对话截图；导航与“快速开始”加入图文使用说明链接。
+- USER-GUIDE：顶部加入图文使用说明入口，定位为完整参考手册。
+- 截图来源：T057 主链路（`feature-send-to-chat`）与 U02 界面验收（点选/历史）、T054（preset、`vibe_status`）、U01（失败态）的真实载体截图；未使用含本机路径的 T054 skill 截图。
+- 验证：相对链接与图片路径检查 0 缺失；`git diff --check` 0 whitespace 错误；文档改动不涉及产品代码与依赖。
+- 后续：API 工作台与验证面板暂无合适的新截图，先用文字说明；有真实载体截图后可补入。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体

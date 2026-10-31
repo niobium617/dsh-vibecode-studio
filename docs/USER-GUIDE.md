@@ -3,6 +3,8 @@
 > 版本：`dsh-vibecode-studio@0.1.0`（pre-alpha）· 更新：2026-10-31
 > 适用：Windows 11 + Microsoft Edge + DeepSeek Harness `0.2.1-rc.2` 或更新版本。
 > 安全边界与残余风险见 [SECURITY.md](./SECURITY.md)；打包与发布流程见 [RELEASE.md](./RELEASE.md)。
+>
+> 第一次使用建议先看 **[使用说明（图文）](./USAGE.zh-CN.md)**；本文是完整参考手册。
 
 ## 1. 安装
 

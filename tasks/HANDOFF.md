@@ -609,3 +609,10 @@ dsh --profile vibe-dev --dump-config
 - **整体稳定性审查完成（2026-10-29）**：四类证据全绿（typecheck 0、514/514、build 0、e2e 9/9；静态 0 环/0 方向违规/0 未声明依赖、23/23 方法、i18n 184/184；真实冒烟 `ok:true`；仅 `vibe-dev` 装插件），未发现跨模块冲突或依赖错误。按用户批准，仅对 Windows `EPERM rename` 偶发做加固：`annotation-store` 的 `replaceFile()` 对 `EPERM`/`EBUSY`/`EACCES` 有界重试 4 次，新增 3 个单测；复测 typecheck 0、全量 3 连跑 517/517、build host 200.6 / client 204.1 KiB、e2e 9/9。其余低风险项未返工。证据 `.tmp/audit/logs/*`，见 DEVLOG 同名段。
 - **推送与最终复核（2026-10-29）**：推送前重跑 typecheck 0、`pnpm test` 517/517、build host 200.6 / client 204.1 KiB、e2e 9/9，并针对重建后的 host 包重跑真实冒烟 `.tmp/audit/logs/smoke.json`（`ok:true`，五页签/拾取保存/队列/历史/设置/抽屉/停止全过，console 0；`.vibe` 无残留、4320/4338 无 LISTEN）。提交 `db63dca`（修复）+ `036a65c`（文档），已推送 `origin/task/m3-inspect`（`036a65c` 及随后文档提交，跟踪已设置）。**未合并到 `main`**。
 - **T034 G3 评审与返工完成（2026-10-29，GO）**：初评基线 `pnpm typecheck` 0 error、`pnpm test` 59 文件 / 507 用例、`pnpm test:e2e` 9/9；50 元素源码 50/50 命中（100%）、标注最坏 4,096 B ≤ 4 KB、不自动发送均通过，“≤3 步”为 4–5 个动作未达标。经用户批准返工：保存通知新增“发送到对话”（`AnnotationSaveNotice.tsx`、`sendQueuedAnnotation`/`clipboardSender` 共用、`StudioShell` 注入 composer handoff），复测 3 个动作直达 composer、四项验收全过；`pnpm test` 60 文件 / 514 用例、`pnpm test:e2e` 9/9、`pnpm build` host 199.8 / client 204.1 KiB。证据 `.tmp/logs/g3-{source,budget,live}.json` 与 `.tmp/g3/`；`.vibe/` 已清理、端口/Playwright Edge 无残留。未开工 M4 T035。
+
+### 公开仓库图文使用说明（2026-11-01，`chore/public-release-cleanup`）
+
+- 新增 `docs/USAGE.zh-CN.md`（特色 / 5 分钟上手 / 功能导览 / 完整示例 / Agent 协作 / 安全边界 / FAQ）与 `docs/images/` 6 张真实载体截图（点选批注、发送到对话、`vibe_status`、Vibe Studio preset、标注历史、预览失败态）。
+- README 首屏加入主视觉截图与中英双语“最大特色”说明，并新增三步小节；USER-GUIDE 顶部加入图文入口；快速开始同步链接。
+- 验证：Markdown 相对链接与图片路径 0 缺失；`git diff --check` 通过；未改产品代码、依赖或 profile。
+- 待办：API 工作台与验证面板暂无合适的新截图，先用文字说明；提交后推送受网络影响，若失败等待用户开启代理。
