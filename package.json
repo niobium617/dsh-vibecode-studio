@@ -46,6 +46,7 @@
     "build:client": "node scripts/build-client.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:soak": "tsx tests/soak/run.ts",
     "fixture:dev": "vite --config fixtures/vite-basic/vite.config.ts --host 127.0.0.1 --port 4320 --strictPort",
     "spike:s1": "tsx spikes/s1/run.ts",
     "spike:s1:build": "tsx spikes/s1/run.ts --build-only",

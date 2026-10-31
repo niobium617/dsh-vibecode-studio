@@ -9,6 +9,8 @@ const TOKEN_URL = /http:\/\/127\.0\.0\.1:\d+\/\?token=[\w-]+/
 export interface DshCarrier {
   /** Authenticated URL printed by the launcher. */
   readonly url: string
+  /** Launcher process id; the root of the tree `close()` kills. */
+  readonly pid: number | undefined
   /** Accumulated stdout/stderr tail, attached to the test on failure. */
   log(): string
   /** Kills the launcher's whole process tree. */
@@ -70,7 +72,7 @@ export async function startDsh(options: DshCarrierOptions): Promise<DshCarrier> 
     throw new Error(`dsh did not print a token URL within the timeout:\n${log.slice(-1500)}`)
   }
 
-  return { url, log: () => log, close: () => stopTree(child) }
+  return { url, pid: child.pid, log: () => log, close: () => stopTree(child) }
 }
 
 function stopTree(child: ChildProcess): void {

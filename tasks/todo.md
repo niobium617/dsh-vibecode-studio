@@ -846,12 +846,19 @@
 - **验证结果**：`VIBE_DSH_BIN=... pnpm exec playwright test --project=studio --repeat-each=2` → **2/2 通过**（17.7 s / 19.4 s）；`VIBE_DSH_BIN=... pnpm test:e2e` → **10/10 通过**（54.6 s）；不设 `VIBE_DSH_BIN` 的 `pnpm test:e2e` → **9 通过 + 1 跳过**；`pnpm typecheck` 0；`pnpm test` **119 文件 / 1105 用例通过**。
   - 备注：调试期间一次 120 s 内未打印 token URL 的失败无法在 Node 侧复现（`.tmp/t057-spawn-probe.mjs` 秒开；Git Bash 把 `cmd.exe /c` 的 `/c` 当盘符是 shell 假象），已在 carrier 增加 `child.on('error')` 与 debug 日志；后续连续 5 次运行均正常。T056 手动验收（证据跳转）仍待用户在 `vibe-dev` 执行。
 
-### - [ ] T058 Soak/性能
+### - [x] T058 Soak/性能
 
 - **目标**：30 分钟使用 + 100 次标注；内存/进程/帧率；修复暴露的问题。
 - **验收**：无崩溃、无进程泄漏、内存增长可解释；报告。
 - **验证**：`pnpm test:soak` + 手动；`tasks/soak-report.md`。
 - **文件**：`tests/soak/*`、报告。
+- **实现（2026-10-31，`task/m6-verify-hardening`）**：
+  - `tests/soak/run.ts`（`pnpm test:soak = tsx tests/soak/run.ts`）：复用 `tests/e2e/dsh-carrier.ts` 启动真实 DSH（`vibe-dev`），fixture 4320 已在跑则复用、否则 `spawn('cmd.exe', ['/c', 'pnpm', 'fixture:dev'])`；Edge headless 1280×800 驱动 Studio：新建会话 → 右栏 `Vibe Studio` → 启动预览 → 打开拾取 → 8 个比例点循环“点选 → 填标注 → 保存”共 100 次 → 之后每 15 s 采样（渲染器堆 / DOM 节点 / 队列徽标 / 预览状态 / 进程树 RSS 与构成），每 5 分钟测可见帧率，每 10 分钟切页签制造 DOM churn。参数 `--seconds`（默认 1800）/`--annotations`（100）/`--profile`/`--report`/`--json`/`--headful`；未设 `VIBE_DSH_BIN` 直接报错退出。
+  - 帧率口径：screencast 只在重绘时出帧，窗口内用交替 `mouse.wheel(±160)` 驱动远端滚动，页面侧每 40 ms 哈希 canvas 居中 320×180 区域，并读工具栏“帧数”增量交叉验证。
+  - 清理：停预览 → 关浏览器 → `carrier.close()`（`taskkill /T`）→ 停 fixture 树 → 5 s 内轮询确认无残留；进程身份用 `ProcessId + CreationDate` 匹配，只对本次启动的进程名允许列表下手（避免 Windows PID 复用误杀，见 DEVLOG 第 54 条）；最后检查 4320/4341 是否仍 LISTENING。
+  - 报告：`tasks/soak-report.md`（结论、标注、内存/DOM、帧率、进程与清理、错误、复现与限制）；完整数据 `.tmp/logs/t058-soak.json`（gitignore）。
+- **验证结果**：`VIBE_DSH_BIN=... pnpm test:soak` → **PASS**：`annotations=100/100`（队列徽标 100、`.vibe/annotations` +100）、`fps median=16.1`（6 个窗口 15.2–18.0）、渲染器堆 49.4 → 40.0 MiB（112 次采样范围 39.2–49.4）、进程树 RSS 2444（标注后）→ 1830 MiB（结束）、DSH 根进程全程存活、`leftovers=none`、4320/4341 已释放、`errors=0`、实际 1810 s。`pnpm typecheck` 0；`pnpm test` **119 文件 / 1105 用例通过**。
+  - 调试记录：首轮冒烟帧率 0（角落采样纯背景 + 静态页面不出帧）；清理曾按进程树派生 PID 强杀并撞上系统 `LeFile*.exe` 的 PID 复用，遂改为身份匹配 + 名称允许列表。产品代码无改动，无暴露缺陷。手动验收（真实桌面窗口缩放/切后台/IME/多标签）仍待用户执行。
 
 ### - [ ] T059 安全加固
 
