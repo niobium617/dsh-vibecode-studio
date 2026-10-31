@@ -52,6 +52,8 @@
   "preview.restart": "Restart",
   "preview.restart.busy": "Restarting…",
   "preview.status.details": "Show preview details",
+  "preview.stale.badge": "files changed",
+  "preview.stale.hint": "Source files changed after this page loaded. Reload the preview (More → Reload) to see the latest code.",
   "preview.details.title": "Details",
   "preview.details.mode": "Mode",
   "preview.details.frames": "Frames",

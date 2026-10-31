@@ -1,6 +1,29 @@
-# dsh-vibecode-studio bundle: one host+client row.
+# dsh-vibecode-studio bundle: one host+client row plus the bundled skill root.
 # Installed only into the development profile (`vibe-dev`); never into the
 # real `desktop` or `web` profiles.
 - insert:
     - id: vibe-studio
       name: dsh-vibecode-studio
+
+    # T051: mount this package's `skills/` as a bundled skill root. A second
+    # filesystem provider instance (rather than DSH's own row) keeps the base
+    # project/user roots untouched: `includeDefaultRoots: false` stops it from
+    # scanning them again and `watch: false` avoids a second file watcher.
+    # `baseUrl` is the profile root that the loader evaluates patch expressions
+    # against, so `createRequire` finds the package in hoisted and nested
+    # installs alike and the skill ships next to `lib/`, not in this profile.
+    - id: vibe-skill-bundled
+      name: '@deepseek-ai/dsh-skill-filesystem'
+      config:
+        providerName: vibe-bundled
+        includeDefaultRoots: false
+        watch: false
+        bundledSkillDir: !!js >-
+          process.getBuiltinModule('node:path').join(
+            process.getBuiltinModule('node:path').dirname(
+              process.getBuiltinModule('node:module')
+                .createRequire(baseUrl)
+                .resolve('dsh-vibecode-studio/package.json')
+            ),
+            'skills'
+          )

@@ -4,7 +4,7 @@
 
 **Status: pre-alpha.** The M0 spike gate is complete. Transport, composer handoff, screencast/input/Chinese IME, and element/source mapping are verified; the G0 review selected stream-first frames with a pull fallback, one-shot CDP input, clipboard-only screenshots, and per-framework source adapters. M1–M4 (foundation, preview, inspect/annotation, and the API workbench) are in `src/`, `tests/` and `fixtures/`; nothing is published yet. See the [G0 review](spikes/G0.md) for the go/no-go and fallback decisions.
 
-[中文简介](#中文简介) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md) · [Dev log](docs/DEVLOG.md) · [M2 手册](docs/2026-10-28-手动测试手册.md) · [M3 手册](docs/2026-10-29-M3手动测试手册.md) · [M4 手册](docs/2026-10-30-M4手动测试手册.md) · [界面与项目方向](docs/2026-10-28-界面与项目方向.md)
+[中文简介](#中文简介) · [Design](docs/SPEC-vibecoding-studio.md) · [Task plan](tasks/todo.md) · [Dev log](docs/DEVLOG.md) · [M2 手册](docs/2026-10-28-手动测试手册.md) · [M3 手册](docs/2026-10-29-M3手动测试手册.md) · [M4 手册](docs/2026-10-30-M4手动测试手册.md) · [M5 手册](docs/2026-10-31-M5手动测试手册.md) · [界面与项目方向](docs/2026-10-28-界面与项目方向.md)
 
 ## 中文简介
 
@@ -56,7 +56,7 @@ pnpm spike:s3 --seconds 10    # screencast / 输入 / 中文
 pnpm spike:s4                 # React / Vue / Svelte 拾取与源码命中
 ```
 
-完整设计见 [SPEC](docs/SPEC-vibecoding-studio.md)，任务顺序见 [todo.md](tasks/todo.md)，开发记录见 [DEVLOG](docs/DEVLOG.md)，自己复测功能见 [M2 手动测试手册](docs/2026-10-28-手动测试手册.md)、[M3 手动测试手册](docs/2026-10-29-M3手动测试手册.md) 与 [M4 手动测试手册](docs/2026-10-30-M4手动测试手册.md)，界面与产品方向见 [方向文档](docs/2026-10-28-界面与项目方向.md)。
+完整设计见 [SPEC](docs/SPEC-vibecoding-studio.md)，任务顺序见 [todo.md](tasks/todo.md)，开发记录见 [DEVLOG](docs/DEVLOG.md)，自己复测功能见 [M2 手动测试手册](docs/2026-10-28-手动测试手册.md)、[M3 手动测试手册](docs/2026-10-29-M3手动测试手册.md) 与 [M4 手动测试手册](docs/2026-10-30-M4手动测试手册.md) 与 [M5 手动测试手册](docs/2026-10-31-M5手动测试手册.md)，界面与产品方向见 [方向文档](docs/2026-10-28-界面与项目方向.md)。
 
 ## Why
 

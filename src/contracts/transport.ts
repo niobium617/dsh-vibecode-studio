@@ -147,6 +147,11 @@ export interface PreviewSessionSnapshot {
   readonly fps: number
   readonly quality: number
   readonly lastError?: StudioError
+  /**
+   * T053: files changed after this page loaded. Absent when the page is current;
+   * reload/navigate/start/stop clear it. Only meaningful while `ready`.
+   */
+  readonly stale?: boolean
 }
 
 /**

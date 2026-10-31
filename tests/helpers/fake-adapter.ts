@@ -32,6 +32,14 @@ export interface FakeAdapterOptions {
   readonly failNavigateWith?: string
   readonly failReloadWith?: string
   readonly failViewportWith?: string
+  /**
+   * T048 DOM read seam: when set, `Runtime.evaluate` resolves to this value so
+   * the preview service's `domSnapshot` can be exercised without a page.
+   */
+  readonly evaluateResult?: unknown
+  /** T049 screenshot seam: bytes returned by `screenshot()` (a PNG signature). */
+  readonly screenshotBytes?: Uint8Array
+  readonly failScreenshotWith?: string
 }
 
 export interface FakeTargetAdapter extends Omit<TargetAdapter, 'start'> {
@@ -171,6 +179,16 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): FakeTargetA
     lastViewport = viewport
   }
 
+  /** A valid PNG signature; tests that persist it get a non-empty image. */
+  const PNG_SIGNATURE = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
+  async function screenshot(): Promise<Uint8Array> {
+    if (status !== 'running' || !active) throw new Error('fake adapter is not running')
+    logs.push('screenshot')
+    if (options.failScreenshotWith) throw new Error(options.failScreenshotWith)
+    return options.screenshotBytes ?? PNG_SIGNATURE
+  }
+
   function isAlive(): boolean {
     return status === 'running' && active !== undefined && alive
   }
@@ -185,7 +203,10 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): FakeTargetA
           : { width: lastViewport.width, height: lastViewport.height },
       async createCdpSession() {
         return {
-          async send() {
+          async send(method: string) {
+            if (method === 'Runtime.evaluate' && 'evaluateResult' in options) {
+              return { result: { value: options.evaluateResult } }
+            }
             return {}
           },
           on() {
@@ -225,6 +246,7 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): FakeTargetA
     navigate,
     reload,
     setViewport,
+    screenshot,
     isAlive,
     screencastPage,
     stop,

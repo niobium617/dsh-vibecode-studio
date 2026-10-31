@@ -53,6 +53,7 @@ describe('host config', () => {
       targets: expect.anything(),
       preview: expect.anything(),
       annotationHistory: expect.anything(),
+      artifacts: expect.anything(),
       apiSecrets: expect.anything(),
     })
   })

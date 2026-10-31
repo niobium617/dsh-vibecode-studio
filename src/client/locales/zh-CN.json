@@ -52,6 +52,8 @@
   "preview.restart": "重启",
   "preview.restart.busy": "重启中…",
   "preview.status.details": "查看预览详情",
+  "preview.stale.badge": "文件已改动",
+  "preview.stale.hint": "页面加载后源码有改动。点「更多 → 刷新」重载预览即可看到最新代码。",
   "preview.details.title": "详情",
   "preview.details.mode": "模式",
   "preview.details.frames": "帧数",

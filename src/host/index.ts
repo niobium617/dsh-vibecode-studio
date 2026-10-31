@@ -12,6 +12,11 @@ import { createApiSampleServer } from './api/sample-server'
 import type { ApiSecretStore, CredentialProviderLike } from './api/secrets'
 import { createApiSecretStore } from './api/secrets'
 import { ApiService, registerApiMethods } from './api/service'
+import { createArtifactStore, type ArtifactStore } from './artifacts/store'
+import {
+  registerVibeCommand,
+  type VibeCommandRegistry,
+} from './agent/commands/vibe'
 import { Config, resolveConfig, type VibeStudioConfig } from './config'
 import {
   AnnotationHistoryService,
@@ -164,8 +169,13 @@ export type {
   ValidatedTargetConfig,
 } from './targets/types'
 export { registerPreviewMethods, registerPreviewRoutes } from './preview/route'
-export { createPreviewService } from './preview/session'
-export type { PreviewService, PreviewServiceOptions } from './preview/session'
+export { createPreviewService, PREVIEW_TARGET_ID } from './preview/session'
+export type {
+  PreviewScreenshot,
+  PreviewService,
+  PreviewServiceOptions,
+} from './preview/session'
+export { isLoopbackHost } from './preview/url'
 export { createPreviewFrameBuffer, PreviewFrameBuffer } from './preview/frame-buffer'
 export type { FrameListener, PreviewFrame } from './preview/frame-buffer'
 export { createScreencastSource } from './preview/screencast'
@@ -220,6 +230,130 @@ export type {
 } from './inspect/annotation-store'
 export { buildSelector } from './inspect/selector'
 export type { SelectorResult } from './inspect/selector'
+export {
+  isVibeToolName,
+  VIBE_TOOL_NAMES,
+  VIBE_TOOL_SPECS,
+  validateToolArguments,
+  validateToolSpecs,
+} from './agent/tools/definitions'
+export type {
+  JsonSchemaNode,
+  JsonSchemaObject,
+  VibeToolName,
+  VibeToolSpec,
+} from './agent/tools/definitions'
+export {
+  createVibeCommand,
+  createVibeCommandHandler,
+  registerVibeCommand,
+  renderVibeStatus,
+  suggestNextStep,
+  VIBE_COMMAND_BUDGET_BYTES,
+  VIBE_COMMAND_NAME,
+  VIBE_COMMAND_USAGE,
+} from './agent/commands/vibe'
+export type {
+  VibeCommandDefinition,
+  VibeCommandDeps,
+  VibeCommandHandler,
+  VibeCommandInvocation,
+  VibeCommandRegistry,
+  VibeCommandResult,
+} from './agent/commands/vibe'
+export {
+  inspectVibeSkillBundle,
+  parseSkillFrontmatter,
+  resolveBundledSkillDir,
+  resolvePackageRoot,
+  resolveVibeSkillDir,
+  VIBE_SKILL_MAX_CHARS,
+  VIBE_SKILL_NAME,
+  VIBE_SKILL_PATCH_ROW_ID,
+  VIBE_SKILL_PROVIDER,
+  vibeSkillProviderConfig,
+} from './agent/skills'
+export type {
+  VibeSkillBundle,
+  VibeSkillFrontmatter,
+  VibeSkillProviderConfig,
+} from './agent/skills'
+export {
+  asVibeToolError,
+  createVibeToolDefinitions,
+  registerVibeTools,
+  renderToolResult,
+  VibeToolError,
+} from './agent/tools/register'
+export type {
+  VibeTextBlock,
+  VibeToolContent,
+  VibeToolDefinition,
+  VibeToolHandler,
+  VibeToolHandlers,
+  VibeToolRegistry,
+  VibeToolRunContext,
+} from './agent/tools/register'
+export { createStatusHandler } from './agent/tools/status'
+export type {
+  StatusAnnotationSource,
+  StatusPreviewSource,
+  StatusToolDeps,
+  StatusToolOutput,
+} from './agent/tools/status'
+export { createObserveHandler, OBSERVE_SECTIONS } from './agent/tools/observe'
+export type {
+  ObservePreviewSource,
+  ObserveSection,
+  ObserveToolDeps,
+  ObserveToolOutput,
+} from './agent/tools/observe'
+export {
+  createPreviewApprovalGate,
+  createPreviewHandler,
+  PREVIEW_ACTIONS,
+  PREVIEW_TOOL_NAME,
+  previewApprovalDecision,
+} from './agent/tools/preview'
+export type {
+  PreviewAction,
+  PreviewArtifactSink,
+  PreviewAskDecision,
+  PreviewGateExecution,
+  PreviewToolConfig,
+  PreviewToolDeps,
+  PreviewToolOutput,
+  PreviewToolSource,
+} from './agent/tools/preview'
+export {
+  ARTIFACT_DIR_NAME,
+  ArtifactStore,
+  ArtifactStoreError,
+  createArtifactStore,
+  isArtifactId,
+  MAX_ARTIFACT_BYTES,
+  SCREENSHOT_FILE_EXT,
+  toArtifactStudioError,
+} from './artifacts/store'
+export type {
+  ArtifactStoreOptions,
+  SaveScreenshotOptions,
+  StoredArtifact,
+} from './artifacts/store'
+export { createAnnotationGetHandler, toAnnotationToolOutput } from './agent/tools/annotation'
+export type {
+  AnnotationElementOutput,
+  AnnotationToolDeps,
+  AnnotationToolOutput,
+} from './agent/tools/annotation'
+export {
+  buildDomOutlineExpression,
+  collectDomOutline,
+  DOM_OUTLINE_MAX_BYTES,
+  isDomSnapshotParams,
+  parseDomOutlineResult,
+} from './preview/dom'
+export type { DomSnapshot, DomSnapshotParams } from './preview/dom'
 export { createWebTargetAdapter, WEB_TARGET_CAPABILITIES } from './targets/web/adapter'
 export type {
   WebTargetAdapter,
@@ -281,6 +415,8 @@ export interface VibeStudioService {
   readonly preview: PreviewService
   /** Persisted annotation history under `.vibe/annotations` (T033). */
   readonly annotationHistory: AnnotationHistoryService
+  /** Screenshot artifacts under `.vibe/artifacts` (T052, used by `vibe_preview`). */
+  readonly artifacts: ArtifactStore
   /** Credential seam for API environments (T036); never returns secret values. */
   readonly apiSecrets: ApiSecretStore
 }
@@ -290,6 +426,28 @@ export interface HostContext extends TransportHostContext {
   provide(name: string, value: unknown): void
   /** DSH's `ctx.credentials`; absent in bare test hosts. */
   readonly credentials?: CredentialProviderLike
+  /**
+   * Cordis' inject-free service read. `/vibe` registers through this slot so
+   * a host without the `commands` plugin keeps the rest of the studio working.
+   */
+  get?(name: string): unknown
+  /** The command registry itself, when a host exposes it directly. */
+  readonly commands?: VibeCommandRegistry
+}
+
+/**
+ * Read DSH's command registry without making it a hard dependency:
+ * `ctx.commands` throws in a Cordis context that did not `inject` the service,
+ * so real hosts resolve through `ctx.get`, while bare test hosts may expose the
+ * registry as a plain property.
+ */
+function resolveCommandRegistry(ctx: HostContext): VibeCommandRegistry | undefined {
+  const service =
+    typeof ctx.get === 'function' ? ctx.get('commands') : ctx.commands
+  if (!service || typeof (service as { register?: unknown }).register !== 'function') {
+    return undefined
+  }
+  return service as VibeCommandRegistry
 }
 
 export function apply(ctx: HostContext, config: VibeStudioConfig = new Config()): void {
@@ -322,6 +480,10 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
 
   // T020 preview: unary lifecycle methods plus the stream/pull frame routes.
   const preview = createPreviewService({ targets })
+  // T052: `vibe_preview screenshot` stores PNG bytes under `.vibe/artifacts` and
+  // returns only the artifact id, so the model never receives image data. The
+  // preset reads this store through the `vibeStudio` service.
+  const artifacts = createArtifactStore(process.cwd())
   const setupPreview = () => {
     const disposeMethods = registerPreviewMethods(registry, preview)
     return async () => {
@@ -335,6 +497,20 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
     void setupPreview()
   }
   registerPreviewRoutes(ctx, preview)
+
+  // T050: `/vibe` reads the same host-owned state as `vibe_status` and answers
+  // with one next step; it never starts, stops or navigates a preview. The
+  // command is user-facing only, so unlike the tools it is not preset-gated.
+  const commands = resolveCommandRegistry(ctx)
+  if (commands) {
+    const setupCommand = () =>
+      registerVibeCommand(commands, { preview, annotations: annotationHistory })
+    if (typeof ctx.effect === 'function') {
+      ctx.effect(setupCommand, 'vibe-studio: /vibe command')
+    } else {
+      void setupCommand()
+    }
+  }
 
   // T036: secrets live only in `ctx.credentials`. A host without the seam
   // reports every reference as unconfigured rather than storing values here.
@@ -379,6 +555,7 @@ export function apply(ctx: HostContext, config: VibeStudioConfig = new Config())
     targets,
     preview,
     annotationHistory,
+    artifacts,
     apiSecrets,
   } satisfies VibeStudioService)
 }

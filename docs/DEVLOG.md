@@ -9,7 +9,7 @@
 
 - 阶段：**Phase 4 实现（M0/G0 已通过，M1 已完成，M2 已完成）**。
 - 已完成：T001 S1 传输 spike、T002 S2 composer handoff spike、T003 S3 screencast + 输入 + 中文 spike、T004 S4 拾取 + 源码 spike、T005 G0 Spike 评审、T006 包脚手架与工具链、T007 Client bundle loader 包装、T008 Host 插件骨架与 Config、T009 Contracts v1、T010 Client shell + 右栏 tab、T011 Connection 传输骨架、T012 测试 harness + fixture、T013 `.vibe` 配置存储、T014 设置面板（基础）、T015 G1 Foundation 评审、T016 Target 模型/配置/adapter 注册表、T017 Web target adapter（Edge 启动/导航/截图/关闭）、T018 S8 进程生命周期 spike、T019 Dev server 进程监督、T020 Screencast + 帧路由 + canvas、T021 输入转发（点击/滚轮/键盘）、T022 中文输入（隐藏 textarea + `Input.insertText`）、T023 Console 采集与抽屉、T024 Network 采集与抽屉、T025 预览工具栏与生命周期、T026 G2 Preview 评审（通过）、T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 三框架源码适配、T030 标注模型与存储、T031 标注气泡与队列。
-- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），**T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 源码适配（React/Vue/Svelte）、T030 标注模型与存储、T031 标注气泡与队列、T032 Composer handoff、T033 标注历史 已完成**；**T034 G3 评审完成（GO）**：初评“≤3 步”实测 4–5 个动作，经用户批准在保存通知加“发送到对话”后为 3 个动作（点元素 → 保存 → 发送），复测四项验收全过（源码 100%、标注 4,095 B ≤ 4 KB、不自动发送），M3 完成；手动复测入口见 `docs/2026-10-29-M3手动测试手册.md`（M2 见 `docs/2026-10-28-手动测试手册.md`）。**M3.5/U02 界面优化（气泡直达发送、状态归位、删除弹窗）与 U03 拾取注入修复已完成并合并入 `main`**（合并提交 `a1c7577`，2026-10-29；依据 `界面审查/M3修改意见.docx` 与用户实测反馈）。**M4 API Workbench 已完成并合并入 `main`（2026-10-30，合并提交 `35962e4`）**：T035 HTTP 执行器、T036 环境/变量/密钥、T037 集合与历史持久化、T038 请求构建 UI、T039 响应查看 UI、T040 富响应体、T041 S7 OpenAPI spike、T042 OpenAPI 导入、T043 抓包回放、T044 集合/历史 UI、T045 断言、T046 G4 评审与 R1–R7 返工已完成（**GO**，2026-10-30）；**U04 界面整改**（M4 人工审核意见：首屏只留“方法 + URL + 发送”、响应区居中、其余折叠、新手/专业模式、内置 loopback 示例端点、术语口语化）已完成（`pnpm test` 100 文件 / 897 用例、e2e 9/9）；手动复测入口 `docs/2026-10-30-M4手动测试手册.md`（配套本机目标服务 `tools/m4-manual-server.mjs`）。分支 `task/m4-api-workbench`（末端 `0290e19`）已推送并合并入 `main`（合并提交 `35962e4`，推送前回归 typecheck 0 / 100 文件 897 用例 / build host 354.0 client 440.5 KiB / e2e 9/9）。
+- 阶段：**M1 已完成并通过 G1；M2 已完成并通过 G2；M2.5/U01 预览界面精简（Layout v2）已完成**（`3f14d93`；方向见 `docs/2026-10-28-界面与项目方向.md`），**T027 拾取 overlay 与选择器、T028 元素上下文提取、T029 源码适配（React/Vue/Svelte）、T030 标注模型与存储、T031 标注气泡与队列、T032 Composer handoff、T033 标注历史 已完成**；**T034 G3 评审完成（GO）**：初评“≤3 步”实测 4–5 个动作，经用户批准在保存通知加“发送到对话”后为 3 个动作（点元素 → 保存 → 发送），复测四项验收全过（源码 100%、标注 4,095 B ≤ 4 KB、不自动发送），M3 完成；手动复测入口见 `docs/2026-10-29-M3手动测试手册.md`（M2 见 `docs/2026-10-28-手动测试手册.md`）。**M3.5/U02 界面优化（气泡直达发送、状态归位、删除弹窗）与 U03 拾取注入修复已完成并合并入 `main`**（合并提交 `a1c7577`，2026-10-29；依据 `界面审查/M3修改意见.docx` 与用户实测反馈）。**M4 API Workbench 已完成并合并入 `main`（2026-10-30，合并提交 `35962e4`）**：T035 HTTP 执行器、T036 环境/变量/密钥、T037 集合与历史持久化、T038 请求构建 UI、T039 响应查看 UI、T040 富响应体、T041 S7 OpenAPI spike、T042 OpenAPI 导入、T043 抓包回放、T044 集合/历史 UI、T045 断言、T046 G4 评审与 R1–R7 返工已完成（**GO**，2026-10-30）；**U04 界面整改**（M4 人工审核意见：首屏只留“方法 + URL + 发送”、响应区居中、其余折叠、新手/专业模式、内置 loopback 示例端点、术语口语化）已完成（`pnpm test` 100 文件 / 897 用例、e2e 9/9）；手动复测入口 `docs/2026-10-30-M4手动测试手册.md`（配套本机目标服务 `tools/m4-manual-server.mjs`）。分支 `task/m4-api-workbench`（末端 `0290e19`）已推送并合并入 `main`（合并提交 `35962e4`，推送前回归 typecheck 0 / 100 文件 897 用例 / build host 354.0 client 440.5 KiB / e2e 9/9）。**M5 已开工：T047 工具 schema 与注册已完成**（分支 `task/m5-agent-integration`，2026-10-30；typecheck 0、102 文件 / 919 用例、build host 372.8 / client 440.5 KiB、e2e 9/9，DSH 自带校验 16/16 通过；四个工具尚未接入 `apply()`，实现体在 T048/T049、可见性门禁在 T052）。**T048 已提交**（同一分支）：`vibe_status`/`vibe_observe`/`vibe_annotation_get` 实现完成，新增 `PreviewService.domSnapshot` 只读 DOM 摘要（4 KB/400 节点）；typecheck 0、106 文件 / 950 用例、build host 398.7 / client 440.5 KiB、e2e 9/9；artifact id 有意留到 T049。**T049 已提交**（同一分支，`f2ecf60`）：`vibe_preview` 五动作 + origin 门禁（loopback → allowedOrigins → 同源）、`PreviewService.captureScreenshot` 与 `.vibe/artifacts`（截图字节不进工具结果）、start/stop 的 ask 监听器导出；typecheck 0、110 文件 / 1002 用例、build host 420.3 / client 440.5 KiB、e2e 9/9；`apply()` 仍未接线（T052/T053）。**T050 已提交**（同一分支）：`/vibe` 命令（状态 + 一条下一步建议，输出 208 B ≤ 2 KB，无副作用），复用 `vibe_status` 数据源，经 `ctx.get('commands')` 在 `apply()` 装配（不加硬 inject，命令不缺件时面板仍可用）；typecheck 0、111 文件 / 1016 用例、build host 424.8 / client 440.5 KiB、e2e 9/9；真实 Cordis + `dsh-commands` 校验 `ok:true`（5 项，含 dispose 后移除）。**T051/T052/T053 已完成**（同一分支，2026-10-30/31）：内置技能 `vibecoding-studio`（`skills/` + `vibe-skill-bundled` 行）、可选 preset `Vibe Studio`（第二包入口 `lib/agent.js` 在 preset scope 注册四个工具 + 审批门禁）、M5 hooks（`write`/`edit` 后标记预览 `stale`，`vibe_status`/`/vibe`/工具栏提示；`vibe_preview` 越权在 `tools/pre-execute` 先于审批直接 deny）；typecheck 0、**115 文件 / 1075 用例**、build host 430.6 + agent 59.1 / client 441.3 KiB、e2e 9/9；**T054 G5 人工评审 GO**（2026-10-31，用户按 `docs/2026-10-31-M5手动测试手册.md` 在真实 `vibe-dev` UI 完成第 1–6 节手测，反馈“手测完毕，没有问题”，未提出返工）；**M5 完成**，分支 `task/m5-agent-integration` 未推送、未合并。下一任务 **M6 T055 验证服务**。
 - 产品包已能在 DSH 加载：根 `package.json` 为 `dsh-vibecode-studio@0.1.0`；`lib/index.js`（host ESM）与 `lib/client.js`（loader 包装）由 `pnpm build` 生成，均已 gitignore；`vibe-dev` 中可见 Vibe Studio 右栏 tab，host 提供 `vibeStudio` 服务、校验 Config，并注册 `/api/vibe/health` 与 `/api/vibe/request` 两条精确路由；client transport 已接入设置页（T014），其余页面待后续任务接入。
 - T001–T015 已提交并推送至 `origin/task/m1-foundation`（`a1cae3a..1cdcb74`，2026-10-27），随后以 `--no-ff` 合并入 `main`（合并提交 `d1f4053`）并推送，功能分支保留。M2 从 `main` 新建 `task/m2-target-model`；T016–T026 已提交并推送到 `origin/task/m2-target-model`（`ebee1e5`，文档至 `92ecc32`），尚未合并入 `main`；其后 `9c19501..88a4070`（方向/手册文档、U01 实现、去重复标题）已推送到 `origin/task/m2-target-model`（`92ecc32..88a4070`，2026-10-28）；`f64e928`（清理残留 locale key 与过期布局引用）推送后，以 `--no-ff` 合并入 `main`（合并提交 `768e129`，`main` 树与分支一致），功能分支保留。手动复测入口见 `docs/2026-10-28-手动测试手册.md`；界面/产品方向见 `docs/2026-10-28-界面与项目方向.md`。S3/S4/T010/T014/T015/T020/T021/T022/T025 用 Playwright 启动的 Edge/Desktop 在脚本结束时关闭，未留下进程。
 - 真实 `desktop` profile **未修改**；S2 的 Desktop 手测只在 `.tmp/` 下的隔离 `DSH_HOME` 中进行。
@@ -781,6 +781,120 @@
 - M4 范围：T035–T046 + U04，共 28 个提交；T046（G4 GO）与 U04 均已勾选。`task/m4-api-workbench` 远端保留，不再提交新工作；下一任务 T047 从 `main` 新建分支。
 - 未推送任何密钥或本地审查材料：`界面审查/*.docx` 未入库，`.tmp/` 全程 gitignore。
 
+### T047 — 工具 schema 与注册（2026-10-30，`task/m5-agent-integration`）
+
+- 目标：`vibe_status` / `vibe_observe` / `vibe_annotation_get` / `vibe_preview` 的模型可见 schema、注册函数、错误码统一与假服务单测（FR-AGENT-03/09/10 的前置）。
+- 依赖取舍：`@deepseek-ai/dsh-tools` 不是本包依赖，插件导入需从插件自身解析，**结构镜像而不新增依赖**（同 `ctx.credentials` 的做法）。DSH 强制子集：单一标量 `type`、标量 `enum`/`const`、`properties`/`required`、布尔 `additionalProperties`、`items`、独占 `oneOf`、注解 `description/title/default/examples`；`minimum`/`pattern`/`format`/`anyOf` 一律不认。
+- 文件：`src/host/agent/tools/definitions.ts`（specs + 自检 + 参数校验）、`src/host/agent/tools/register.ts`（定义装配、注册、错误归一、渲染）、`src/host/index.ts` 导出；`tests/unit/tools/{definitions,register}.test.ts`。
+- 形状：`VIBE_TOOL_SPECS` 是单一定义源；参数与输出都 object 根、`additionalProperties:false`；`vibe_status` 空参数，`vibe_annotation_get` 必填 `id`，`vibe_preview` 必填 `action`（`reload|navigate|screenshot|start|stop`），`vibe_observe` 可选 `detail`/`selector`/`include`。超时 10 s / 20 s / 10 s / 60 s，`exec.signal` 只做协作式取消。
+- 注册：`createVibeToolDefinitions(handlers)` 产出 `{name,description,parameters,output:{schema,render},timeoutMs,execute}`；`registerVibeTools(registry, handlers)` 返回幂等 disposer。执行链固定为 参数校验 → handler → 归一出错；未接实现返回 `unsupported`，坏参数 `invalid_input`（`details.violations`），`StudioError` 码保留，普通异常 `internal`。
+- 渲染：`renderToolResult` 只产一个 text block；紧凑 JSON 超 `OBSERVE_BUDGET_BYTES`（8 KB）即 `truncateUtf8` + `…`；循环引用退化为 `{"error":"unserializable tool result"}`，不抛。
+- **有意不接线**：`apply()` 不调用 `registerVibeTools`。实现体在 T048/T049，preset 可见性门禁在 T052；此刻注册会把四个尚无实现的工具暴露给标准会话，违反 T052「标准会话不受影响」与 FR 门禁。
+- 真实 DSH 校验：`.tmp/t047-schema-check.mjs` 载入构建产物 `lib/index.js` 与 DSH 自带 `assertObjectJsonSchema`/`validateJsonSchemaValue`，4 工具 × 参数/输出 schema + 有效/无效示例参数共 **16/16** 通过，`.tmp/logs/t047-schema-check.json` 为 `ok:true`。
+- 踩坑：`JsonSchemaObject` 起初写成 `interface`，TS2322（缺 string 索引签名）拒收为 `Record<string, unknown>`；改为 `type` 别名后自动获得隐式索引签名，无需 cast。
+- 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/unit/tools` 2 文件 / 22 用例；`pnpm test` **102 文件 / 919 用例**（基线 100/897）；`pnpm build` host **372.8** / client **440.5 KiB**；`pnpm test:e2e` **9/9**（15.1 s）。
+- 已知限制：四个工具没有实现体（T048/T049）；preset 可见性、审批与 hooks 未做（T052/T053）；schema 只覆盖当前契约字段，后续字段变更需同步 `definitions.ts` 与 `tests/unit/tools`。
+- 提交：`9f8cfb0`（`task/m5-agent-integration`，未推送、未合并）。
+
+### T048 — status/observe/annotation 实现（2026-10-30，`task/m5-agent-integration`）
+
+- 目标：三个只读工具的实际数据、摘要、8 KB 预算与不可信包裹（FR-AGENT-03/09/10）。
+- 文件：`src/host/agent/tools/{status,observe,annotation,preview-data}.ts`；支撑性新增 `src/host/preview/dom.ts` 与 `PreviewService.domSnapshot`；`src/host/index.ts` 导出；`tests/integration/tools/{status,observe,annotation,dom-snapshot}.test.ts`。
+- `vibe_status`：只读宿主自有数据（会话快照、缓冲区快照计数、`annotations.list({limit:1}).total`），不读页面源码；缓冲区只在 `ready` 时读取，`idle` 映射为工具词汇 `closed`；console/network 不可用时把原因写进 `summary` 而不是失败；`queued` 恒为 0（客户端队列宿主不可见，注释标明）；`stale` 留给 T053。
+- `vibe_observe`：`detail`（`summary` DOM 2 KB / `full` 4 KB）与 `include` 严格解析；每个 section 独立降级为摘要备注，只请求一个且它失败时抛真实错误，`invalid_input` 始终上抛；DOM/console/network 文本一律 `wrapUntrustedPageContent`（`source` 为 selector/`document`、`preview-console`、`preview-network`）；8 KB 适配在 handler 内完成——先丢 network/console 行（列表大者先），再按字节截 DOM——保证输出 JSON 可解析，而不是依赖注册层的字符串截断。
+- `vibe_annotation_get`：`history.get({id})`；用户评论（指令）在结构化字段与 `content` 中都在包裹之外，页面派生数据在 `renderAnnotationText` 的包裹内；有意不输出 `element.html` 的结构化副本；超长评论进入收缩循环，直到整体 ≤ 8 KB。
+- DOM 读取：`PreviewService.domSnapshot(params?)` 每次新建 CDP 会话、`Runtime.evaluate` 页内 `collectDomOutline`，`finally` 里 `detach`。页内上限 4 KB / 400 节点 / 14 层、跳过 script/style/noscript/template/meta/link/head 与 `hidden`/`aria-hidden`；回包在宿主再归一化（删控制字符、按字节截断、nodeCount ≤ 400）。畸形回包 `preview_failed`、坏选择器 `invalid_input`、无匹配 `not_found`。
+- **artifact id 未做（有意）**：仓库只有 `ArtifactRef` 契约，没有 artifact 存储/读取；FR-AGENT-10 的二次读取暂由 `detail:'full'` 承载，`artifactId` 等 T049 截图/artifact 路径落地后再接。
+- 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/tools` 4 文件 / 31 用例；`pnpm exec vitest run tests/unit/tools` 2 文件 / 22 用例；`pnpm test` **106 文件 / 950 用例**（T047 基线 102/919）；`pnpm build` host **398.7** / client **440.5 KiB**；`pnpm test:e2e` **9/9**（21.4 s）。
+- 已知限制：工具仍未接入 `apply()`（T052 门禁）；`vibe_preview` 与审批在 T049；`status.stale` 在 T053；DOM 摘要不含样式/计算布局，仅结构。
+
+### T049 — preview 工具与门禁（2026-10-30，`task/m5-agent-integration`）
+
+- 目标：`vibe_preview` 五个动作落地；origin 限制（FR-SEC-01 / SPEC 191）；`start`/`stop` 走 ask/审批；截图不把图像字节交给模型（FR-AGENT-09）。
+- 文件：新增 `src/host/agent/tools/preview.ts`、`src/host/artifacts/store.ts`、`src/host/preview/url.ts`（`isLoopbackHost` 单一实源）；`src/host/preview/session.ts` 增加 `captureScreenshot()`（能力缺 `screenshot` → `unsupported`，closed → `target_unavailable`，空字节 → `preview_failed`）；`src/host/index.ts` 导出；测试 `tests/integration/preview-tool/{preview,approval,capture}.test.ts`（18/10/5）与 `tests/unit/artifacts/artifact-store.test.ts`（19）。
+- origin 门禁（`navigate`/`start` 共用一条流水线）：先解析（只允许 http/https、不允许凭据、非 URL → `invalid_input{field:'url'}`）→ `isLoopbackHost`（非回环 → `permission_denied{host}`）→ `allowedOrigins` 包含 origin（否则 `permission_denied{origin}`）→ 预览必须 `ready`（`start` 例外）→ 与当前页同源（否则 `permission_denied{origin}`）。`file:`/`chrome:`/`devtools:`/`about:` 都在第一步被拒，用协议白名单而不是黑名单。此前 `allowedOrigins` 只有配置与契约，没有任何执行点，T049 是首个 enforcement 位置；把它放在 loopback 之后，错误信息才能区分“不是本地”和“不在允许名单”。
+- 动作语义：`reload` 只刷当前页，不做状态检查（由 `PreviewService.requireReady()` 抛 `target_unavailable`，保持服务是唯一状态机）；`navigate` 只换地址不重启；`start` 在已运行时**不**静默跳转，返回 “already running” + 当前 url；`stop` 幂等，未运行返回 “Preview was not running.”；`targetId` 只接受 `preview`（start 也接受当前 live id），其他值 `not_found{field:'targetId'}`。
+- 配置必须每次现读：`deps.config()` 是 getter，`screenshotEnabled`（关闭时 `permission_denied` 且不抓图）与 `retentionDays` 都在调用时读取，避免启动快照把开关钉死。
+- 截图落盘：`ArtifactStore` 写 `.vibe/artifacts/<id>.png` + sidecar `<id>.json`（`{version:1, artifact}`），返回的 `ArtifactRef` 带 `expiresAt = createdAt + retentionDays`；工具结果只含 `{artifactId, width?, height?, bytes}`，测试断言 JSON 里没有 base64 且 < 1 KB；store 侧 8 MiB 上限、`EPERM` 退避重试（4 次）、`ENOSPC` → `io`；错误经 `toArtifactStudioError` 映射为 Studio 词表（`path_outside_project` → `permission_denied`，`artifact_too_large` → `preview_failed`）。
+- 审批形态：DSH 的 `ToolRunContext` 没有 approval 字段，工具体无法自行 ask，因此门禁做成 `tools/pre-execute` 监听器 `createPreviewApprovalGate()`（`(exec, next) => previewApprovalDecision(exec) ?? next()`）。**非 ask 必须 `next()` 而不是返回 `{kind:'allow'}`**——`allow` 是终局决定，会跳过后续监听器（T053 的越权/stale 守卫）。`reason` 是不带空格的 `vibe_preview start <url>` 便于程序判定；`displayReason` 给人看（en + zh-CN），URL 截到 120 字符并剥控制字符，防止长 URL/终端转义污染弹窗。
+- 有意未接线：`apply()` 仍未注册工具、也未挂监听器；可见性与装配在 T052/T053，避免把未门禁的工具暴露给标准会话。
+- 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/preview-tool tests/unit/artifacts` 4 文件 / 52 用例；`pnpm test` **110 文件 / 1002 用例**（T048 基线 106/950，差值正好是新增 4 文件 52 用例）；`pnpm build` host **420.3** / client **440.5 KiB**；`pnpm test:e2e` **9/9**（23.6 s）。
+- 踩坑：①测试替身必须复刻 `requireReady()`——最初假 `PreviewService.reload()` 对 closed 会话照常返回，暴露的是测试不忠实而不是产品缺陷，应该在替身里复刻服务语义而不是放宽断言；②`preview.test.ts` 的临时目录必须在模块级 `beforeEach` 建（截图用例所在 describe 也要用），写在文件末尾的 `let` 只声明不赋值，`tsc` 抓不到这类顺序错误；③审批决策做 `toEqual` 时只放 JSON 可序列化的普通字符串，避免函数或 Symbol 让断言变脆。
+- 提交：`f2ecf60`（实现，`task/m5-agent-integration`，未推送、未合并）。
+
+### T050 — `/vibe` 命令（2026-10-30，`task/m5-agent-integration`）
+
+- 目标：注册 `/vibe`；返回状态 + 下一步建议；不执行危险动作；输出 ≤ 2 KB（FR-AGENT-05 的用户命令部分）。
+- 文件：新增 `src/host/agent/commands/vibe.ts`；`src/host/index.ts` 增加 `resolveCommandRegistry()`、`HostContext.commands`/`HostContext.get` 与 `/vibe` 装配、导出；测试 `tests/integration/command/vibe.test.ts`（14 用例）。
+- 结构化镜像 DSH 注册表：本包不依赖 `@deepseek-ai/dsh-commands`（与 T047 对 `dsh-tools` 的处理一致），`VibeCommandRegistry.register({name,description,input?,recordInput?,handler})` 只取用到的字段；`recordInput:false` 让 `/vibe` 的调用不写进会话日志的 `args`。
+- 单一数据源：处理器内部用 `createStatusHandler`（T048 的 `vibe_status` 实现）读状态，人命令和模型工具不会给出不一致的数字；输出三行——预览状态（含 URL 与 fps）、`控制台错误 / 网络失败 / 已保存标注`计数、一条“下一步”建议。建议按“最该先动的一件事”排序：失败→面板重启；未启动→面板启动或 `vibe_preview start`；有 console 错误→`vibe_observe` console；只有网络失败→`vibe_observe` network；有已保存标注→`vibe_annotation_get`；全好→点选元素写标注或 `vibe_observe`。
+- 无副作用：只调用 `preview.status()`、`consoleList()`/`networkList()`（仅 ready 时）与 `annotations.list({limit:1})`，不 start/stop/navigate/screenshot；**带参数时先返回用法错误，状态一次都不读**（用例断言 `calls` 全 0），避免半截子命令看起来执行了。
+- 预算：URL 先截到 200 字符（避免一条长地址吃掉整屏），整体再过 `truncateUtf8(…, 2048)`；当前真实输出 208 B。真实宿主里 URL 被截后总量远低于 2 KB，`truncateUtf8` 是防御性上限，测试断言字节数 ≤ 2048 并确认超长 URL 被裁掉。
+- 接线策略（与工具有意不同）：`apply()` 用 `ctx.get('commands')`（Cordis 的无 inject 读服务）取注册表，缺失时静默跳过——**不把 `commands` 加进 `inject`**，因为命令是 SHOULD、且加进去会让整个插件在缺 commands 的宿主里不激活（预览面板一起失效）；`ctx.commands` 在 Cordis 里未 inject 会抛错，所以裸测试宿主才回退读 `ctx.commands` 属性。命令按 DSH 自身惯例（`/feedback`、`/compact`）全局注册，不做 preset 门禁；工具门禁仍在 T052。
+- 真机校验：`.tmp/t050-command-check.mjs`（只读，无 profile、无浏览器、无模型）用真实 Cordis 加载真实 `@deepseek-ai/dsh-commands` 的 `CommandRuntime`，再挂载构建产物 `lib/index.js`，`ok:true`：①commands 服务在活；②`vibeStudio` 已提供；③`commands.find({}, 'vibe')` 命中；④处理器返回 208 B 中文文本；⑤dispose 插件 fiber 后 `/vibe` 从注册表移除。
+- 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/command` 1 文件 / 14 用例；`pnpm test` **111 文件 / 1016 用例**（T049 基线 110/1002）；`pnpm build` host **424.8** / client **440.5 KiB**；`pnpm test:e2e` **9/9**（16.9 s）。
+- 已知限制：`/vibe preview|api|verify` 子命令未做（FR-AGENT-05 的 SHOULD，任务清单未批准）；命令不保证能打开右栏 tab（plan §3 明确）；`stale` 提示在 T053。
+- 提交：`0d24707`（`task/m5-agent-integration`，未推送、未合并）；归档 `F:\Project\claudecode修改优化\2026-10-30-T050-vibe命令.md`。
+
+### T051 — Bundled skill（2026-10-30，`task/m5-agent-integration`）
+
+- 目标：`SKILL.md` + `references/`；`bundledSkillDir` 挂载；说明何时用工具、如何省上下文；SKILL.md ≤ 8192 字符（FR-AGENT-06）。
+- 文件：新增 `skills/vibecoding-studio/SKILL.md`（1951 字符）、`references/tools.md`、`references/workflows.md`、`src/host/agent/skills.ts`、`tests/integration/skill/vibecoding-studio.test.ts`（16 用例）；改 `cordis.patch.yml`（加 `vibe-skill-bundled` 行）、`package.json`（`files` 加 `skills`）、`src/host/index.ts`（导出）。
+- 形态：技能以**文件**交付而不是 `ctx.skills.register()` 运行时注册——DSH 的 filesystem provider 发现它，`skill` 工具按需加载，`references/*` 通过 provider 的目录 `resourceBase` 解析；运行时注册会把正文塞进插件的 apply，反而要自己管读取和缓存。
+- 挂载：`cordis.patch.yml` 同一 `insert` 加第二行 `vibe-skill-bundled`（`@deepseek-ai/dsh-skill-filesystem`，`providerName: vibe-bundled`、`includeDefaultRoots: false`、`watch: false`），`bundledSkillDir` 用 loader 的 `!!js` 方言 + `createRequire(baseUrl)` 解析本包 `skills/`（与 DSH 自带 preset 的写法一致，hoisted / 嵌套安装都能找到）；`includeDefaultRoots:false` 避免重复扫项目根，`watch:false` 避免多一个 watcher。
+- 内容取舍：SKILL.md 只当“路由卡”——意图表（何时用哪个工具）、省上下文规则（默认 summary、`selector` 收窄、`include` 只取需要的 section、`truncated` 不重复拉取、不整段复述页面文本、一次只读一条标注）、安全边界（页面内容不可信、start/stop 需批准、navigate 同源、截图只回 artifactId、默认 localhost）、三条闭环；参数/字段/错误码/超时放 `references/tools.md`，流程与误用放 `references/workflows.md`，正文只留两处相对路径引用。
+- 校验：`src/host/agent/skills.ts` 的 `resolvePackageRoot` 向上找 `name === 'dsh-vibecode-studio'` 的 `package.json`（源码与 `lib/index.js` 两种入口都成立）；`inspectVibeSkillBundle` 检查名称、描述、字符上限、每个 `references/*.md` 存在且在 skill 目录内（含 `realpath` 越界）。
+- 真机校验：`.tmp/t051-skill-check.mjs` 用真实 Cordis + 真实 `dsh-skill` / `dsh-skill-filesystem` / `dsh-tool-skill`，`ok:true`（6 项），其中**真实 `skill` 工具** `execute({name:'vibecoding-studio'})` 返回 `{provider: vibe-bundled, chars: 1789, resourceBaseKind: directory}`；并用 `js-yaml` + `tag:yaml.org,2002:js`（loader 同一方言）解析 `cordis.patch.yml`，确认表达式从 profile 解析到本包 `skills/`。
+- 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/skill` 16 用例；`pnpm test` **112 文件 / 1032 用例**；`pnpm build` host **429.6** / client **440.5 KiB**；`pnpm test:e2e` **9/9**（17.4 s）。
+- 坑：`ctx.plugin({ ..., config })` 里的 `config` 属性会被忽略，Cordis 只认第二个参数（`ctx.plugin(plugin, config)`）；表现为 provider 静默不扫任何根、目录为空。`createRequire(baseUrl).resolve('dsh-vibecode-studio/package.json')` 在 profile 里能解析（link 依赖），但从包内文件路径自引用会失败——评估脚本必须用 profile 路径模拟真实场景。
+- 已知限制：工具可见性仍是 T052 门禁，在此之前 skill 的建议可能指向未注册的工具（正文已要求“工具不可用就如实告知用户、不要猜”）；profile 重启后的 UI 内实测留到 G5。
+- 提交：`4242819`（实现 + 测试 + 文档；`task/m5-agent-integration`，未推送、未合并）；归档 `F:\Project\claudecode修改优化\2026-10-30-T051-bundled-skill.md`。
+
+### T052 — `Vibe Studio` preset（2026-10-30，`task/m5-agent-integration`）
+
+- 目标：新增可选 preset `Vibe Studio`——最小工具集（fs / fs-search / bash / pwsh / jobs / web / skill / plan / todo / ask-user / compaction）+ 四个 vibe 工具；**standard 不受影响**。
+- 文件：新增 `presets/vibe-studio/cordis.patch.yml`、`src/host/agent/preset.ts`、`tests/integration/preset/vibe-preset.test.ts`（16 用例）；改 `package.json`（`exports['./agent']`、`files` 加 `presets`、`dsh.bundle.patch` 改数组）、`scripts/build-host.mjs`（多入口）、`src/host/index.ts`（服务加 `artifacts`）、`tests/unit/config.test.ts`（精确对象断言补 `artifacts`）。
+- 形态：preset 行（`@deepseek-ai/dsh-agent-preset`，`order: 5`）的 `plugins` 里放**本包第二个入口** `dsh-vibecode-studio/agent`。不在这里重挂宿主插件：`apply()` 会再次 `registerTransport`/`registerPreviewRoutes`，同一进程里重复注册传输路由；而 agent 入口只做两件事——注册四个工具、挂 `tools/pre-execute` 审批门禁。
+- 可见性（为什么能只给这个 preset）：DSH 的 `preset-registry` 为每个 preset revision 在 `createScope` 下挂一棵 `PresetTree`，agent 把自己的 scope 父级绑到 generation key；`ctx.tools.register()` 写入的是**调用者的 scope 层**，所以 `vibe-tools` 在 mount scope 里注册的工具只被该 preset 的 agent 继承。宿主 patch 一行 agent-plane 工具都不加（`cordis.patch.yml` 至今没有 `dsh-agent-preset` 行），standard 的工具集合因此按构造不变。
+- 门禁：`apply()` 里 `ctx.on('tools/pre-execute', createPreviewApprovalGate())` 沿用 T049 的监听器；`tools/pre-execute` 是 waterfall，按 `scopeTarget(this, exec.agent)` 匹配——监听器的 ctx 在 preset scope 内，是被门禁 agent 的祖先 scope，所以只对这些 agent 生效。
+- 依赖与失效方式：`inject: ['tools', 'vibeStudio']`（`ctx.provide` 是真服务，注入即可保证顺序）；`vibeStudio` 缺席时**直接抛错**而不是静默空转——preset 装错时会话起不来，比四个工具凭空消失好排查。`apply()` 返回 disposer，工具与监听器一起释放。
+- 内容取舍：刻意**不放** goal / schedule / subagent / workflow / plugin-manager / present——面向初学者，复杂度留给 DSH 本体；bash 与 pwsh 按 `process.platform` 二选一（Windows 上是 pwsh）；`tool-fs-search` 关掉 `sampleOverCapGlobResults` 少给噪音；plan/compaction 用 `isolate` 分组（`planMode` / `compaction`+`toolResultPruner`），与 standard 的隔离方式一致。
+- 校验：`package.json` 的 `dsh.bundle.patch` 改成数组 `[./cordis.patch.yml, ./presets/vibe-studio/cordis.patch.yml]`（`dsh-web-app` 本身就是数组写法的先例），宿主 patch 先、preset patch 后；`build-host.mjs` 每产出一个入口就 import 一次，坏 ESM 在构建期就炸。
+- 真机校验：`F:\Deepseek-Harness\DH\bin\dsh.cmd --profile vibe-dev --dump-config` 退出码 0、stderr 空，1392 行落 `.tmp/logs/dump-vibe-dev-t052.txt`——`preset-vibe-studio` 在 L1260（与 standard L632 / ptc L796 / minimal L966 / cordis L1063 并列第五个），`vibe-tools → dsh-vibecode-studio/agent` 在 L1391–1392；`createRequire(profile/noop.js).resolve('dsh-vibecode-studio/agent')` 能解析到 `lib/agent.js`，说明 profile 里子路径导出可用。
+- 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/preset/vibe-preset.test.ts` 1 文件 / 16 用例；`pnpm test` **113 文件 / 1048 用例**（T051 基线 112/1032）；`pnpm build:host` **429.7** + **56.7 KiB**（`lib/index.js`、`lib/agent.js`），"host entries import cleanly"；`pnpm test:e2e` **9/9**（26.3 s）。
+- 未验证（如实记录）：**没有跑真实 Cordis mount**（要 agent scope + 完整宿主树），`--dump-config` 只证明组合与解析；preset 选择器里的可见性、会话内四个工具是否真的出现在工具列表，留给 G5/T054 手测。标准会话不受影响这一点，目前由“宿主 patch 无工具行 + scope 分层”的构造保证，而不是实测。
+- 坑：`pnpm test -- <path>` 不过滤，聚焦测试必须 `pnpm exec vitest run <path>`；`src/host/index.ts` 的服务对象是精确对象断言（`tests/unit/config.test.ts`），加 `artifacts` 字段必须同步补 `expect.anything()`，否则一个无关的红灯会掩盖真实回归。
+- 已知限制：preset 里的工具名是硬编码列表，T053 若增删工具需同步 `presets/vibe-studio/cordis.patch.yml`；`vibe_preview` 的截图落盘依赖宿主把 `process.cwd()` 当项目根（与 settings/annotations 同一假设，M1 起一致）。
+- 提交：`c439d8e`（实现 + 测试；`task/m5-agent-integration`，未推送、未合并）；归档 `F:\Project\claudecode修改优化\2026-10-30-T052-Vibe-Studio-preset.md`。
+
+### T053 — Hooks（过期提示/越权拦截）（2026-10-31，`task/m5-agent-integration`）
+
+- 目标：文件编辑后把运行中的预览标成“可能过期”，并在 `vibe_status` / `/vibe` / 工具栏三处提示；在 `tools/pre-execute` 直接拒绝越权的 `vibe_preview` 动作，**不误伤 standard**。
+- 文件：新增 `src/host/agent/hooks/{types,stale,guard}.ts`、`tests/integration/hooks/{stale,guard}.test.ts`；改 `src/host/agent/preset.ts`（注册两个监听器）、`src/contracts/transport.ts`（`stale?`）、`src/host/preview/session.ts`（`markStale` + 生命周期清位）、`src/host/agent/tools/status.ts`、`src/host/agent/commands/vibe.ts`、`src/host/agent/tools/preview.ts`（导出四个 URL 策略函数复用）、`src/client/preview/Toolbar.tsx`、`src/client/locales/{en,zh-CN}.json`；测试补 `session-lifecycle`、`tools/status`、`command/vibe`、`component/preview/toolbar`、`preset/vibe-preset`。
+- 形态：两个 hook 都是普通的 waterfall 监听器函数，形状与 `tools/*-execute` 的 `(exec, next) => decision` 一致；`hooks/types.ts` 只放**结构子集**类型（`PostToolDecision` / `PreToolDenyDecision`），不 import `@deepseek-ai/dsh-tools`，真实 decision 对象原样透传。
+- stale 语义：状态放在 `PreviewService`（`let stale`），`markStale()` 只在 `state === 'ready'` 时置位；`reload()` / `navigate()` / `runStop()` 清位，`runStart()` 在 `release()` 之后清位；快照 `stale?: boolean` **只在 true 时出现**，不给旧断言添字段。**ready 时重复 `start()` 是 no-op（不重载），所以不会清 stale**——这是行为，不是 bug，测试里专门断言。
+- 标记时机：`tools/post-execute` 先 `next()` 拿最终结果，仅 `accept` + `!isError` + 工具名 ∈ `{write, edit}` 时 `markStale()`。`bash`/`pwsh` 刻意排除：shell 改文件无法判定，会一次误判之后整个会话都挂 stale 徽标；被 block 的结果与失败结果不标。
+- 可见性（三处，同一字段）：`vibe_status` 输出 `stale: true` 并追加“文件已改动…reload”；`/vibe` 预览行追加 `· 可能过期（文件已改动）`，`suggestNextStep` 把“刷新重载”排在控制台错误之前（旧页面的报错可能已修掉）；工具栏 `[data-vibe-stale]` 徽标只在 `ready && stale` 渲染，文案走 i18n（`preview.stale.badge` / `.hint`）。
+- guard 决策表：截图开关关闭时的 `screenshot` → deny(`vibe-studio: screenshots are disabled in settings`)；`start`/`navigate` 的 url 非 loopback → deny(`not local`)；loopback 但 origin ∉ `allowedOrigins` → deny；已有页时 `navigate` 到不同 origin → deny；其余情况返回 `null` 并 `next()`。畸形参数（缺 url、非字符串、不可解析、`file:`）一律交给 schema/工具体报 `invalid_input`；`reload`/`stop` 永不放行失败；非 `vibe_preview` 不动。deny 结果带 `info: {name:'VibeToolError', code:'permission_denied'}`。
+- 顺序：guard 注册**在审批门禁之前**（`ctx.on` 按注册序串联），越权的 `start` 直接 deny，不会先弹审批再拒；guard≥0 位、stale=2 位，测试按索引取监听器并断言顺序 `['tools/pre-execute','tools/pre-execute','tools/post-execute']`。
+- 不误伤 standard：两个监听器都在 preset 的 `apply()` 内注册，`tools/*-execute` 用 `scopeTarget(this, exec.agent)` 匹配，standard 会话不在 preset scope 链上——按构造拿不到；不需要在 hook 里判断 preset 名。
+- 复用：`tools/preview.ts` 的 `parseHttpUrl` / `requireLoopback` / `requireAllowedOrigin` / `snapshotOrigin` 改为导出，guard 直接用同一套策略，避免两处 URL 判断漂移。
+- 验证：`pnpm typecheck` 0 error；`pnpm exec vitest run tests/integration/hooks tests/integration/preview/session-lifecycle.test.ts` 3 文件 / 27 用例；`pnpm test` **115 文件 / 1075 用例**（T052 基线 113/1048）；`pnpm build` host **430.6** + agent **59.1** / client **441.3 KiB**，"host entries import cleanly"；`pnpm test:e2e` **9/9**（44.0 s）。
+- 未验证（如实记录）：真实 Cordis mount 与 UI 内实测仍未做，留到 G5/T054；`bash`/`pwsh` 改文件不触发提示是刻意限制。
+- 坑：`ctx.on` 的监听器类型在 preset 里是三种 hook 的联合，测试里取 `Parameters<VibeAgentContext['on']>[1]` 再转 `CallableHook`（`...rest: unknown[]`）才能按需调用，否则 TS2554；`start()` 在 ready 时短路是 T025 的既有行为，写 stale 测试时别假设它会“重新加载”。
+- 已知限制：stale 只看 `write`/`edit` 两个工具名，agents 用别的写文件工具（如未来加的 patch 工具）需要同步 `EDITING_TOOL_NAMES`；guard 的跨源判断基于 `status().url`，页面自身重定向到别的 origin 时不会回写，留待后续需要时再评估。
+- 提交：`e90a91b`（`task/m5-agent-integration`，未推送、未合并）；归档 `F:\Project\claudecode修改优化\2026-10-31-T053-hooks过期提示与越权拦截.md`。
+
+### T054 — G5 Agent 评审（GO）（2026-10-31，`task/m5-agent-integration`）
+
+- 目标：在真实环境验证 preset 可选、工具可用、standard 不受影响、越权被拒、skill 加载、结果 ≤ 8 KB。
+- 方式：先做自动化证据（真实 `vibe-dev` DSH + Playwright + 真实模型会话，脚本 `.tmp/t054-*.mjs`，输出 `.tmp/logs/t054-*.json`），再把无法自动化的“预览启动一整套链路”整理成 `docs/2026-10-31-M5手动测试手册.md` 交用户手测；**评审期间未改产品代码**。
+- 自动化结果：`pnpm test` **115 文件 / 1075 用例**通过；模式菜单列出 **Vibe Studio**，选中后按钮文案随之变化；Vibe Studio 会话不调工具即可列出 `vibe_annotation_get vibe_observe vibe_preview vibe_status`，调用 `vibe_status` 返回约 208 B、`vibe_observe detail=full` 未开预览时约 270 B；标准模式会话对四个工具逐个回答“没有”；`start http://example.com/` 返回 `not local` 且**无审批弹窗**（guard 先于审批）；未授权的 `http://127.0.0.1:4320/` 返回 `origin ... is not in allowedOrigins`（默认名单不带端口，符合设计）；`skill` 工具返回 `<skill_content name="vibecoding-studio">`。
+- 用户手测：按手册完成 6 节（含预览启动→审批→Live→`vibe_observe` 真实 DOM 结果；第 6.4 stale 徽标为可选项），反馈“手测完毕，没有问题”，未提出返工项。
+- 结论：**GO，M5 完成**；评审结论已回写 `tasks/todo.md` T054。
+- 已知限制（非缺陷，保留在手册里）：`bash`/`pwsh` 改文件不标 stale；带端口的 loopback origin 需显式加入 `allowedOrigins`；页面自身跨源重定向不回写同源判断。
+- 提交：证据与手册 `6e17399`；收尾文档（todo/DEVLOG/HANDOFF）见本分支后续提交；未推送、未合并。归档 `F:\Project\claudecode修改优化\2026-10-31-T054-G5评审.md`。
+
 ## 3. 踩坑与已验证经验
 
 ### 构建 / 载体
@@ -923,6 +1037,14 @@
 3. **组件测试要能完全绕开 Host**：`setApiCollectionApi`/`setApiHistoryApi` 注入假实现，测试不碰 `.vibe` 也不碰 transport；“回放 → 保存 → 重开”的验收直接从 `openDraftInBuilder` 交接开始数点击，用假 Host 的 `add` 调用次数证明没有额外保存。
 4. **`pnpm test -- <path>` 不过滤**：`test` 是 `vitest run`，位置参数不会缩小范围；只跑某个目录要用 `pnpm exec vitest run <path>`。
 
+### Agent 工具 / 预算（T048）
+
+1. **8 KB 预算要在 handler 内“减内容”，不能靠注册层截字符串**：`renderToolResult` 的截断会把 JSON 切成非法文本，模型只能看到半截。observe 缩 DOM/丢条目、annotation 缩评论，最终输出都保持 `JSON.parse` 可解析。
+2. **`StudioError` 是普通对象，不是 `Error`**：测试假服务用 `instanceof Error` 判断失败会漏掉它，被当成正常快照使用。要么判 `isStudioError`，要么按形状（`'entries' in value`）区分。
+3. **handler 工厂返回 `unknown` 会让测试失去类型**：`VibeToolHandler` 的返回是 `unknown`，测试里 `output.dom` 全是 TS18046。给每个工厂定义具体返回类型的 handler 别名（`StatusHandler` 等），仍可直接赋给 `VibeToolHandler`。
+4. **契约词汇与工具词汇不同名**：`PreviewSessionState` 是 `idle|ready|failed`，工具 schema 用 `starting|ready|degraded|failed|closed`；映射集中在 `toToolPreviewState`，避免各工具各写一份。`ConsoleEntry.level` 也没有 `log`/`warning`，只有 `error|warn|debug|info`。
+5. **页内函数参数用 JSON 字面量拼接**：`(${fn.toString()})(${JSON.stringify(options)})` 让选择器里的引号/反斜杠安全；不要用模板字符串直接插值。
+
 ## 4. 已改变的计划假设
 
 | 决策 | 原假设 | 当前结论 | 证据 |
@@ -1005,6 +1127,10 @@ pnpm tsx spikes/s8/run.ts   # 进程生命周期，约 20 s，会自动清理
 - 抓包回放：`src/host/api/replay.ts`、`src/client/api/ReplayButton.tsx`、`src/host/preview/network.ts`（采集体上限）、`tests/integration/capture-replay/`、`.tmp/logs/t043-web.json`、`.tmp/t043-manual.mjs`。
 - 集合/历史 UI：`src/host/api/service.ts`（collection/history 方法）、`src/client/api/{ApiWorkbench,CollectionTree,HistoryList}.tsx`、`src/client/api/{collection-store,history-store,draft-store}.ts`、`tests/component/api-collections/`、`tests/unit/api-send/api-service-stores.test.ts`、`.tmp/logs/t044-web.json`、`.tmp/t044-manual.mjs`。
 - 断言：`src/host/api/assertions.ts`（`parseJsonPath`/`evaluateAssertions`）、`src/client/api/AssertionsEditor.tsx`、`tests/unit/assertions/`、`tests/component/api-request/assertions-editor.test.tsx`、`.tmp/logs/t045-web.json`、`.tmp/t045-manual.mjs`。
+- 工具 schema 与注册：`src/host/agent/tools/{definitions,register}.ts`、`tests/unit/tools/`、`.tmp/t047-schema-check.mjs`、DSH 校验结果 `.tmp/logs/t047-schema-check.json`。
+- 工具实现（状态/观察/标注）：`src/host/agent/tools/{status,observe,annotation,preview-data}.ts`、`src/host/preview/dom.ts`（`PreviewService.domSnapshot`）、`tests/integration/tools/`。
+- 预览工具与门禁：`src/host/agent/tools/preview.ts`（`createPreviewHandler`/`previewApprovalDecision`/`createPreviewApprovalGate`）、`src/host/artifacts/store.ts`、`src/host/preview/url.ts`、`tests/integration/preview-tool/`、`tests/unit/artifacts/`。
+- Vibe Studio preset：`presets/vibe-studio/cordis.patch.yml`（preset 行与工具集）、`src/host/agent/preset.ts`（agent 入口，`lib/agent.js`）、`tests/integration/preset/vibe-preset.test.ts`、`package.json`（`exports['./agent']` 与 `dsh.bundle.patch` 数组）、`scripts/build-host.mjs`（多入口）、组合证据 `.tmp/logs/dump-vibe-dev-t052.txt`（L1260 preset 行、L1391 `vibe-tools`）。
 - Web 预览：`src/host/targets/web/{adapter,launch}.ts`、`tests/integration/web-adapter/`、`tests/helpers/png.ts`。
 - 预览生命周期：`src/host/preview/session.ts`、`src/client/preview/{Toolbar.tsx,lifecycle.ts,local-url.ts}`、`tests/integration/preview/session-lifecycle.test.ts`、`.tmp/logs/t025-{host,desktop}.json`。
 - 技术决策：[plan.md](../tasks/plan.md)、[SPEC](./SPEC-vibecoding-studio.md)。

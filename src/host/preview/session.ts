@@ -57,12 +57,29 @@ import { createPreviewInputDispatcher } from './input'
 import type { PreviewNetworkCollector } from './network'
 import { createPreviewNetworkCollector } from './network'
 import { createScreencastSource, type ScreencastSource } from './screencast'
+import {
+  buildDomOutlineExpression,
+  isDomSnapshotParams,
+  parseDomOutlineResult,
+  type DomSnapshot,
+} from './dom'
 
-const PREVIEW_TARGET_ID = 'preview'
+export const PREVIEW_TARGET_ID = 'preview'
 const PREVIEW_TARGET_NAME = 'Preview'
 const DEFAULT_PREVIEW_KIND: TargetKind = 'web'
 /** Only used to satisfy config validation when a URL is already known. */
 const PLACEHOLDER_URL = 'http://127.0.0.1/'
+
+/**
+ * One captured PNG plus the viewport it was taken at (CSS pixels). The bytes
+ * stay on the host: callers store them as an artifact and hand out its id
+ * (FR-AGENT-09).
+ */
+export interface PreviewScreenshot {
+  readonly bytes: Uint8Array
+  readonly width: number | null
+  readonly height: number | null
+}
 
 export interface PreviewService {
   readonly buffer: PreviewFrameBuffer
@@ -80,10 +97,27 @@ export interface PreviewService {
   networkClear(): PreviewNetworkClearResult
   /** Fetches one response body on demand. */
   networkBody(params: unknown): Promise<PreviewNetworkBody>
+  /**
+   * Bounded DOM outline of the live page (T048). Read-only; it opens its own
+   * short-lived CDP session so a page evaluation never shares state with the
+   * screencast or input sessions.
+   */
+  domSnapshot(params?: unknown): Promise<DomSnapshot>
+  /**
+   * One PNG of the live page (T049). Capability-gated; the adapter decodes no
+   * pixels here, so the result is exactly what the browser renders.
+   */
+  captureScreenshot(): Promise<PreviewScreenshot>
   /** Registered adapters for the toolbar's target select (T025). */
   listTargets(): PreviewTargetsResult
   /** Navigates the live page after validating the URL (T025). */
   navigate(params: unknown): Promise<PreviewSessionSnapshot>
+  /**
+   * Marks the running page as possibly outdated after source files changed
+   * (T053). No-op while no page runs; the flag clears on start/reload/navigate
+   * and on stop.
+   */
+  markStale(): void
   /** Reloads the live page (T025). */
   reload(): Promise<PreviewSessionSnapshot>
   /** Resizes the live viewport; DPR needs a restart (T025). */
@@ -162,6 +196,9 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
   let viewport: TargetViewport | null = null
   let capabilities: TargetCapabilities | null = null
   let lastError: StudioError | undefined
+  // T053: files changed since this page loaded. Cleared whenever a fresh
+  // document takes over, so a reload makes the page current again.
+  let stale = false
   let startPromise: Promise<PreviewSessionSnapshot> | undefined
   let stopPromise: Promise<PreviewSessionSnapshot> | undefined
 
@@ -191,7 +228,17 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
       fps: source?.fps ?? fps,
       quality: source?.quality ?? quality,
     }
-    return lastError === undefined ? base : { ...base, lastError }
+    const withError = lastError === undefined ? base : { ...base, lastError }
+    return stale ? { ...withError, stale: true } : withError
+  }
+
+  /**
+   * T053: the agent edited a source file after this page loaded. The flag is
+   * advisory only — it never blocks input, and the next reload clears it.
+   */
+  function markStale(): void {
+    if (state !== 'ready') return
+    stale = true
   }
 
   async function release(): Promise<void> {
@@ -250,6 +297,8 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     // them before reusing the adapter so a restart cannot leak a browser.
     await release()
     lastError = undefined
+    // A new document loads fresh files, so any staleness from the old page ends.
+    stale = false
     targetId = null
     kind = null
     url = null
@@ -436,6 +485,92 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     return requireNetwork().body(params)
   }
 
+  /**
+   * Evaluate one bounded serializer in the live page. The CDP session is
+   * created per call and detached in `finally`: a failed or aborted read must
+   * not leave a handle behind, and the page may navigate between calls.
+   */
+  async function domSnapshot(params: unknown): Promise<DomSnapshot> {
+    if (params !== undefined && !isDomSnapshotParams(params)) {
+      throw studioError('invalid_input', 'vibe-studio: invalid DOM snapshot params', {
+        field: 'params',
+      })
+    }
+    const options = params ?? {}
+    const active = requireReady()
+    const page = typeof active.screencastPage === 'function' ? active.screencastPage() : undefined
+    if (!page) {
+      throw studioError('target_unavailable', 'vibe-studio: the preview page is not available', {
+        capability: 'dom',
+      })
+    }
+
+    let session: Awaited<ReturnType<typeof page.createCdpSession>>
+    try {
+      session = await page.createCdpSession()
+    } catch (error) {
+      throw toPreviewError(error)
+    }
+
+    let raw: unknown
+    try {
+      const result = (await session.send('Runtime.evaluate', {
+        expression: buildDomOutlineExpression(options),
+        returnByValue: true,
+        awaitPromise: false,
+      })) as { result?: { value?: unknown }; exceptionDetails?: unknown } | undefined
+      if (result && result.exceptionDetails) {
+        throw studioError('preview_failed', 'vibe-studio: the page failed to describe its DOM')
+      }
+      raw = result?.result?.value
+    } catch (error) {
+      throw toPreviewError(error)
+    } finally {
+      await session.detach().catch(() => undefined)
+    }
+
+    const parsed = parseDomOutlineResult(raw, options)
+    if (parsed.kind === 'invalid_selector') {
+      throw studioError('invalid_input', 'vibe-studio: invalid CSS selector', {
+        field: 'selector',
+      })
+    }
+    if (parsed.kind === 'not_found') {
+      throw studioError('not_found', 'vibe-studio: the selector matched no element', {
+        field: 'selector',
+      })
+    }
+    return parsed.snapshot
+  }
+
+  /**
+   * Screenshot through the adapter. Failures come back already mapped to a
+   * Studio error by the adapter, so only shape problems are added here.
+   */
+  async function captureScreenshot(): Promise<PreviewScreenshot> {
+    const active = requireReady()
+    if (!active.capabilities.screenshot || typeof active.screenshot !== 'function') {
+      throw studioError('unsupported', 'vibe-studio: the target does not support screenshots', {
+        capability: 'screenshot',
+      })
+    }
+    let bytes: Uint8Array
+    try {
+      bytes = await active.screenshot()
+    } catch (error) {
+      throw toPreviewError(error)
+    }
+    if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
+      throw studioError('preview_failed', 'vibe-studio: the screenshot capture returned no image')
+    }
+    const size = viewport
+    return {
+      bytes,
+      width: size?.width ?? null,
+      height: size?.height ?? null,
+    }
+  }
+
   function listTargets(): PreviewTargetsResult {
     return {
       targets: options.targets.list().map((entry) => ({ id: entry.id, kind: entry.kind })),
@@ -458,6 +593,7 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     url = params.url.trim()
     // The new document runs a fresh, idle picker script.
     picker?.reset()
+    stale = false
     return snapshot()
   }
 
@@ -473,6 +609,7 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
       })
     }
     picker?.reset()
+    stale = false
     return snapshot()
   }
 
@@ -574,6 +711,7 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     await release()
     state = 'idle'
     lastError = undefined
+    stale = false
     targetId = null
     kind = null
     url = null
@@ -604,9 +742,12 @@ export function createPreviewService(options: PreviewServiceOptions): PreviewSer
     networkList,
     networkClear,
     networkBody,
+    domSnapshot,
+    captureScreenshot,
     listTargets,
     navigate,
     reload,
+    markStale,
     setViewport,
     pickStart,
     pickStop,

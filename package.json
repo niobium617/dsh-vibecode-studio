@@ -9,11 +9,14 @@
   "main": "./lib/index.js",
   "exports": {
     ".": "./lib/index.js",
+    "./agent": "./lib/agent.js",
     "./client": "./lib/client.js",
     "./package.json": "./package.json"
   },
   "files": [
     "lib",
+    "presets",
+    "skills",
     "cordis.patch.yml"
   ],
   "engines": {
@@ -22,7 +25,10 @@
   },
   "dsh": {
     "bundle": {
-      "patch": "./cordis.patch.yml"
+      "patch": [
+        "./cordis.patch.yml",
+        "./presets/vibe-studio/cordis.patch.yml"
+      ]
     },
     "client": {
       "platform": "web",
